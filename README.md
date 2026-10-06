@@ -8,6 +8,62 @@ First user: ScienceMadeReadable.
 - [hosting-lesson.md](hosting-lesson.md): how hosting on lambda works (systemd, cgroups, NixOS, tunnels).
 - `experiments/`: measured design questions, each script with its log.
 
+## The search API (running since 2026-10-06)
+
+**https://lambda.tail69222b.ts.net:18810** (tailnet only; local `http://127.0.0.1:8810`).
+Covers every embedded English title+abstract published from 2024-01-01: **63,814,851 papers**.
+
+```sh
+curl -G https://lambda.tail69222b.ts.net:18810/search --data-urlencode "q=sleep apnea and atrial fibrillation" -d k=5
+curl -G .../search --data-urlencode "q=CRISPR base editing sickle cell" -d pmc_open_access=true -d license=cc-by -d type=article
+curl .../similar/10.1073/pnas.2532413123?k=5        # by DOI, W-id or PMCID
+curl .../works/PMC13552904
+curl .../health
+```
+
+Filters: `year_from`, `year_to`, `type`, `open_access`, `license`, `pmc_open_access`
+(the article's full text is in our PMC mirror), `abstracts=false`. Retracted works and
+paratext (covers, tables of contents) are left out unless asked for. Each result carries
+OpenAlex id, DOI, PMCID, title, authors (first 12 + count), venue, year, type, licence,
+open-access status, citations, links, abstract and a similarity score. `timing` shows where the
+time went.
+
+How a search works: DenseOn encodes the question on CPU (`query:` prompt) → exact comparison
+with the 16,384 list centres → the 64 closest lists are scanned with 1-bit RaBitQ codes
+(7.2 GB in RAM) → the best 300 are re-scored exactly with the original float16 vectors, read in
+parallel from the embedding shards (no copy) → details from SQLite (72.6 GB, by id/DOI/PMCID).
+Measured on the busy machine: ~110 ms median per search (encoding ~80 ms), 240 ms worst of 12.
+
+Running it (transient user unit: survives logout, not a reboot; to be declared in NixOS):
+
+```sh
+systemd-run --user --unit=srl-search -p CPUWeight=1000 -p MemoryMax=24G -p LimitNOFILE=65536 \
+  -p Restart=on-failure -p WorkingDirectory=$PWD -E TOKENIZERS_PARALLELISM=false \
+  -p ExecStartPre="-/run/current-system/sw/bin/tailscale serve --bg --https=18810 http://127.0.0.1:8810" \
+  $PWD/.venv/bin/uvicorn srl_search.app:app --host 127.0.0.1 --port 8810
+```
+
+Building (2024+ took 48 min for the index, 30 min for the details on a loaded machine):
+
+```sh
+uv run python build_index.py --min-date 2024-01-01 --out /mnt/fast/scholarsreadinglist/search/index-2024plus
+uv run python build_metadata.py --min-date 2024-01-01 --out /mnt/fast/scholarsreadinglist/search/meta-2024plus.sqlite
+uv run python eval_index.py --index ... --meta ... --out experiments/eval-2024plus.json
+```
+
+Lessons from the first build:
+
+- Exact list assignment of 64M papers against 16k centres is ~1.6e15 flops: the build uses an
+  HNSW router (57k papers/s). At search time that router, at its default efSearch=16, missed the
+  single best list for 17-20% of questions; the service routes exactly instead (~1-3 ms).
+- OpenMP's thread count is per calling thread: the model and FAISS must not be called from web
+  worker threads without setting it (the encoder runs on one dedicated thread).
+- Reading 300 scattered vectors through mmap page faults took ~1 s cold; parallel `pread`
+  takes 10-60 ms.
+- 2.9M of the 63.8M rows (4.6%) are exact duplicate texts (BacDive strain templates x65,210,
+  DEPRECATED Zenodo records, journal covers). Results collapse identical records; the next
+  build should index each distinct text once and leave boilerplate out.
+
 Data lives outside the repository:
 
 - vectors: `/mnt/fast/openalex-embeddings/denseon-english-abstracts/` (`pipeline/embeddings`)

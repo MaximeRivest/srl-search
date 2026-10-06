@@ -1,0 +1,22 @@
+[project]
+name = "scholarsreadinglist-search"
+version = "0.1.0"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+  "faiss-cpu==1.15.1",
+  "numpy==2.5.3",
+  "pyarrow==25.0.1",
+  "torch==2.11.0",
+  "sentence-transformers==5.3.0",
+  "transformers==5.3.0",
+  "fastapi==0.115.12",
+  "uvicorn==0.34.2",
+  "duckdb==1.4.1",
+]
+
+[dependency-groups]
+dev = ["pytest==9.1.1", "httpx==0.28.1"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
