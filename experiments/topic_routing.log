@@ -1,0 +1,25 @@
+papers 4398697 21s
+labelled 2337246 topics 4516 54s
+
+A  k-means: 4096 groups, size mean 570, max 3538, largest 1% of groups hold 4% of papers
+    4 groups searched: questions recall 0.521 (scanned 2,508) | papers-as-queries recall 0.848 (scanned 3,130)
+    8 groups searched: questions recall 0.628 (scanned 5,008) | papers-as-queries recall 0.913 (scanned 5,843)
+   16 groups searched: questions recall 0.715 (scanned 9,904) | papers-as-queries recall 0.949 (scanned 10,655)
+   32 groups searched: questions recall 0.799 (scanned 19,541) | papers-as-queries recall 0.971 (scanned 20,442)
+   64 groups searched: questions recall 0.858 (scanned 38,320) | papers-as-queries recall 0.980 (scanned 39,045)
+
+B  topic centres, nearest-centre assignment: 4516 groups, size mean 586, max 116566, largest 1% of groups hold 39% of papers
+    4 groups searched: questions recall 0.559 (scanned 2,987) | papers-as-queries recall 0.857 (scanned 25,608)
+    8 groups searched: questions recall 0.646 (scanned 5,381) | papers-as-queries recall 0.907 (scanned 31,900)
+   16 groups searched: questions recall 0.721 (scanned 9,984) | papers-as-queries recall 0.939 (scanned 40,482)
+   32 groups searched: questions recall 0.788 (scanned 18,364) | papers-as-queries recall 0.959 (scanned 52,383)
+   64 groups searched: questions recall 0.841 (scanned 34,547) | papers-as-queries recall 0.973 (scanned 74,293)
+
+C  topic centres, labelled-topic assignment: 4516 groups, size mean 517, max 208922, largest 1% of groups hold 27% of papers
+    4 groups searched: questions recall 0.398 (scanned 2,635) | papers-as-queries recall 0.386 (scanned 17,239)
+    8 groups searched: questions recall 0.471 (scanned 4,945) | papers-as-queries recall 0.453 (scanned 21,835)
+   16 groups searched: questions recall 0.543 (scanned 9,279) | papers-as-queries recall 0.532 (scanned 36,762)
+   32 groups searched: questions recall 0.607 (scanned 18,007) | papers-as-queries recall 0.576 (scanned 50,392)
+   64 groups searched: questions recall 0.661 (scanned 34,603) | papers-as-queries recall 0.620 (scanned 73,022)
+
+total 2043s
