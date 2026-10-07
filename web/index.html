@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Paper search · test</title>
+<style>
+  :root { color-scheme: light dark; --bg: #fff; --fg: #1d1d1f; --muted: #6b6f76; --line: #e3e4e8;
+          --panel: #f5f6f8; --accent: #2457c5; --good: #1f7a3a; --warn: #9a5b00; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #16171a; --fg: #e8e8ea; --muted: #9a9ca3; --line: #2c2e33; --panel: #1f2125;
+            --accent: #7aa2ff; --good: #5fc27e; --warn: #e0a64a; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg);
+         font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 900px; margin: 0 auto; padding: 20px 16px 60px; }
+  h1 { font-size: 18px; margin: 0 0 4px; }
+  .sub { color: var(--muted); font-size: 13px; margin-bottom: 14px; }
+  form { display: grid; gap: 10px; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  input[type=search] { flex: 1; min-width: 240px; font-size: 16px; padding: 10px 12px;
+         border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--fg); }
+  button { font: inherit; padding: 9px 16px; border-radius: 8px; border: 1px solid var(--accent);
+           background: var(--accent); color: #fff; cursor: pointer; }
+  button.ghost { background: transparent; color: var(--accent); padding: 3px 9px; font-size: 13px; }
+  .filters { font-size: 13px; color: var(--muted); gap: 12px; }
+  .filters input[type=number] { width: 72px; }
+  .filters select, .filters input[type=number] { font: inherit; padding: 3px 5px; border-radius: 6px;
+           border: 1px solid var(--line); background: var(--bg); color: var(--fg); }
+  label { display: inline-flex; gap: 5px; align-items: center; white-space: nowrap; }
+  #status { color: var(--muted); font-size: 13px; margin: 16px 0 6px; min-height: 18px; }
+  #status b { color: var(--fg); font-weight: 600; }
+  .banner { background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+            padding: 8px 12px; font-size: 13px; margin: 10px 0; display: none; }
+  .banner a { color: var(--accent); }
+  ol { list-style: none; padding: 0; margin: 0; }
+  li.hit { border-top: 1px solid var(--line); padding: 14px 0; }
+  .title { font-size: 16px; font-weight: 600; color: var(--fg); text-decoration: none; }
+  .title:hover { text-decoration: underline; }
+  .meta { color: var(--muted); font-size: 13px; margin-top: 3px; }
+  .badges { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; align-items: center; }
+  .badge { font-size: 12px; border: 1px solid var(--line); border-radius: 999px; padding: 1px 8px; color: var(--muted); }
+  .badge.good { color: var(--good); border-color: currentColor; }
+  .badge.warn { color: var(--warn); border-color: currentColor; }
+  .score { font-variant-numeric: tabular-nums; }
+  .abstract { margin-top: 8px; font-size: 14px; color: var(--fg); white-space: pre-line; }
+  .abstract.clamped { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .links { display: flex; gap: 12px; font-size: 13px; margin-top: 6px; flex-wrap: wrap; }
+  .links a { color: var(--accent); text-decoration: none; }
+  .links a:hover { text-decoration: underline; }
+  .err { color: #c0392b; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Paper search <span style="color:var(--muted);font-weight:400">· test page</span></h1>
+  <div class="sub" id="about">Semantic search over English titles and abstracts.</div>
+
+  <form id="f">
+    <div class="row">
+      <input type="search" id="q" name="q" placeholder="Describe what you're looking for, in plain words…" autofocus>
+      <button type="submit">Search</button>
+    </div>
+    <div class="row filters">
+      <label>Years <input type="number" id="year_from" placeholder="from"> – <input type="number" id="year_to" placeholder="to"></label>
+      <label>Type
+        <select id="type">
+          <option value="">any</option><option>article</option><option>review</option><option>preprint</option>
+          <option>book-chapter</option><option>book</option><option>conference-paper</option>
+          <option>dissertation</option><option>dataset</option><option>letter</option><option>editorial</option>
+        </select>
+      </label>
+      <label><input type="checkbox" id="open_access"> open access</label>
+      <label><input type="checkbox" id="ccby"> CC BY</label>
+      <label><input type="checkbox" id="pmc_open_access"> full text in PubMed Central</label>
+      <label>Show <select id="k"><option>10</option><option selected>25</option><option>50</option><option>100</option></select></label>
+    </div>
+  </form>
+
+  <div class="banner" id="banner"></div>
+  <div id="status"></div>
+  <ol id="results"></ol>
+</main>
+
+<script>
+// Served by the API itself (same origin), or opened elsewhere: then talk to lambda over the tailnet.
+const API = ["18810", "8810"].includes(location.port) ? "" : "https://lambda.tail69222b.ts.net:18810";
+const $ = (id) => document.getElementById(id);
+const FIELDS = ["q", "year_from", "year_to", "type", "k"];
+const CHECKS = ["open_access", "ccby", "pmc_open_access"];
+
+function el(tag, attrs = {}, ...kids) {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k === "class") e.className = v; else if (k === "text") e.textContent = v; else e.setAttribute(k, v);
+  }
+  for (const c of kids) if (c != null) e.append(c);
+  return e;
+}
+const plain = (s) => (s || "").replace(/<[^>]+>/g, "").replace(/\s+\n/g, "\n").trim();
+
+function readForm() {
+  const p = new URLSearchParams();
+  for (const f of FIELDS) { const v = $(f).value.trim(); if (v) p.set(f, v); }
+  for (const c of CHECKS) if ($(c).checked) p.set(c, "1");
+  return p;
+}
+function writeForm(p) {
+  for (const f of FIELDS) $(f).value = p.get(f) || (f === "k" ? "25" : "");
+  for (const c of CHECKS) $(c).checked = p.has(c);
+}
+function apiParams(p) {
+  const a = new URLSearchParams();
+  for (const f of ["year_from", "year_to", "type", "k"]) if (p.get(f)) a.set(f, p.get(f));
+  if (p.has("open_access")) a.set("open_access", "true");
+  if (p.has("pmc_open_access")) a.set("pmc_open_access", "true");
+  if (p.has("ccby")) a.set("license", "cc-by");
+  return a;
+}
+
+let run = 0;
+async function go(p) {
+  const mine = ++run;
+  const similar = p.get("similar");
+  const a = apiParams(p);
+  let url;
+  if (similar) { url = `${API}/similar/${encodeURIComponent(similar)}?${a}`; }
+  else if ((p.get("q") || "").length >= 2) { a.set("q", p.get("q")); url = `${API}/search?${a}`; }
+  else { $("status").textContent = ""; $("results").replaceChildren(); $("banner").style.display = "none"; return; }
+
+  $("status").textContent = "Searching…";
+  const t0 = performance.now();
+  let d;
+  try {
+    const r = await fetch(url);
+    d = await r.json();
+    if (!r.ok) throw new Error(d.detail || r.statusText);
+  } catch (e) {
+    if (mine === run) $("status").replaceChildren(el("span", { class: "err", text: "Search failed: " + e.message }));
+    return;
+  }
+  if (mine !== run) return;
+  const ms = Math.round(performance.now() - t0), t = d.timing || {};
+  $("status").innerHTML = "";
+  const parts = [];
+  if (t.encode_ms) parts.push(`understanding the question ${Math.round(t.encode_ms)}`);
+  parts.push(`finding ${Math.round((t.ivf_ms || 0) + (t.rerank_ms || 0))}`, `details ${Math.round(t.details_ms || 0)}`);
+  $("status").append(el("b", { text: `${d.results.length} results` }),
+    ` in ${Math.round(t.total_ms)} ms on the server (${parts.join(", ")}) · ${ms} ms in total`);
+  if (similar) {
+    const back = el("a", { href: "#", text: "back to your search" });
+    back.onclick = (e) => { e.preventDefault(); history.back(); };
+    $("banner").replaceChildren(`Papers most similar to ${similar} · `, back);
+    $("banner").style.display = "block";
+  } else $("banner").style.display = "none";
+  $("results").replaceChildren(...d.results.map(card));
+}
+
+function card(r) {
+  const link = r.doi ? `https://doi.org/${r.doi}` : r.openalex;
+  const authors = (r.authors || "").split(" | ").filter(Boolean);
+  const who = authors.length ? authors.slice(0, 4).join(", ") + (r.authors_count > 4 ? ` +${r.authors_count - 4}` : "") : "";
+  const badges = el("div", { class: "badges" },
+    el("span", { class: "badge score", title: "similarity to your question (0–1)", text: r.score.toFixed(3) }),
+    r.type ? el("span", { class: "badge", text: r.type }) : null,
+    r.license ? el("span", { class: "badge" + (r.license === "cc-by" || r.license === "cc0" || r.license === "public-domain" ? " good" : ""), text: r.license }) : null,
+    r.is_oa ? el("span", { class: "badge good", text: "open access" }) : null,
+    r.pmc_oa ? el("span", { class: "badge good", title: "full text in our PubMed Central copy", text: "PMC full text" }) : null,
+    r.citations ? el("span", { class: "badge", text: `${r.citations} citations` }) : null);
+  const abs = plain(r.abstract);
+  const absEl = abs ? el("div", { class: "abstract clamped", text: abs, title: "click to expand" }) : null;
+  if (absEl) absEl.onclick = () => absEl.classList.toggle("clamped");
+  const sim = el("button", { class: "ghost", type: "button", text: "more like this" });
+  sim.onclick = () => navigate({ similar: r.id });
+  const links = el("div", { class: "links" },
+    r.doi ? el("a", { href: `https://doi.org/${r.doi}`, target: "_blank", rel: "noopener", text: "DOI" }) : null,
+    el("a", { href: r.openalex, target: "_blank", rel: "noopener", text: "OpenAlex" }),
+    r.pmcid ? el("a", { href: `https://pmc.ncbi.nlm.nih.gov/articles/${r.pmcid}/`, target: "_blank", rel: "noopener", text: r.pmcid }) : null,
+    r.pdf_url ? el("a", { href: r.pdf_url, target: "_blank", rel: "noopener", text: "PDF" }) : null,
+    sim);
+  return el("li", { class: "hit" },
+    el("a", { class: "title", href: link, target: "_blank", rel: "noopener", text: plain(r.title) || "(no title)" }),
+    el("div", { class: "meta", text: [who, r.venue, r.year].filter(Boolean).join(" · ") }),
+    badges, absEl, links);
+}
+
+function navigate(extra) {
+  const p = readForm();
+  if (extra && extra.similar) { p.set("similar", extra.similar); }
+  history.pushState(null, "", "?" + p);
+  go(p);
+}
+$("f").onsubmit = (e) => { e.preventDefault(); navigate(); };
+for (const id of [...CHECKS, "type", "k"]) $(id).onchange = () => { if ($("q").value.trim().length >= 2) navigate(); };
+window.onpopstate = () => { const p = new URLSearchParams(location.search); writeForm(p); go(p); };
+
+fetch(`${API}/health`).then((r) => r.json()).then((h) => {
+  $("about").textContent = `Semantic search over ${h.papers.toLocaleString()} English titles and abstracts ` +
+    `published from ${h.published_from} (OpenAlex). Matches by meaning, not exact words.`;
+}).catch(() => { $("about").replaceChildren(el("span", { class: "err", text: "Can't reach the search service." })); });
+
+const start = new URLSearchParams(location.search);
+writeForm(start);
+go(start);
+</script>
+</body>
+</html>

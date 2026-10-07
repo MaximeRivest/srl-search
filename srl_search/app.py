@@ -6,6 +6,7 @@
   GET /similar/{ref}?k=10           papers closest to a paper (W123, DOI or PMCID)
   GET /works/{ref}                  one paper's details
   GET /health                       what this index covers
+  GET /                             a small test page to search and browse (web/index.html)
 
 Run: SRL_INDEX=... SRL_META=... uvicorn srl_search.app:app --host 127.0.0.1 --port 8810
 """
@@ -15,6 +16,8 @@ import os
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Query
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 
 from srl_search.engine import Engine
 
@@ -24,6 +27,14 @@ NPROBE = int(os.environ.get("SRL_NPROBE", "128"))  # eval 2026-10-06: recall@10 
 DEPTH = int(os.environ.get("SRL_DEPTH", "300"))
 
 app = FastAPI(title="Scholars Reading List search", version="0.1")
+# Read-only GETs; lets the test page work when opened from another address (e.g. a preview panel).
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["GET"])
+PAGE = Path(__file__).resolve().parent.parent / "web" / "index.html"
+
+
+@app.get("/", include_in_schema=False)
+def page():
+    return FileResponse(PAGE, headers={"Cache-Control": "no-cache"})
 engine = Engine(INDEX, META, threads=int(os.environ.get("SRL_THREADS", "4")))
 
 
