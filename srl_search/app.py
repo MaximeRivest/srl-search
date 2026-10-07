@@ -20,7 +20,7 @@ from srl_search.engine import Engine
 
 INDEX = Path(os.environ.get("SRL_INDEX", "/mnt/fast/scholarsreadinglist/search/index-2024plus"))
 META = Path(os.environ.get("SRL_META", "/mnt/fast/scholarsreadinglist/search/meta-2024plus.sqlite"))
-NPROBE = int(os.environ.get("SRL_NPROBE", "64"))
+NPROBE = int(os.environ.get("SRL_NPROBE", "128"))  # eval 2026-10-06: recall@10 0.89, ~37 ms search
 DEPTH = int(os.environ.get("SRL_DEPTH", "300"))
 
 app = FastAPI(title="Scholars Reading List search", version="0.1")

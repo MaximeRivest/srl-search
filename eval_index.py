@@ -71,7 +71,10 @@ def exact_top(engine: Engine, Q: np.ndarray, k: int = 10, threads: int = 24) -> 
     t = time.time()
     for n, (first, x, _) in enumerate(engine.vectors.iter_shards()):
         s = Q @ x.astype(np.float32).T
-        idx = np.argpartition(-s, k, axis=1)[:, :k]
+        if s.shape[1] <= k:  # small shard: every row is a candidate
+            idx = np.tile(np.arange(s.shape[1]), (len(Q), 1))
+        else:
+            idx = np.argpartition(-s, k, axis=1)[:, :k]
         cs = np.take_along_axis(s, idx, axis=1)
         allp = np.concatenate([best_p, idx + first], axis=1)
         alls = np.concatenate([best_s, cs], axis=1)
@@ -105,9 +108,17 @@ def main() -> None:
     Q = np.concatenate([sets[n] for n in names])
     owner = np.concatenate([[n] * len(sets[n]) for n in names])
 
-    print("exact search over every paper...", flush=True)
+    import hashlib
+    key = hashlib.sha256(Q.tobytes()).hexdigest()[:16]
+    cache = a.index / f"eval-exact-top10-{key}.npy"
     t = time.time()
-    gt = exact_top(engine, Q)
+    if cache.exists():
+        gt = np.load(cache)
+        print("exact answers loaded from", cache, flush=True)
+    else:
+        print("exact search over every paper...", flush=True)
+        gt = exact_top(engine, Q)
+        np.save(cache, gt)
     exact_s = time.time() - t
     faiss.omp_set_num_threads(4)
 

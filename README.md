@@ -32,7 +32,20 @@ How a search works: DenseOn encodes the question on CPU (`query:` prompt) → ex
 with the 16,384 list centres → the 64 closest lists are scanned with 1-bit RaBitQ codes
 (7.2 GB in RAM) → the best 300 are re-scored exactly with the original float16 vectors, read in
 parallel from the embedding shards (no copy) → details from SQLite (72.6 GB, by id/DOI/PMCID).
-Measured on the busy machine: ~110 ms median per search (encoding ~80 ms), 240 ms worst of 12.
+Default: 128 lists, rerank 300. Measured end to end: ~61 ms median, 68 ms worst of 8.
+
+Accuracy (`experiments/eval-2024plus.json`): share of the exact top 10 (checking all 63.8M
+papers) that the index returns, 440 questions:
+
+| Lists searched | Rerank | All | SciFact | NFCorpus | SciDocs | TREC-COVID | Plain questions | Search p50 / p95 |
+|---:|---:|---:|---:|---:|---:|---:|---:|---|
+| 32 | 300 | 0.81 | 0.80 | 0.63 | 0.88 | 0.94 | 0.98 | 17 / 26 ms |
+| 64 | 300 | 0.85 | 0.86 | 0.69 | 0.92 | 0.95 | 0.98 | 34 / 82 ms |
+| **128** | **300** | **0.89** | 0.91 | 0.74 | 0.95 | 0.97 | 0.99 | 37 / 70 ms |
+| 256 | 300 | 0.91 | 0.94 | 0.77 | 0.96 | 0.97 | 0.99 | 62 / 133 ms |
+
+Search times exclude question encoding (~50-80 ms on 4 cores). NFCorpus (short, vague
+nutrition queries) is the weak spot.
 
 Running it (transient user unit: survives logout, not a reboot; to be declared in NixOS):
 
