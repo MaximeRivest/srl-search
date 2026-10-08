@@ -59,7 +59,7 @@
 
   <form id="f">
     <div class="row">
-      <input type="search" id="q" name="q" placeholder="Describe what you're looking for, in plain words…" autofocus>
+      <input type="search" id="q" name="q" placeholder='Plain words for meaning; "quotes", AND / OR / NOT for exact words…' autofocus>
       <button type="submit">Search</button>
     </div>
     <div class="row filters">
@@ -74,6 +74,14 @@
       <label><input type="checkbox" id="open_access"> open access</label>
       <label><input type="checkbox" id="ccby"> CC BY</label>
       <label><input type="checkbox" id="pmc_open_access"> full text in PubMed Central</label>
+      <label>Search
+        <select id="mode">
+          <option value="">automatic</option><option value="semantic">by meaning</option><option value="keyword">exact words</option>
+        </select>
+      </label>
+      <label>Collection
+        <select id="collection"><option value="">all papers</option><option value="smr">ScienceMadeReadable</option></select>
+      </label>
       <label>Show <select id="k"><option>10</option><option selected>25</option><option>50</option><option>100</option></select></label>
     </div>
   </form>
@@ -87,7 +95,7 @@
 // Served by the API itself (same origin), or opened elsewhere: then talk to lambda over the tailnet.
 const API = ["18810", "8810"].includes(location.port) ? "" : "https://lambda.tail69222b.ts.net:18810";
 const $ = (id) => document.getElementById(id);
-const FIELDS = ["q", "year_from", "year_to", "type", "k"];
+const FIELDS = ["q", "year_from", "year_to", "type", "k", "mode", "collection"];
 const CHECKS = ["open_access", "ccby", "pmc_open_access"];
 
 function el(tag, attrs = {}, ...kids) {
@@ -112,7 +120,7 @@ function writeForm(p) {
 }
 function apiParams(p) {
   const a = new URLSearchParams();
-  for (const f of ["year_from", "year_to", "type", "k"]) if (p.get(f)) a.set(f, p.get(f));
+  for (const f of ["year_from", "year_to", "type", "k", "mode", "collection"]) if (p.get(f)) a.set(f, p.get(f));
   if (p.has("open_access")) a.set("open_access", "true");
   if (p.has("pmc_open_access")) a.set("pmc_open_access", "true");
   if (p.has("ccby")) a.set("license", "cc-by");
@@ -125,7 +133,7 @@ async function go(p) {
   const similar = p.get("similar");
   const a = apiParams(p);
   let url;
-  if (similar) { url = `${API}/similar/${encodeURIComponent(similar)}?${a}`; }
+  if (similar) { a.delete("mode"); url = `${API}/similar/${encodeURIComponent(similar)}?${a}`; }
   else if ((p.get("q") || "").length >= 2) { a.set("q", p.get("q")); url = `${API}/search?${a}`; }
   else { $("status").textContent = ""; $("results").replaceChildren(); $("banner").style.display = "none"; return; }
 
@@ -145,8 +153,13 @@ async function go(p) {
   $("status").innerHTML = "";
   const parts = [];
   if (t.encode_ms) parts.push(`understanding the question ${Math.round(t.encode_ms)}`);
-  parts.push(`finding ${Math.round((t.ivf_ms || 0) + (t.rerank_ms || 0))}`, `details ${Math.round(t.details_ms || 0)}`);
-  $("status").append(el("b", { text: `${d.results.length} results` }),
+  if (d.mode === "keyword") parts.push(`word index ${Math.round(t.keyword_ms)}`);
+  else parts.push(`finding ${Math.round((t.ivf_ms || 0) + (t.rerank_ms || 0) + (t.exact_ms || 0))}`);
+  parts.push(`details ${Math.round(t.details_ms || 0)}`);
+  const how = d.mode === "keyword"
+    ? `Exact words · ${d.matches.toLocaleString()} papers match · understood as ${d.query} · `
+    : "By meaning · ";
+  $("status").append(how, el("b", { text: `${d.results.length} results` }),
     ` in ${Math.round(t.total_ms)} ms on the server (${parts.join(", ")}) · ${ms} ms in total`);
   if (similar) {
     const back = el("a", { href: "#", text: "back to your search" });
@@ -192,12 +205,14 @@ function navigate(extra) {
   go(p);
 }
 $("f").onsubmit = (e) => { e.preventDefault(); navigate(); };
-for (const id of [...CHECKS, "type", "k"]) $(id).onchange = () => { if ($("q").value.trim().length >= 2) navigate(); };
+for (const id of [...CHECKS, "type", "k", "mode", "collection"]) $(id).onchange = () => { if ($("q").value.trim().length >= 2) navigate(); };
 window.onpopstate = () => { const p = new URLSearchParams(location.search); writeForm(p); go(p); };
 
 fetch(`${API}/health`).then((r) => r.json()).then((h) => {
-  $("about").textContent = `Semantic search over ${h.papers.toLocaleString()} English titles and abstracts ` +
-    `published from ${h.published_from} (OpenAlex). Matches by meaning, not exact words.`;
+  const kw = h.keyword ? ` Exact-word search (quotes, AND / OR / NOT, word*, title:) covers all ` +
+    `${h.keyword.papers.toLocaleString()}.` : "";
+  $("about").textContent = `Search by meaning over ${h.papers.toLocaleString()} English titles and abstracts ` +
+    `published from ${h.published_from} (OpenAlex).` + kw;
 }).catch(() => { $("about").replaceChildren(el("span", { class: "err", text: "Can't reach the search service." })); });
 
 const start = new URLSearchParams(location.search);

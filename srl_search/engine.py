@@ -83,7 +83,7 @@ class Engine:
     def details(self, work_ids: list[int]) -> dict[int, dict]:
         if not work_ids:
             return {}
-        q = f"SELECT {','.join(FIELDS)} FROM works WHERE id IN ({','.join('?' * len(work_ids))})"
+        q = f"SELECT * FROM works WHERE id IN ({','.join('?' * len(work_ids))})"
         return {r["id"]: dict(r) for r in self.db().execute(q, work_ids)}
 
     def position_of(self, work_id: int) -> int | None:
@@ -152,18 +152,12 @@ class Engine:
         q = self.vectors.get(np.array([pos]))[0]
         return self._finish(q, k, nprobe, depth, filters, abstracts, {}, t0, exclude=work_id)
 
-    def _finish(self, q, k, nprobe, depth, filters, abstracts, timing, t0, exclude=None) -> dict:
-        filters = {f: v for f, v in (filters or {}).items() if v is not None}
-        if filters:
-            depth = max(depth, 2000)
-        hits, t = self.search_vector(q, k, nprobe, depth, exclude=exclude)
-        timing.update(t)
-        t = time.perf_counter()
-        results = []
-        seen = set()  # identical records (same title + abstract) count once
-        # fetch details in pages until k results pass the filters (or candidates run out)
-        for start in range(0, len(hits), 200 if filters else k):
-            page = hits[start:start + (200 if filters else k)]
+    def shape(self, hits: list[tuple[int, float]], k: int, filters: dict, abstracts: bool) -> list[dict]:
+        """Details for scored ids, best first: filters applied, identical records once, k at most."""
+        results, seen = [], set()
+        step = 200 if filters else max(k, 20)
+        for start in range(0, len(hits), step):
+            page = hits[start:start + step]
             det = self.details([w for w, _ in page])
             for w, s in page:
                 d = det.get(w)
@@ -180,9 +174,17 @@ class Engine:
                 d["id"] = f"W{w}"
                 results.append(d)
                 if len(results) == k:
-                    break
-            if len(results) == k:
-                break
+                    return results
+        return results
+
+    def _finish(self, q, k, nprobe, depth, filters, abstracts, timing, t0, exclude=None) -> dict:
+        filters = {f: v for f, v in (filters or {}).items() if v is not None}
+        if filters:
+            depth = max(depth, 2000)
+        hits, t = self.search_vector(q, k, nprobe, depth, exclude=exclude)
+        timing.update(t)
+        t = time.perf_counter()
+        results = self.shape(hits, k, filters, abstracts)
         timing["details_ms"] = round((time.perf_counter() - t) * 1000, 1)
         timing["total_ms"] = round((time.perf_counter() - t0) * 1000, 1)
         return {"results": results, "timing": timing, "filters": filters}
@@ -192,7 +194,8 @@ class ExactEngine(Engine):
     """A small collection whose stored vectors are the original fp16 ones (scores are exact); ids are
     OpenAlex W-numbers. Flat (every paper compared) or IVF (the `nprobe` closest groups compared)."""
 
-    def __init__(self, collection_dir: Path, threads: int = 4, encoder: "Encoder | None" = None, nprobe: int = 512):
+    def __init__(self, collection_dir: Path, threads: int = 4, encoder: "Encoder | None" = None, nprobe: int = 512,
+                 meta_path: Path | None = None):
         self.threads = threads
         self.manifest = json.loads((collection_dir / "manifest.json").read_text())
         self.manifest.setdefault("min_date", self.manifest.get("oldest_shard_date"))
@@ -201,7 +204,7 @@ class ExactEngine(Engine):
         if ivf is not None:
             ivf.nprobe = nprobe
             ivf.set_direct_map_type(faiss.DirectMap.Hashtable)  # reconstruct(W-number) for "similar"
-        self.meta_path = collection_dir / "meta.sqlite"
+        self.meta_path = meta_path or collection_dir / "meta.sqlite"
         self.local = threading.local()
         self.encoder = encoder
 

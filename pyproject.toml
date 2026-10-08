@@ -12,6 +12,7 @@ dependencies = [
   "fastapi==0.115.12",
   "uvicorn==0.34.2",
   "duckdb==1.4.1",
+  "tantivy==0.25.0",
 ]
 
 [dependency-groups]
