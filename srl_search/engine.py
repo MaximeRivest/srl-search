@@ -188,6 +188,40 @@ class Engine:
         return {"results": results, "timing": timing, "filters": filters}
 
 
+class ExactEngine(Engine):
+    """A small collection whose stored vectors are the original fp16 ones (scores are exact); ids are
+    OpenAlex W-numbers. Flat (every paper compared) or IVF (the `nprobe` closest groups compared)."""
+
+    def __init__(self, collection_dir: Path, threads: int = 4, encoder: "Encoder | None" = None, nprobe: int = 512):
+        self.threads = threads
+        self.manifest = json.loads((collection_dir / "manifest.json").read_text())
+        self.manifest.setdefault("min_date", self.manifest.get("oldest_shard_date"))
+        self.index = faiss.read_index(str(collection_dir / "index.faiss"))
+        ivf = faiss.try_extract_index_ivf(self.index)
+        if ivf is not None:
+            ivf.nprobe = nprobe
+            ivf.set_direct_map_type(faiss.DirectMap.Hashtable)  # reconstruct(W-number) for "similar"
+        self.meta_path = collection_dir / "meta.sqlite"
+        self.local = threading.local()
+        self.encoder = encoder
+
+    def search_vector(self, q, k, nprobe, depth, keep=None, exclude=None):
+        faiss.omp_set_num_threads(self.threads)
+        t = time.perf_counter()
+        scores, ids = self.index.search(q.reshape(1, -1).astype(np.float32), depth)
+        m = ids[0] >= 0
+        hits = [(int(w), float(s)) for w, s in zip(ids[0][m], scores[0][m]) if w != exclude]
+        return hits, {"candidates": int(m.sum()), "exact_ms": round((time.perf_counter() - t) * 1000, 1)}
+
+    def similar(self, work_id, k=10, nprobe=0, depth=300, filters=None, abstracts=True):
+        t0 = time.perf_counter()
+        try:
+            q = self.index.reconstruct(int(work_id))
+        except RuntimeError:  # not in this collection
+            return None
+        return self._finish(q, k, nprobe, depth, filters, abstracts, {}, t0, exclude=work_id)
+
+
 def passes(d: dict, f: dict) -> bool:
     if "year_from" in f and (d["year"] is None or d["year"] < f["year_from"]):
         return False

@@ -19,7 +19,7 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 
-from srl_search.engine import Engine
+from srl_search.engine import Engine, ExactEngine
 
 INDEX = Path(os.environ.get("SRL_INDEX", "/mnt/fast/scholarsreadinglist/search/index-2024plus"))
 META = Path(os.environ.get("SRL_META", "/mnt/fast/scholarsreadinglist/search/meta-2024plus.sqlite"))
@@ -36,6 +36,20 @@ PAGE = Path(__file__).resolve().parent.parent / "web" / "index.html"
 def page():
     return FileResponse(PAGE, headers={"Cache-Control": "no-cache"})
 engine = Engine(INDEX, META, threads=int(os.environ.get("SRL_THREADS", "4")))
+# Collections searched exactly, by name: ?collection=smr (ScienceMadeReadable: papers it can open).
+COLLECTIONS = {"all": engine}
+SMR = os.environ.get("SRL_SMR")
+if SMR:
+    # 512 of 4,096 groups: 99% of the exact top 15 for plain questions, ~45 ms (experiments/smr_hnsw.log)
+    COLLECTIONS["smr"] = ExactEngine(Path(SMR), threads=4, encoder=engine.encoder,
+                                     nprobe=int(os.environ.get("SRL_SMR_NPROBE", "512")))
+
+
+def pick(collection: str):
+    e = COLLECTIONS.get(collection)
+    if e is None:
+        raise HTTPException(404, f"unknown collection {collection!r}; have {sorted(COLLECTIONS)}")
+    return e
 
 
 def filters(year_from, year_to, type, open_access, license, pmc_open_access):
@@ -45,9 +59,13 @@ def filters(year_from, year_to, type, open_access, license, pmc_open_access):
 
 
 @app.get("/health")
-def health():
+def health(collection: str = "all"):
+    if collection != "all":
+        m = pick(collection).manifest
+        return {"collection": collection, "papers": m["papers"], "published_from": m["min_date"],
+                "rule": m.get("rule"), "built_utc": m["created_utc"], "collections": sorted(COLLECTIONS)}
     m = engine.manifest
-    return {"papers": m["papers"], "published_from": m["min_date"], "index": m["index"]["factory"],
+    return {"collections": sorted(COLLECTIONS), "papers": m["papers"], "published_from": m["min_date"], "index": m["index"]["factory"],
             "model": "lightonai/DenseOn", "searched_text": "English title + abstract (first 512 tokens)",
             "built_utc": m["created_utc"]}
 
@@ -57,8 +75,8 @@ def search(q: str = Query(..., min_length=2, max_length=2000), k: int = Query(10
            year_from: int | None = None, year_to: int | None = None, type: str | None = None,
            open_access: bool = False, license: str | None = None, pmc_open_access: bool = False,
            abstracts: bool = True, nprobe: int = Query(NPROBE, ge=1, le=1024),
-           depth: int = Query(DEPTH, ge=10, le=5000)):
-    return engine.search(q, k, nprobe, depth,
+           depth: int = Query(DEPTH, ge=10, le=5000), collection: str = "all"):
+    return pick(collection).search(q, k, nprobe, depth,
                          filters(year_from, year_to, type, open_access, license, pmc_open_access), abstracts)
 
 
@@ -66,20 +84,23 @@ def search(q: str = Query(..., min_length=2, max_length=2000), k: int = Query(10
 def similar(ref: str, k: int = Query(10, ge=1, le=100), year_from: int | None = None,
             year_to: int | None = None, type: str | None = None, open_access: bool = False,
             license: str | None = None, pmc_open_access: bool = False, abstracts: bool = True,
-            nprobe: int = Query(NPROBE, ge=1, le=1024), depth: int = Query(DEPTH, ge=10, le=5000)):
-    w = engine.resolve(ref)
-    out = engine.similar(w, k, nprobe, depth,
+            nprobe: int = Query(NPROBE, ge=1, le=1024), depth: int = Query(DEPTH, ge=10, le=5000),
+            collection: str = "all"):
+    e = pick(collection)
+    w = e.resolve(ref)
+    out = e.similar(w, k, nprobe, depth,
                          filters(year_from, year_to, type, open_access, license, pmc_open_access),
                          abstracts) if w is not None else None
     if out is None:
-        raise HTTPException(404, f"{ref} is not in this index (published from {engine.manifest['min_date']})")
+        raise HTTPException(404, f"{ref} is not in collection {collection!r}")
     return out
 
 
 @app.get("/works/{ref:path}")
-def work(ref: str):
-    w = engine.resolve(ref)
-    d = engine.details([w]).get(w) if w is not None else None
+def work(ref: str, collection: str = "all"):
+    e = pick(collection)
+    w = e.resolve(ref)
+    d = e.details([w]).get(w) if w is not None else None
     if d is None:
         raise HTTPException(404, f"{ref} is not in this index")
     d["id"] = f"W{w}"

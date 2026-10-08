@@ -1,0 +1,11 @@
+vectors (3052236, 768)
+nlist 4096: built in 312s
+  nprobe  32: recall@15 0.728  p50 3.6 ms  p95 30.9 ms
+  nprobe  64: recall@15 0.781  p50 6.4 ms  p95 46.5 ms
+  nprobe 128: recall@15 0.829  p50 11.9 ms  p95 40.8 ms
+  nprobe 256: recall@15 0.877  p50 22.3 ms  p95 24.5 ms
+nlist 8192: built in 442s
+  nprobe  32: recall@15 0.723  p50 2.9 ms  p95 3.3 ms
+  nprobe  64: recall@15 0.773  p50 4.2 ms  p95 4.9 ms
+  nprobe 128: recall@15 0.822  p50 6.9 ms  p95 7.8 ms
+  nprobe 256: recall@15 0.864  p50 12.5 ms  p95 14.6 ms

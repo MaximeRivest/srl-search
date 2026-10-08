@@ -47,7 +47,8 @@ papers) that the index returns, 440 questions:
 Search times exclude question encoding (~50-80 ms on 4 cores). NFCorpus (short, vague
 nutrition queries) is the weak spot.
 
-Running it (transient user unit: survives logout, not a reboot; to be declared in NixOS):
+Running it (transient user unit: survives logout, not a reboot; to be declared in NixOS.
+Until then a reboot leaves the site on its Europe PMC fallback):
 
 ```sh
 systemd-run --user --unit=srl-search -p CPUWeight=1000 -p MemoryMax=24G -p LimitNOFILE=65536 \
@@ -76,6 +77,35 @@ Lessons from the first build:
 - 2.9M of the 63.8M rows (4.6%) are exact duplicate texts (BacDive strain templates x65,210,
   DEPRECATED Zenodo records, journal covers). Results collapse identical records; the next
   build should index each distinct text once and leave boilerplate out.
+
+## Collection `smr`: what ScienceMadeReadable searches (live since 2026-10-08)
+
+`/search?collection=smr&q=...` (also `/similar`, `/works`, `/health?collection=smr`).
+Papers the site can open: in our PMC mirror with NCBI licence code **CC BY** and JATS
+article-type **research-article**, DOI-matched to an embedded OpenAlex title+abstract.
+2026-10-08 build (`/mnt/fast/scholarsreadinglist/search/smr-2026-10-08`): 3,944,966 PMC
+candidates → 3,173,358 OpenAlex matches → **3,052,236 embedded** (publication dates from
+2017-08; older ones arrive as the backfill continues).
+
+IVF with 4,096 groups over the original fp16 vectors (scores exact), 512 groups searched:
+99% of the exact top 15 for plain questions, 89% for NFCorpus-style terse queries; ~85 ms
+end to end. Comparing all 3M papers took 360 ms (`experiments/smr_ivf.log`, `smr_hnsw.log`).
+
+The site reaches it through its queue server's public door (`/api/search` in
+`sciencemadereadable/app/server.py`: collection fixed to `smr`, 30 searches/min per address,
+words not stored) and falls back to Europe PMC when it fails or takes over 7 s.
+
+Refresh (after more embeddings): ~10 min build, then restart the service on the new folder.
+
+```sh
+uv run python build_smr.py --out /mnt/fast/scholarsreadinglist/search/smr-$(date +%F)
+# then recreate srl-search with -E SRL_SMR=<new folder> (stopping a transient unit deletes it)
+```
+
+Known gap: on devices running Tailscale, the machine's name resolves to its private address,
+and Chrome blocks/asks before a public page calls it, so those visitors get the Europe PMC
+fallback (and "GPU offline"). The server answers the private-network preflight; the real fix
+is a public hostname of our own (tunnel/relay, planned).
 
 Data lives outside the repository:
 

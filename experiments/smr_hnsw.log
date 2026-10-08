@@ -1,0 +1,14 @@
+  IVF4096 nprobe 256: plain questions 0.991 (23.2 ms) | NFCorpus 0.821 (22.3 ms)
+  IVF4096 nprobe 512: plain questions 0.992 (44.2 ms) | NFCorpus 0.886 (44.5 ms)
+  IVF4096 nprobe 1024: plain questions 0.997 (88.0 ms) | NFCorpus 0.934 (87.7 ms)
+HNSW M=32 efConstruction=80 built in 597s
+Traceback (most recent call last):
+  File "/home/maxime/Projects/scholarsreadinglist/search/experiments/smr_hnsw.py", line 46, in <module>
+    hm = faiss.IndexIDMap2(h)
+         ^^^^^^^^^^^^^^^^^^^^
+  File "/home/maxime/Projects/scholarsreadinglist/search/.venv/lib/python3.12/site-packages/faiss/__init__.py", line 254, in replacement_init
+    original_init(self, *args)
+  File "/home/maxime/Projects/scholarsreadinglist/search/.venv/lib/python3.12/site-packages/faiss/swigfaiss.py", line 13943, in __init__
+    _swigfaiss.IndexIDMap2_swiginit(self, _swigfaiss.new_IndexIDMap2(*args))
+                                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+RuntimeError: Error in faiss::IndexIDMapTemplate<IndexT>::IndexIDMapTemplate(IndexT*) [with IndexT = faiss::Index] at /project/faiss/IndexIDMap.cpp:53: Error: '!(index_->ntotal == 0)' failed: index must be empty on input

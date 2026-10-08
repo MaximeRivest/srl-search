@@ -52,16 +52,23 @@ def main() -> None:
     if a.out.exists():
         raise SystemExit(f"{a.out} exists")
     t0 = time.time()
-
     shards = select_shards(a.min_date)
     wanted = np.unique(np.concatenate([np.load(SHARDS / s["dir"] / "work_ids.npy") for s in shards])).astype(np.int64)
     folders = sorted({s["dir"].split("/")[0] for s in shards})
     print(f"{len(wanted):,} works from {len(folders)} source folders ({time.time()-t0:.0f}s)", flush=True)
+    build(wanted, folders, a.out, a.threads, a.memory)
 
-    tmpdir = a.out.parent / (a.out.name + ".duckdb-tmp")
+
+def build(wanted: np.ndarray, folders: list[str], out: Path, threads: int = 8, memory: str = "30GB") -> int:
+    """Details for the given W-numbers from the given content year folders, into SQLite at `out`."""
+    t0 = time.time()
+    if out.exists():
+        raise SystemExit(f"{out} exists")
+    wanted = np.unique(np.asarray(wanted, dtype=np.int64))
+    tmpdir = out.parent / (out.name + ".duckdb-tmp")
     tmpdir.mkdir(parents=True, exist_ok=True)
     con = duckdb.connect()
-    con.execute(f"SET threads={a.threads}; SET memory_limit='{a.memory}'; SET temp_directory='{tmpdir}';"
+    con.execute(f"SET threads={threads}; SET memory_limit='{memory}'; SET temp_directory='{tmpdir}';"
                 "SET preserve_insertion_order=false;")
     con.register("wanted", pa.table({"id": wanted}))
     oa = pa.table({"pmcid": [l.split(".")[0] for l in PMC_OA.read_text().split()]})
@@ -102,7 +109,7 @@ def main() -> None:
         raise SystemExit(f"{dup:,} duplicate work ids in the content rows")
     print(f"selected, joined and sorted {n:,} rows ({time.time()-t0:.0f}s)", flush=True)
 
-    tmp = a.out.with_suffix(".sqlite.tmp")
+    tmp = out.with_suffix(".sqlite.tmp")
     tmp.unlink(missing_ok=True)
     db = sqlite3.connect(tmp)
     db.executescript("PRAGMA page_size=8192;" + SCHEMA)
@@ -122,11 +129,12 @@ def main() -> None:
     db.execute("CREATE INDEX works_pmcid ON works(pmcid)")
     db.commit()
     db.close()
-    os.replace(tmp, a.out)
+    os.replace(tmp, out)
     sorted_parquet.unlink()
     tmpdir.rmdir() if not any(tmpdir.iterdir()) else None
     print(f"done: {done:,} works ({len(wanted) - done:,} index works without a content row); "
-          f"{a.out.stat().st_size/1e9:.1f} GB in {time.time()-t0:.0f}s", flush=True)
+          f"{out.stat().st_size/1e9:.1f} GB in {time.time()-t0:.0f}s", flush=True)
+    return done
 
 
 if __name__ == "__main__":
