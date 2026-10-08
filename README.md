@@ -53,6 +53,7 @@ Until then a reboot leaves the site on its Europe PMC fallback):
 ```sh
 systemd-run --user --unit=srl-search -p CPUWeight=1000 -p MemoryMax=24G -p LimitNOFILE=65536 \
   -p Restart=on-failure -p WorkingDirectory=$PWD -E TOKENIZERS_PARALLELISM=false \
+  -E SRL_SMR=/mnt/fast/scholarsreadinglist/search/smr-2026-10-08 \
   -p ExecStartPre="-/run/current-system/sw/bin/tailscale serve --bg --https=18810 http://127.0.0.1:8810" \
   $PWD/.venv/bin/uvicorn srl_search.app:app --host 127.0.0.1 --port 8810
 ```
