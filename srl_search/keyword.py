@@ -104,16 +104,14 @@ class KeywordIndex:
                                              f.get("year_from", -9999), f.get("year_to", 9999))))
         if f.get("type"):
             out.append((O.Must, Q.term_query(S, "type", f["type"])))
-        else:  # covers, tables of contents, issue information
-            out.append((O.MustNot, Q.term_query(S, "type", "paratext")))
+        # Covers/tables of contents and retracted papers are dropped from the returned page by
+        # Engine.shape (they are rare); as index clauses they cost 30-100 ms on broad queries.
         if f.get("license"):
             out.append((O.Must, Q.term_query(S, "license", f["license"])))
         if f.get("open_access"):
             out.append((O.Must, Q.term_query(S, "oa", 1)))
         if f.get("pmc_open_access"):
             out.append((O.Must, Q.term_query(S, "pmc_oa", 1)))
-        if f.get("exclude_retracted", True):
-            out.append((O.MustNot, Q.term_query(S, "retracted", 1)))
         return out
 
     def search(self, q: str, k: int, filters: dict, collection: str = "all") -> tuple[list[tuple[int, float]], int, str]:

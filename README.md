@@ -54,6 +54,7 @@ Until then a reboot leaves the site on its Europe PMC fallback):
 systemd-run --user --unit=srl-search -p CPUWeight=1000 -p MemoryMax=24G -p LimitNOFILE=65536 \
   -p Restart=on-failure -p WorkingDirectory=$PWD -E TOKENIZERS_PARALLELISM=false \
   -E SRL_SMR=/mnt/fast/scholarsreadinglist/search/smr-2026-10-08 \
+  -E SRL_CORPUS=/mnt/fast/scholarsreadinglist/search/corpus-2026-10-05 \
   -p ExecStartPre="-/run/current-system/sw/bin/tailscale serve --bg --https=18810 http://127.0.0.1:8810" \
   $PWD/.venv/bin/uvicorn srl_search.app:app --host 127.0.0.1 --port 8810
 ```
@@ -79,6 +80,36 @@ Lessons from the first build:
   DEPRECATED Zenodo records, journal covers). Results collapse identical records; the next
   build should index each distinct text once and leave boilerplate out.
 
+## The shared corpus (since 2026-10-08)
+
+One "paper universe" for every project (API, test page, ScienceMadeReadable, the MCP server):
+the **203,486,035** works the embedding plan selected (English, non-empty abstract; same
+snapshot, count checked equal). `/mnt/fast/scholarsreadinglist/search/corpus-2026-10-05/`:
+
+| File | What | Size | Build |
+|---|---|---:|---:|
+| `parts/*.parquet` | selection + PMC flags, the input of the next two | 83 GB | 41 min |
+| `works.sqlite` | details by W-number / DOI (NOCASE) / PMCID: title, authors (12 + count), venue, year, type, licence, OA, citations, links, topic, keywords, MeSH, abstract; `pmcid`, `pmc_oa` (full text in our mirror), `pmc_license`, `pmc_type`, `smr` (site can open it) | 330 GB | 64 min |
+| `keywords/` | tantivy: title, abstract, keywords (OpenAlex keywords + MeSH), English stemming, positions; year/type/licence/OA/PMC/smr filters | 71 GB | 51 min |
+| `vocabulary-keywords-mesh.parquet` | the 87,007 distinct OpenAlex keyword + MeSH terms with counts | small | 2 min |
+
+`build_corpus.py parts|sqlite|keywords`. Semantic indexes and collections refer to the same
+W-numbers, so every mode and collection shares one details store.
+
+### Search modes
+
+`/search?mode=auto` (default) picks **keyword** when the query uses search syntax, else
+**semantic**. Keyword syntax (`srl_search/keyword.py`): plain words are ANDed; `"phrases"`,
+`OR`, `NOT`/`-word`, brackets, `word*`, `"a b"~5`, `title:` / `abstract:` / `keywords:`. Answers
+carry `matches` (exact count) and `query` (as understood). Keyword search covers all 203.5M
+papers now; semantic `all` covers 2024+ until the full rebuild.
+
+Measured warm over 203.5M (`all`) / the site's openable subset (`smr`): selective queries
+4-140 ms; a single very common word 120-320 ms (`cancer`: 5.65M matches). The paratext and
+retraction exclusions are applied to the returned page, not in the index (they cost 30-100 ms).
+SQLite FTS5 was tried first on 3M papers: fine for selective queries, 250 ms for one common word
+(it ranks every match); tantivy's top-k skipping and 36%-of-text index size scale better.
+
 ## Collection `smr`: what ScienceMadeReadable searches (live since 2026-10-08)
 
 `/search?collection=smr&q=...` (also `/similar`, `/works`, `/health?collection=smr`).
@@ -93,8 +124,9 @@ IVF with 4,096 groups over the original fp16 vectors (scores exact), 512 groups 
 end to end. Comparing all 3M papers took 360 ms (`experiments/smr_ivf.log`, `smr_hnsw.log`).
 
 The site reaches it through its queue server's public door (`/api/search` in
-`sciencemadereadable/app/server.py`: collection fixed to `smr`, 30 searches/min per address,
-words not stored) and falls back to Europe PMC when it fails or takes over 7 s.
+`sciencemadereadable/app/server.py`: collection fixed to `smr`, `mode=auto`, 30 searches/min per
+address, words not stored). Exact-word searches there cover openable papers of every year
+(keyword index), searches by meaning those embedded so far and falls back to Europe PMC when it fails or takes over 7 s.
 
 Refresh (after more embeddings): ~10 min build, then restart the service on the new folder.
 
@@ -134,3 +166,12 @@ several times more papers for the same recall. Topic labels as group membership 
 a third of the results. LLM-written archetype papers would at best match the topic-centre
 row. Decision: data-driven (k-means) groups for the index; a topic tree as a browsing,
 filtering and evaluation layer on top.
+
+### Aho-Corasick term counting (measured 2026-10-08, not built)
+
+Vocabulary: the 87,007 OpenAlex keyword + MeSH terms. pyahocorasick on 200k abstracts:
+~9,000 abstracts/s/core with whole-word checks (all 203.5M ≈ 12 min on 32 cores). Raw
+substring matching is unusable ("ion", "men", "sed" top the counts); generic terms ("data",
+"methods") dominate without weighting. Fits as a concept layer: per-paper tags, term × year
+counts, autocomplete, phrase detection; not a replacement for the keyword index, which
+matches any word and counts any phrase on demand.

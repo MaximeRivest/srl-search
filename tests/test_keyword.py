@@ -48,7 +48,7 @@ def test_keyword_index(tmp_path):
     w.commit(); w.wait_merging_threads()
     k = KeywordIndex(tmp_path)
     ids = lambda q, f={}, c="all": [h for h, _ in k.search(q, 10, f, c)[0]]
-    assert ids('"gut microbiome" autism') == [1]                 # paratext left out by default
+    assert set(ids('"gut microbiome" autism')) == {1, 4}         # the API drops paratext later (Engine.shape)
     assert ids('"gut microbiome" autism', {"type": "paratext"}) == [4]
     assert set(ids("sleep adolescents")) == {2, 3}
     assert ids("sleep adolescents NOT caffeine") == []           # 3 has caffeine in its title
@@ -57,4 +57,4 @@ def test_keyword_index(tmp_path):
     assert ids("microplastic*") == [5]
     assert ids("title:(drinking water)") == [5]
     hits, matches, understood = k.search("sleep OR autism", 1, {})
-    assert matches == 3 and len(hits) == 1 and understood == "sleep OR autism"
+    assert matches == 4 and len(hits) == 1 and understood == "sleep OR autism"
