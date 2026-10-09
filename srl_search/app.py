@@ -271,8 +271,11 @@ def map_tiles(release: str, path: str):
     if TILES.resolve() not in f.parents or not f.is_file() or f.suffix not in (".json", ".pts", ".ids", ".bin") \
             or f.name == "label-candidates.json":
         raise HTTPException(404, "no such tile")
+    headers = {"Cache-Control": "public, max-age=31536000, immutable"}
+    if path.startswith(("v2/d/", "v2/p/")):   # stored gzipped: the browser inflates them off its main thread
+        headers["Content-Encoding"] = "gzip"
     return FileResponse(f, media_type="application/json" if f.suffix == ".json" else "application/octet-stream",
-                        headers={"Cache-Control": "public, max-age=31536000, immutable"})
+                        headers=headers)
 
 
 @app.get("/map/counts")
