@@ -13,7 +13,8 @@
   GET /works/{ref}                  one paper's details
   GET /map/place?ids=W1,W2&q=...    atlas positions of papers and/or a question
   GET /map/regions                  atlas field names, colours and label positions
-  GET /map/tiles/{release}/...      the release's map tiles (index.json, z/x/y.pts, z/x/y.ids); immutable
+  GET /map/tiles/{release}/...      the release's map tiles (index.json, z/x/y.pts, z/x/y.ids); immutable;
+                                    v2/: the map engine's data (map.json, labels.json, d|p|i/z/x/y.bin)
   GET /map/counts                   exact publications per year and subfield (whole corpus)
   GET /walk?id=W...|DOI             citation walk (citewalk server) with map positions and "readable"
                                     flags on every paper
@@ -90,7 +91,7 @@ def place_work(work_id: int) -> tuple[float, float] | None:
     v = vector_of(int(work_id)) if ATLAS is not None else None
     if v is None:
         return None
-    x, y = ATLAS.place(v[None])[0]
+    x, y = ATLAS.place(v[None], np.array([work_id], np.uint64))[0]
     return float(x), float(y)
 
 
@@ -267,7 +268,8 @@ def map_tiles(release: str, path: str):
     if release != RELEASE["id"]:
         raise HTTPException(404, f"release {release!r} is not served; current is {RELEASE['id']!r}")
     f = (TILES / path).resolve()
-    if TILES.resolve() not in f.parents or not f.is_file() or f.suffix not in (".json", ".pts", ".ids"):
+    if TILES.resolve() not in f.parents or not f.is_file() or f.suffix not in (".json", ".pts", ".ids", ".bin") \
+            or f.name == "label-candidates.json":
         raise HTTPException(404, "no such tile")
     return FileResponse(f, media_type="application/json" if f.suffix == ".json" else "application/octet-stream",
                         headers={"Cache-Control": "public, max-age=31536000, immutable"})

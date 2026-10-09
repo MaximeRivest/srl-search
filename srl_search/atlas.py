@@ -40,12 +40,20 @@ class Atlas:
         self.k = int(ref["k"])
         self.tau = float(ref["tau"])
         self.id = self.meta["id"]
+        # the build's placement rule (citewalk/science/placement.py): "mean" (first build) or "mode"
+        self.rule = str(ref["rule"]) if "rule" in ref.files else "mean"
+        if self.rule == "mode":
+            self.h, self.jitter = float(ref["h"]), float(ref["jitter"])
+            self.spacing = np.asarray(ref["spacing"], np.float64)
 
-    def place(self, vectors: np.ndarray) -> np.ndarray:
-        """float32 [n, 768] normalized -> [n, 2] map coordinates."""
+    def place(self, vectors: np.ndarray, works: np.ndarray | None = None) -> np.ndarray:
+        """float32 [n, 768] normalized -> [n, 2] map coordinates. works: W-numbers (the "mode" rule's
+        fixed per-paper offset; a question has none)."""
         q = np.ascontiguousarray(vectors, dtype=np.float32)
         faiss.omp_set_num_threads(4)  # per calling thread
         s, nn = self.index.search(q, self.k)  # sorted, best first
+        if self.rule == "mode":
+            return mode_place(s, nn, self.ref_xy, self.spacing, self.tau, self.h, self.jitter, works)
         w = np.exp((s - s[:, :1]) / self.tau)
         w /= w.sum(1, keepdims=True)
         return (w[:, :, None] * self.ref_xy[nn]).sum(1).astype(np.float32)
@@ -55,3 +63,42 @@ class Atlas:
         return [{"name": f["name"], "colour": f["colour"], "domain": f.get("domain", ""),
                  "x": f["anchor"]["x"], "y": f["anchor"]["y"]}
                 for f in self.meta["fields"] if f["name"] != "Unclassified"]
+
+
+# Same as citewalk/science/placement.py (mode_place, offsets); tests/test_atlas_rule.py keeps them equal.
+SALT_R, SALT_A = np.uint64(0xA24BAED4963EE407), np.uint64(0x9FB21C651E98DF25)
+
+
+def splitmix_u(ids):
+    with np.errstate(over="ignore"):
+        z = np.asarray(ids).astype(np.uint64) + np.uint64(0x9E3779B97F4A7C15)
+        z = (z ^ (z >> np.uint64(30))) * np.uint64(0xBF58476D1CE4E5B9)
+        z = (z ^ (z >> np.uint64(27))) * np.uint64(0x94D049BB133111EB)
+        z = z ^ (z >> np.uint64(31))
+    return (z >> np.uint64(11)).astype(np.float64) * (1.0 / (1 << 53))
+
+
+def offsets(works):
+    w = np.asarray(works).astype(np.uint64)
+    u1 = np.maximum(splitmix_u(w ^ SALT_R), 1e-300)
+    u2 = splitmix_u(w ^ SALT_A)
+    r = np.sqrt(-2.0 * np.log(u1))
+    return np.stack([r * np.cos(2 * np.pi * u2), r * np.sin(2 * np.pi * u2)], 1)
+
+
+def mode_place(sims, nn, Yref, spacing, tau, h, jitter, works=None, iters=3):
+    sims = np.asarray(sims, np.float64)
+    w = np.exp((sims - sims[:, :1]) / tau)
+    w /= w.sum(1, keepdims=True)
+    Y = np.asarray(Yref, np.float64)[nn]
+    d2 = ((Y[:, :, None, :] - Y[:, None, :, :]) ** 2).sum(-1)
+    j = (w[:, :, None] * np.exp(-d2 / (2 * h * h))).sum(1).argmax(1)
+    rows = np.arange(len(Y))
+    c = Y[rows, j]
+    for _ in range(iters):
+        kk = w * np.exp(-((Y - c[:, None]) ** 2).sum(-1) / (2 * h * h))
+        c = (kk[:, :, None] * Y).sum(1) / kk.sum(1, keepdims=True)
+    if works is not None and jitter > 0:
+        near = ((Y - c[:, None]) ** 2).sum(-1).argmin(1)
+        c = c + offsets(works) * (jitter * np.asarray(spacing, np.float64)[nn[rows, near]])[:, None]
+    return np.clip(c, 0.0, 1.0).astype(np.float32)
