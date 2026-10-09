@@ -178,3 +178,16 @@ substring matching is unusable ("ion", "men", "sed" top the counts); generic ter
 "methods") dominate without weighting. Fits as a concept layer: per-paper tags, term × year
 counts, autocomplete, phrase detection; not a replacement for the keyword index, which
 matches any word and counts any phrase on demand.
+
+## Changing the search API safely (dev → public)
+
+Never edit `search/` itself: the public API runs it and restarts on its own (nightly release, crash, reboot).
+
+```sh
+search/dev.sh up            # a private copy on branch dev: ~/Projects/scholarsreadinglist/search-dev, :8811
+# edit and commit in search-dev; search/dev.sh restart to load the change (~30 s)
+sciencemadereadable/app/tools/dev.sh up --data dev   # the dev site on top of it
+search/dev.sh promote       # tests, master := dev, restart the public API, smoke test, undo by itself on failure
+search/dev.sh rollback      # the version before the last promote
+search/dev.sh down          # frees its ~28 GB
+```
