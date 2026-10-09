@@ -7,8 +7,12 @@
                                      research article)
        &year_from=&year_to=&type=article&open_access=true&license=cc-by&pmc_open_access=true
        &abstracts=true&nprobe=&depth=
+       &map=true                         add atlas positions: "x","y" on each result we hold a vector
+                                         for, and "map": {"x","y"} where the question lands (semantic)
   GET /similar/{ref}?k=10           papers closest in meaning to a paper (W123, DOI or PMCID)
   GET /works/{ref}                  one paper's details
+  GET /map/place?ids=W1,W2&q=...    atlas positions of papers and/or a question
+  GET /map/regions                  atlas field names, colours and label positions
   GET /health                       what each mode and collection covers
   GET /                             a small test page (web/index.html)
 
@@ -24,6 +28,9 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 
+import numpy as np
+
+from srl_search.atlas import Atlas
 from srl_search.engine import Engine, ExactEngine
 from srl_search.keyword import KeywordIndex, looks_boolean
 
@@ -50,6 +57,38 @@ if SMR:
                                   meta_path=WORKS if WORKS.exists() else None)
 KEYWORDS = KeywordIndex(CORPUS / "keywords") if (CORPUS / "keywords" / "DONE.json").exists() else None
 KEYWORD_COLLECTIONS = {"all", "smr"}
+ATLAS_BUILD = Path(os.environ.get("SRL_ATLAS", "/mnt/fast/science-atlas/build/20261008T131030-tsne"))
+ATLAS = Atlas(ATLAS_BUILD, cache_dir=ROOT) if (ATLAS_BUILD / "reference.npz").exists() else None
+
+
+def vector_of(work_id: int) -> np.ndarray | None:
+    """The paper's stored fp16 embedding, from whichever loaded index holds it."""
+    smr = SEMANTIC.get("smr")
+    if smr is not None:
+        try:
+            return np.asarray(smr.index.reconstruct(int(work_id)), dtype=np.float32)
+        except RuntimeError:
+            pass
+    pos = engine.position_of(int(work_id))
+    return engine.vectors.get(np.array([pos]))[0] if pos is not None else None
+
+
+def add_positions(out: dict, q: str | None) -> dict:
+    if ATLAS is None:
+        return out
+    t = time.perf_counter()
+    found = [(r, vector_of(int(r["id"][1:]))) for r in out["results"]]
+    found = [(r, v) for r, v in found if v is not None]
+    if found:
+        xy = ATLAS.place(np.stack([v for _, v in found]))
+        for (r, _), (x, y) in zip(found, xy):
+            r["x"], r["y"] = round(float(x), 5), round(float(y), 5)
+    if q and out.get("mode") == "semantic":
+        x, y = ATLAS.place(engine.encoder.encode(q))[0]
+        out["map"] = {"x": round(float(x), 5), "y": round(float(y), 5)}
+    out["map_placed"] = len(found)
+    out.setdefault("timing", {})["map_ms"] = round((time.perf_counter() - t) * 1000, 1)
+    return out
 
 
 @app.get("/", include_in_schema=False)
@@ -93,7 +132,7 @@ def search(q: str = Query(..., min_length=2, max_length=2000), k: int = Query(10
            year_from: int | None = None, year_to: int | None = None, type: str | None = None,
            open_access: bool = False, license: str | None = None, pmc_open_access: bool = False,
            abstracts: bool = True, nprobe: int = Query(NPROBE, ge=1, le=1024),
-           depth: int = Query(DEPTH, ge=10, le=5000)):
+           depth: int = Query(DEPTH, ge=10, le=5000), map: bool = False):
     f = filters(year_from, year_to, type, open_access, license, pmc_open_access)
     if mode == "auto":
         mode = "keyword" if KEYWORDS and looks_boolean(q) else "semantic"
@@ -108,12 +147,13 @@ def search(q: str = Query(..., min_length=2, max_length=2000), k: int = Query(10
         t1 = time.perf_counter()
         results = engine.shape(hits, k, f, abstracts)
         t2 = time.perf_counter()
-        return {"mode": "keyword", "matches": matches, "query": understood, "results": results, "filters": f,
-                "timing": {"keyword_ms": round((t1 - t0) * 1000, 1), "details_ms": round((t2 - t1) * 1000, 1),
-                           "total_ms": round((t2 - t0) * 1000, 1)}}
+        out = {"mode": "keyword", "matches": matches, "query": understood, "results": results, "filters": f,
+               "timing": {"keyword_ms": round((t1 - t0) * 1000, 1), "details_ms": round((t2 - t1) * 1000, 1),
+                          "total_ms": round((t2 - t0) * 1000, 1)}}
+        return add_positions(out, None) if map else out
     out = semantic_engine(collection).search(q, k, nprobe, depth, f, abstracts)
     out["mode"] = "semantic"
-    return out
+    return add_positions(out, q) if map else out
 
 
 @app.get("/similar/{ref:path}")
@@ -131,6 +171,33 @@ def similar(ref: str, k: int = Query(10, ge=1, le=100), year_from: int | None = 
         raise HTTPException(404, f"{ref} is not in the semantic collection {collection!r} (yet)")
     out["mode"] = "semantic"
     return out
+
+
+@app.get("/map/place")
+def map_place(ids: str = "", q: str | None = Query(None, max_length=2000)):
+    if ATLAS is None:
+        raise HTTPException(503, "no atlas build")
+    out = {"atlas": ATLAS.id, "papers": {}, "missing": []}
+    refs = [x for x in ids.split(",") if x.strip()][:200]
+    for ref in refs:
+        w = engine.resolve(ref)
+        v = vector_of(w) if w is not None else None
+        if v is None:
+            out["missing"].append(ref)
+            continue
+        x, y = ATLAS.place(v[None])[0]
+        out["papers"][ref] = {"x": round(float(x), 5), "y": round(float(y), 5)}
+    if q:
+        x, y = ATLAS.place(engine.encoder.encode(q))[0]
+        out["question"] = {"x": round(float(x), 5), "y": round(float(y), 5)}
+    return out
+
+
+@app.get("/map/regions")
+def map_regions():
+    if ATLAS is None:
+        raise HTTPException(503, "no atlas build")
+    return {"atlas": ATLAS.id, "fields": ATLAS.regions()}
 
 
 @app.get("/works/{ref:path}")

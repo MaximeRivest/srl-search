@@ -37,6 +37,7 @@ class Encoder:
         # One dedicated thread runs the model. OpenMP's thread count is per calling thread, so
         # calling from the web server's many worker threads gave each one 48 threads (2x slower).
         self.pool = ThreadPoolExecutor(1, initializer=torch.set_num_threads, initargs=(threads,))
+        self._cache: dict[str, np.ndarray] = {}  # same question again (e.g. placing it on the map): no re-encoding
 
     def _encode(self, text: str) -> np.ndarray:
         v = self.model.encode([text], prompt_name="query", normalize_embeddings=True,
@@ -44,7 +45,14 @@ class Encoder:
         return v.astype(np.float32)
 
     def encode(self, text: str) -> np.ndarray:
-        return self.pool.submit(self._encode, text).result()
+        hit = self._cache.get(text)
+        if hit is not None:
+            return hit.copy()
+        v = self.pool.submit(self._encode, text).result()
+        if len(self._cache) > 512:
+            self._cache.clear()
+        self._cache[text] = v
+        return v.copy()
 
 
 class Engine:
