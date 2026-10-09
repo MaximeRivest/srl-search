@@ -4,6 +4,9 @@ Semantic search over ~203M English title+abstract records (OpenAlex, DenseOn emb
 and the PubMed Central open-access full texts, served as an HTTP API and an MCP server.
 First user: ScienceMadeReadable.
 
+- [../DATA.md](../DATA.md): **the data releases the site uses** (what, where, nightly update, publish,
+  rollback). Since 2026-10-09 the service runs from a release, declared in
+  `~/Projects/os/machines/hm/scholarsreadinglist-data.nix`; the run commands below are history.
 - [PLAN.md](PLAN.md): steps, measurements, timeline, update pipeline.
 - [hosting-lesson.md](hosting-lesson.md): how hosting on lambda works (systemd, cgroups, NixOS, tunnels).
 - `experiments/`: measured design questions, each script with its log.

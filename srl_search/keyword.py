@@ -18,6 +18,8 @@ from pathlib import Path
 
 import tantivy
 
+from srl_search.scope import NON_PUBLICATION_TYPES
+
 FIELDS = ["title", "abstract", "keywords"]
 BOOSTS = {"title": 2.0, "abstract": 1.0, "keywords": 1.5}
 
@@ -106,6 +108,8 @@ class KeywordIndex:
             out.append((O.Must, Q.term_query(S, "type", f["type"])))
         # Covers/tables of contents and retracted papers are dropped from the returned page by
         # Engine.shape (they are rare); as index clauses they cost 30-100 ms on broad queries.
+        if f.get("publications_only"):   # costs 100-500 ms on broad queries: used only as a fallback
+            out.append((O.MustNot, Q.term_set_query(S, "type", list(NON_PUBLICATION_TYPES))))
         if f.get("license"):
             out.append((O.Must, Q.term_query(S, "license", f["license"])))
         if f.get("open_access"):

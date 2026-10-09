@@ -13,20 +13,31 @@
   GET /works/{ref}                  one paper's details
   GET /map/place?ids=W1,W2&q=...    atlas positions of papers and/or a question
   GET /map/regions                  atlas field names, colours and label positions
+  GET /map/tiles/{release}/...      the release's map tiles (index.json, z/x/y.pts, z/x/y.ids); immutable
+  GET /map/counts                   exact publications per year and subfield (whole corpus)
+  GET /walk?id=W...|DOI             citation walk (citewalk server) with map positions and "readable"
+                                    flags on every paper
+Without an explicit type=, search leaves out records that are not publications (datasets,
+figures, covers...; srl_search/scope.py), in both modes.
   GET /health                       what each mode and collection covers
   GET /                             a small test page (web/index.html)
 
-Run: see README.md (SRL_CORPUS, SRL_INDEX, SRL_SMR).
+Run: see README.md. With a published data release (pipeline/release, DATA.md) every path comes
+from SRL_RELEASE (default .../release/current); otherwise SRL_CORPUS, SRL_INDEX, SRL_SMR, SRL_ATLAS.
 """
 from __future__ import annotations
 
+import json
 import os
 import time
+import urllib.error
+import urllib.parse
+import urllib.request
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 
 import numpy as np
 
@@ -35,8 +46,13 @@ from srl_search.engine import Engine, ExactEngine
 from srl_search.keyword import KeywordIndex, looks_boolean
 
 ROOT = Path("/mnt/fast/scholarsreadinglist/search")
-CORPUS = Path(os.environ.get("SRL_CORPUS", ROOT / "corpus-2026-10-05"))
-INDEX = Path(os.environ.get("SRL_INDEX", ROOT / "index-2024plus"))
+RELEASE_LINK = Path(os.environ.get("SRL_RELEASE", "/mnt/fast/scholarsreadinglist/release/current"))
+RELEASE = json.loads((RELEASE_LINK / "manifest.json").read_text()) if (RELEASE_LINK / "manifest.json").exists() else None
+P = {k: Path(v) for k, v in RELEASE["paths"].items()} if RELEASE else {}
+CORPUS = P.get("corpus") or Path(os.environ.get("SRL_CORPUS", ROOT / "corpus-2026-10-05"))
+INDEX = P.get("index") or Path(os.environ.get("SRL_INDEX", ROOT / "index-2024plus"))
+TILES = P.get("tiles")
+CITEWALK = os.environ.get("SRL_CITEWALK", "http://127.0.0.1:8798")
 WORKS = CORPUS / "works.sqlite"
 META = WORKS if WORKS.exists() else Path(os.environ.get("SRL_META", ROOT / "meta-2024plus.sqlite"))
 NPROBE = int(os.environ.get("SRL_NPROBE", "128"))  # eval 2026-10-06: recall@10 0.89, ~37 ms search
@@ -49,7 +65,7 @@ PAGE = Path(__file__).resolve().parent.parent / "web" / "index.html"
 
 engine = Engine(INDEX, META, threads=int(os.environ.get("SRL_THREADS", "4")))
 SEMANTIC = {"all": engine}
-SMR = os.environ.get("SRL_SMR")
+SMR = str(P["smr"]) if "smr" in P else os.environ.get("SRL_SMR")
 if SMR:
     # 512 of 4,096 groups: 99% of the exact top 15 for plain questions, ~45 ms (experiments/smr_hnsw.log)
     SEMANTIC["smr"] = ExactEngine(Path(SMR), threads=4, encoder=engine.encoder,
@@ -57,8 +73,32 @@ if SMR:
                                   meta_path=WORKS if WORKS.exists() else None)
 KEYWORDS = KeywordIndex(CORPUS / "keywords") if (CORPUS / "keywords" / "DONE.json").exists() else None
 KEYWORD_COLLECTIONS = {"all", "smr"}
-ATLAS_BUILD = Path(os.environ.get("SRL_ATLAS", "/mnt/fast/science-atlas/build/20261008T131030-tsne"))
+ATLAS_BUILD = P.get("atlas") or Path(os.environ.get("SRL_ATLAS", "/mnt/fast/science-atlas/build/20261008T131030-tsne"))
 ATLAS = Atlas(ATLAS_BUILD, cache_dir=ROOT) if (ATLAS_BUILD / "reference.npz").exists() else None
+# The release's position table (one row per embedded paper, NaN = not placed yet) and its
+# "readable on the site" column, both aligned with the index's rows (engine.position_of).
+XY = np.load(TILES / "xy.npy", mmap_mode="r") if TILES and (TILES / "xy.npy").exists() else None
+READABLE = np.load(P["rows"] / "smr.npy", mmap_mode="r") if "rows" in P else None
+
+
+def place_work(work_id: int) -> tuple[float, float] | None:
+    """Map position of an embedded paper: the release's table, else placed from its vector."""
+    if XY is not None:
+        row = engine.position_of(int(work_id))
+        if row is not None and not np.isnan(XY[row, 0]):
+            return float(XY[row, 0]), float(XY[row, 1])
+    v = vector_of(int(work_id)) if ATLAS is not None else None
+    if v is None:
+        return None
+    x, y = ATLAS.place(v[None])[0]
+    return float(x), float(y)
+
+
+def readable(work_id: int) -> bool | None:
+    if READABLE is None:
+        return None
+    row = engine.position_of(int(work_id))
+    return bool(READABLE[row]) if row is not None else None
 
 
 def vector_of(work_id: int) -> np.ndarray | None:
@@ -77,16 +117,16 @@ def add_positions(out: dict, q: str | None) -> dict:
     if ATLAS is None:
         return out
     t = time.perf_counter()
-    found = [(r, vector_of(int(r["id"][1:]))) for r in out["results"]]
-    found = [(r, v) for r, v in found if v is not None]
-    if found:
-        xy = ATLAS.place(np.stack([v for _, v in found]))
-        for (r, _), (x, y) in zip(found, xy):
-            r["x"], r["y"] = round(float(x), 5), round(float(y), 5)
+    found = 0
+    for r in out["results"]:
+        p = place_work(int(r["id"][1:]))
+        if p is not None:
+            r["x"], r["y"] = round(p[0], 5), round(p[1], 5)
+            found += 1
     if q and out.get("mode") == "semantic":
         x, y = ATLAS.place(engine.encoder.encode(q))[0]
         out["map"] = {"x": round(float(x), 5), "y": round(float(y), 5)}
-    out["map_placed"] = len(found)
+    out["map_placed"] = found
     out.setdefault("timing", {})["map_ms"] = round((time.perf_counter() - t) * 1000, 1)
     return out
 
@@ -123,6 +163,8 @@ def health():
     # older clients read these top-level fields
     out.update({"papers": engine.manifest["papers"], "published_from": engine.manifest["min_date"],
                 "collections": sorted(SEMANTIC)})
+    if RELEASE:
+        out["release"] = {k: RELEASE.get(k) for k in ("id", "built_utc", "published_utc", "counts", "embeddings")}
     return out
 
 
@@ -146,6 +188,12 @@ def search(q: str = Query(..., min_length=2, max_length=2000), k: int = Query(10
         hits, matches, understood = KEYWORDS.search(q, k * 3 + 20, f, collection)
         t1 = time.perf_counter()
         results = engine.shape(hits, k, f, abstracts)
+        if len(results) < k and "type" not in f and len(hits) >= k * 3 + 20:
+            # the best matches were mostly non-publications (datasets, figures...): ask the index
+            # for publications only (slower, so only here); its count is then exact for them
+            hits, matches, understood = KEYWORDS.search(q, k * 3 + 20, {**f, "publications_only": True}, collection)
+            t1 = time.perf_counter()
+            results = engine.shape(hits, k, f, abstracts)
         t2 = time.perf_counter()
         out = {"mode": "keyword", "matches": matches, "query": understood, "results": results, "filters": f,
                "timing": {"keyword_ms": round((t1 - t0) * 1000, 1), "details_ms": round((t2 - t1) * 1000, 1),
@@ -181,12 +229,11 @@ def map_place(ids: str = "", q: str | None = Query(None, max_length=2000)):
     refs = [x for x in ids.split(",") if x.strip()][:200]
     for ref in refs:
         w = engine.resolve(ref)
-        v = vector_of(w) if w is not None else None
-        if v is None:
+        p = place_work(w) if w is not None else None
+        if p is None:
             out["missing"].append(ref)
             continue
-        x, y = ATLAS.place(v[None])[0]
-        out["papers"][ref] = {"x": round(float(x), 5), "y": round(float(y), 5)}
+        out["papers"][ref] = {"x": round(p[0], 5), "y": round(p[1], 5)}
     if q:
         x, y = ATLAS.place(engine.encoder.encode(q))[0]
         out["question"] = {"x": round(float(x), 5), "y": round(float(y), 5)}
@@ -197,7 +244,8 @@ def map_place(ids: str = "", q: str | None = Query(None, max_length=2000)):
 def map_regions():
     if ATLAS is None:
         raise HTTPException(503, "no atlas build")
-    return {"atlas": ATLAS.id, "fields": ATLAS.regions()}
+    # "release": the id the tile URLs need (/map/tiles/<release>/...); the site reads it here
+    return {"atlas": ATLAS.id, "release": RELEASE["id"] if RELEASE else None, "fields": ATLAS.regions()}
 
 
 @app.get("/works/{ref:path}")
@@ -209,3 +257,55 @@ def work(ref: str):
     d["id"] = f"W{w}"
     d["openalex"] = f"https://openalex.org/W{w}"
     return d
+
+
+@app.get("/map/tiles/{release}/{path:path}")
+def map_tiles(release: str, path: str):
+    """Static map tiles of the current release. The release id in the URL makes them immutable."""
+    if not TILES or not RELEASE:
+        raise HTTPException(503, "no data release")
+    if release != RELEASE["id"]:
+        raise HTTPException(404, f"release {release!r} is not served; current is {RELEASE['id']!r}")
+    f = (TILES / path).resolve()
+    if TILES.resolve() not in f.parents or not f.is_file() or f.suffix not in (".json", ".pts", ".ids"):
+        raise HTTPException(404, "no such tile")
+    return FileResponse(f, media_type="application/json" if f.suffix == ".json" else "application/octet-stream",
+                        headers={"Cache-Control": "public, max-age=31536000, immutable"})
+
+
+@app.get("/map/counts")
+def map_counts():
+    """Exact publications per year and subfield over the whole corpus (for the map's charts)."""
+    f = P.get("rows", Path("/nonexistent")) / "counts.json"
+    if not f.exists():
+        raise HTTPException(503, "no data release")
+    return FileResponse(f, media_type="application/json", headers={"Cache-Control": "public, max-age=3600"})
+
+
+@app.get("/walk")
+def walk(id: str = Query(..., min_length=2, max_length=300), k: int = Query(30, ge=1, le=200),
+         max_refs: int = Query(300, ge=0), max_cites: int = Query(500, ge=0)):
+    """The citation walk from one paper, with each paper's map position and whether the site can open it."""
+    params = urllib.parse.urlencode({"id": id, "k": k, "max_refs": max_refs, "max_cites": max_cites})
+    t = time.perf_counter()
+    try:
+        with urllib.request.urlopen(f"{CITEWALK}/api/analyze?{params}", timeout=60) as r:
+            out = json.load(r)
+    except urllib.error.HTTPError as e:
+        return JSONResponse(json.loads(e.read() or b"{}") or {"error": str(e)}, status_code=e.code)
+    except OSError as e:
+        raise HTTPException(503, f"citation walk unavailable: {e}")
+    t1 = time.perf_counter()
+    out.pop("atlas", None)      # the citewalk page's own local map; positions below use the atlas
+    out.pop("regions", None)
+    placed = 0
+    for wid, n in out.get("nodes", {}).items():
+        w = int(wid[1:])
+        p = place_work(w)
+        if p is not None:
+            n["x"], n["y"] = round(p[0], 5), round(p[1], 5)
+            placed += 1
+        n["readable"] = readable(w)
+    out["map"] = {"atlas": ATLAS.id if ATLAS else None, "placed": placed, "papers": len(out.get("nodes", {}))}
+    out["timing"] = {"walk_ms": round((t1 - t) * 1000, 1), "map_ms": round((time.perf_counter() - t1) * 1000, 1)}
+    return out

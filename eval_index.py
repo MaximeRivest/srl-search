@@ -69,8 +69,12 @@ def exact_top(engine: Engine, Q: np.ndarray, k: int = 10, threads: int = 24) -> 
     best_s = np.full((len(Q), k), -np.inf, dtype=np.float32)
     best_p = np.full((len(Q), k), -1, dtype=np.int64)
     t = time.time()
+    keep_file = Path(engine.manifest.get("index_dir", "")) / "keep.npy"
+    keep = np.load(keep_file, mmap_mode="r") if keep_file.exists() else None   # rows the index holds
     for n, (first, x, _) in enumerate(engine.vectors.iter_shards()):
         s = Q @ x.astype(np.float32).T
+        if keep is not None:
+            s[:, ~np.asarray(keep[first:first + len(x)])] = -np.inf
         if s.shape[1] <= k:  # small shard: every row is a candidate
             idx = np.tile(np.arange(s.shape[1]), (len(Q), 1))
         else:

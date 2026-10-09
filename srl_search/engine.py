@@ -12,6 +12,7 @@ from pathlib import Path
 import faiss
 import numpy as np
 
+from srl_search.scope import SCHOLARLY_TYPES
 from srl_search.vectors import Vectors
 
 EMBEDDING_PLAN = Path("/mnt/fast/openalex-embeddings/denseon-english-abstracts/manifest.json")
@@ -240,7 +241,7 @@ def passes(d: dict, f: dict) -> bool:
         return False
     if "type" in f and d["type"] != f["type"]:
         return False
-    if "type" not in f and d["type"] == "paratext":  # covers, tables of contents, issue information
+    if "type" not in f and d["type"] not in SCHOLARLY_TYPES:  # datasets, covers, figures, logs...
         return False
     if f.get("open_access") and not d["is_oa"]:
         return False

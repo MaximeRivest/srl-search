@@ -1,0 +1,225 @@
+{
+ "papers": 72501936,
+ "queries": {
+  "scifact": 100,
+  "nfcorpus": 100,
+  "scidocs": 100,
+  "trec-covid": 50,
+  "plain questions": 40
+ },
+ "exact_search_seconds_all_queries": 1018,
+ "query_encoding_ms_cpu4": 0.0,
+ "threads": 4,
+ "results": [
+  {
+   "nprobe": 16,
+   "depth": 100,
+   "recall@10": 0.795,
+   "by_set": {
+    "scifact": 0.781,
+    "nfcorpus": 0.629,
+    "scidocs": 0.84,
+    "trec-covid": 0.936,
+    "plain questions": 0.955
+   },
+   "p50_ms": 8.6,
+   "p95_ms": 15.3
+  },
+  {
+   "nprobe": 16,
+   "depth": 300,
+   "recall@10": 0.802,
+   "by_set": {
+    "scifact": 0.785,
+    "nfcorpus": 0.637,
+    "scidocs": 0.848,
+    "trec-covid": 0.948,
+    "plain questions": 0.957
+   },
+   "p50_ms": 12.7,
+   "p95_ms": 14.6
+  },
+  {
+   "nprobe": 16,
+   "depth": 1000,
+   "recall@10": 0.803,
+   "by_set": {
+    "scifact": 0.787,
+    "nfcorpus": 0.638,
+    "scidocs": 0.849,
+    "trec-covid": 0.948,
+    "plain questions": 0.957
+   },
+   "p50_ms": 36.8,
+   "p95_ms": 174.3
+  },
+  {
+   "nprobe": 32,
+   "depth": 100,
+   "recall@10": 0.848,
+   "by_set": {
+    "scifact": 0.837,
+    "nfcorpus": 0.696,
+    "scidocs": 0.909,
+    "trec-covid": 0.95,
+    "plain questions": 0.975
+   },
+   "p50_ms": 9.0,
+   "p95_ms": 10.5
+  },
+  {
+   "nprobe": 32,
+   "depth": 300,
+   "recall@10": 0.859,
+   "by_set": {
+    "scifact": 0.847,
+    "nfcorpus": 0.708,
+    "scidocs": 0.92,
+    "trec-covid": 0.968,
+    "plain questions": 0.978
+   },
+   "p50_ms": 12.8,
+   "p95_ms": 14.3
+  },
+  {
+   "nprobe": 32,
+   "depth": 1000,
+   "recall@10": 0.862,
+   "by_set": {
+    "scifact": 0.85,
+    "nfcorpus": 0.711,
+    "scidocs": 0.924,
+    "trec-covid": 0.968,
+    "plain questions": 0.978
+   },
+   "p50_ms": 34.9,
+   "p95_ms": 169.6
+  },
+  {
+   "nprobe": 64,
+   "depth": 100,
+   "recall@10": 0.881,
+   "by_set": {
+    "scifact": 0.887,
+    "nfcorpus": 0.738,
+    "scidocs": 0.934,
+    "trec-covid": 0.966,
+    "plain questions": 0.985
+   },
+   "p50_ms": 11.2,
+   "p95_ms": 13.8
+  },
+  {
+   "nprobe": 64,
+   "depth": 300,
+   "recall@10": 0.895,
+   "by_set": {
+    "scifact": 0.9,
+    "nfcorpus": 0.753,
+    "scidocs": 0.951,
+    "trec-covid": 0.986,
+    "plain questions": 0.988
+   },
+   "p50_ms": 14.8,
+   "p95_ms": 17.6
+  },
+  {
+   "nprobe": 64,
+   "depth": 1000,
+   "recall@10": 0.899,
+   "by_set": {
+    "scifact": 0.905,
+    "nfcorpus": 0.757,
+    "scidocs": 0.955,
+    "trec-covid": 0.986,
+    "plain questions": 0.988
+   },
+   "p50_ms": 37.6,
+   "p95_ms": 171.1
+  },
+  {
+   "nprobe": 128,
+   "depth": 100,
+   "recall@10": 0.905,
+   "by_set": {
+    "scifact": 0.916,
+    "nfcorpus": 0.776,
+    "scidocs": 0.951,
+    "trec-covid": 0.978,
+    "plain questions": 0.993
+   },
+   "p50_ms": 15.2,
+   "p95_ms": 19.9
+  },
+  {
+   "nprobe": 128,
+   "depth": 300,
+   "recall@10": 0.921,
+   "by_set": {
+    "scifact": 0.932,
+    "nfcorpus": 0.793,
+    "scidocs": 0.97,
+    "trec-covid": 0.998,
+    "plain questions": 0.995
+   },
+   "p50_ms": 18.8,
+   "p95_ms": 23.7
+  },
+  {
+   "nprobe": 128,
+   "depth": 1000,
+   "recall@10": 0.925,
+   "by_set": {
+    "scifact": 0.937,
+    "nfcorpus": 0.798,
+    "scidocs": 0.974,
+    "trec-covid": 0.998,
+    "plain questions": 0.995
+   },
+   "p50_ms": 44.1,
+   "p95_ms": 175.8
+  },
+  {
+   "nprobe": 256,
+   "depth": 100,
+   "recall@10": 0.921,
+   "by_set": {
+    "scifact": 0.941,
+    "nfcorpus": 0.804,
+    "scidocs": 0.961,
+    "trec-covid": 0.978,
+    "plain questions": 0.995
+   },
+   "p50_ms": 23.0,
+   "p95_ms": 30.2
+  },
+  {
+   "nprobe": 256,
+   "depth": 300,
+   "recall@10": 0.94,
+   "by_set": {
+    "scifact": 0.958,
+    "nfcorpus": 0.827,
+    "scidocs": 0.983,
+    "trec-covid": 0.998,
+    "plain questions": 0.997
+   },
+   "p50_ms": 26.6,
+   "p95_ms": 33.4
+  },
+  {
+   "nprobe": 256,
+   "depth": 1000,
+   "recall@10": 0.944,
+   "by_set": {
+    "scifact": 0.965,
+    "nfcorpus": 0.832,
+    "scidocs": 0.987,
+    "trec-covid": 0.998,
+    "plain questions": 0.997
+   },
+   "p50_ms": 56.9,
+   "p95_ms": 188.8
+  }
+ ]
+}
