@@ -1,8 +1,15 @@
 # Scholars Reading List · search
 
-Semantic search over ~203M English title+abstract records (OpenAlex, DenseOn embeddings)
-and the PubMed Central open-access full texts, served as an HTTP API and an MCP server.
-First user: ScienceMadeReadable.
+Search over ~203M English title+abstract records (OpenAlex; by meaning with DenseOn embeddings, by exact
+words with tantivy), served as one HTTP API. First user: ScienceMadeReadable.
+
+**Using the API** (people, programs, AI agents): [web/llms.txt](web/llms.txt), served live with current
+coverage at **https://api.sciencemadereadable.com/api/data/llms.txt**; interactive reference at
+`.../api/data/docs`, spec at `.../api/data/openapi.json` (public routes only). Coding agents on Maxime's
+machines get it as the `scholars-search` skill ([skill/SKILL.md](skill/SKILL.md), linked into
+`~/.pi/agent/skills`, `~/.claude/skills`, `~/.agents/skills`). An MCP server is not built (llms.txt covers
+the same ground for any agent). When you change a route or parameter, update llms.txt and the skill:
+`tests/test_public.py` checks that every documented route is passed by the public door.
 
 - [../DATA.md](../DATA.md): **the data releases the site uses** (what, where, nightly update, publish,
   rollback). Since 2026-10-09 the service runs from a release, declared in
@@ -13,14 +20,17 @@ First user: ScienceMadeReadable.
 
 ## The search API (running since 2026-10-06)
 
-**https://lambda.tail69222b.ts.net:18810** (tailnet only; local `http://127.0.0.1:8810`).
-Covers every embedded English title+abstract published from 2024-01-01: **63,814,851 papers**.
+Addresses: public `https://api.sciencemadereadable.com/api/data` (60 requests/min per address, through the
+site's door: `sciencemadereadable/app/server.py` `DATA_ROUTES`), tailnet `https://lambda.tail69222b.ts.net:18810`,
+local `http://127.0.0.1:8810`. What it covers changes with each data release: `/health` (tailnet/local) or the
+top of `/llms.txt`. The first index (2026-10-06) covered 2024+ only (63.8M papers); the measurements below
+are from it.
 
 ```sh
-curl -G https://lambda.tail69222b.ts.net:18810/search --data-urlencode "q=sleep apnea and atrial fibrillation" -d k=5
+curl -G http://127.0.0.1:8810/search --data-urlencode "q=sleep apnea and atrial fibrillation" -d k=5
 curl -G .../search --data-urlencode "q=CRISPR base editing sickle cell" -d pmc_open_access=true -d license=cc-by -d type=article
-curl .../similar/10.1073/pnas.2532413123?k=5        # by DOI, W-id or PMCID
-curl .../works/PMC13552904
+curl .../similar/10.1126/science.aan8048?k=5        # by DOI, W-id or PMCID
+curl .../works/PMC5904187
 curl .../health
 ```
 

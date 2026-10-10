@@ -1,4 +1,4 @@
-"""HTTP API: one search service for every project (the test page, ScienceMadeReadable, the MCP server).
+"""HTTP API: one search service for every project (the test page, ScienceMadeReadable, programs and agents via llms.txt).
 
   GET /search?q=...&k=10
        &mode=auto|semantic|keyword   auto (default): keyword when the query uses search syntax
@@ -29,6 +29,8 @@ In auto mode, a query that looked like search syntax but matched no exact words 
 meaning instead ("fallback" says so).
   GET /health                       what each mode and collection covers
   GET /                             a small test page (web/index.html)
+  GET /llms.txt                     the guide for programs and AI agents (web/llms.txt + live coverage)
+  GET /docs, /openapi.json          interactive reference and spec of the public routes only
 
 Run: see README.md. With a published data release (pipeline/release, DATA.md) every path comes
 from SRL_RELEASE (default .../release/current); otherwise SRL_CORPUS, SRL_INDEX, SRL_SMR, SRL_ATLAS.
@@ -45,13 +47,16 @@ from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.openapi.docs import get_swagger_ui_html
+from fastapi.openapi.utils import get_openapi
+from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
 
 import numpy as np
 
 from srl_search.atlas import Atlas, question_spot
-from srl_search.engine import JUNK_PENALTY, Engine, ExactEngine
+from srl_search.engine import EMBEDDING_PLAN, JUNK_PENALTY, Engine, ExactEngine
 from srl_search.keyword import KeywordIndex, looks_boolean
+from srl_search.public import PUBLIC_BASE, PUBLIC_ROUTES
 from srl_search.quality import Quality
 
 ROOT = Path("/mnt/fast/scholarsreadinglist/search")
@@ -69,10 +74,31 @@ DEPTH = int(os.environ.get("SRL_DEPTH", "300"))
 # Record-quality signals and the junk model (build_quality.py, fit_quality.py); per OpenAlex snapshot, like CORPUS.
 QUALITY_DIR = P.get("quality") or Path(os.environ.get("SRL_QUALITY", ROOT / "quality-2026-10-05"))
 
-app = FastAPI(title="Scholars Reading List search", version="0.2")
+# The built-in /docs and /openapi.json are replaced below: the published spec lists only the routes the public
+# door passes (sciencemadereadable/app/server.py DATA_ROUTES), and the docs page loads it by a relative URL so
+# it works both here and behind the door's /api/data/ prefix.
+app = FastAPI(title="Scholars Reading List search", version="0.3", docs_url=None, redoc_url=None, openapi_url=None,
+              description="Search ~200 million scholarly papers by meaning or exact words. Guide for programs "
+                          "and agents: [llms.txt](llms.txt).")
 # Read-only GETs; lets the test page work when opened from another address (e.g. a preview panel).
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["GET"])
 PAGE = Path(__file__).resolve().parent.parent / "web" / "index.html"
+GUIDE = Path(__file__).resolve().parent.parent / "web" / "llms.txt"
+
+# Parameter documentation, shared by /search and /similar
+D_K = "Number of results, 1-100. No paging: ask for up to 100 at once."
+D_COLLECTION = "all (default) or smr: only papers ScienceMadeReadable can open (PubMed Central, CC BY, research articles)."
+D_YEAR_FROM, D_YEAR_TO = "Earliest publication year.", "Latest publication year."
+D_TYPE = ("Only this publication type (article, review, preprint, book, book-chapter, conference-paper, dissertation, "
+          "report, letter, editorial, dataset, ...). Without it, non-publications (datasets, figures, covers) are left out.")
+D_OA = "Only open-access papers."
+D_LICENSE = "Only this licence, e.g. cc-by."
+D_PMC = "Only papers whose full text is in PubMed Central's open-access set."
+D_ABSTRACTS = "Include abstracts. false makes answers about 10x smaller."
+D_NPROBE = "Index lists scanned (search by meaning): more = slower and slightly more complete. Rarely needed."
+D_DEPTH = "Candidates re-scored exactly before filtering (search by meaning). Rarely needed."
+D_JUNK = ("Search by meaning ranks by similarity - junk_penalty x junk (how likely a record is spam or not "
+          "scholarship). Default 0.3 for all, 0 for smr; 0 = pure similarity.")
 
 QUALITY = Quality(QUALITY_DIR) if (QUALITY_DIR / "model.npz").exists() else None
 # smr holds PMC research articles under CC BY only; on the 60 evaluation questions it had no junk in the top 10
@@ -190,14 +216,73 @@ def health():
     return out
 
 
+@app.get("/llms.txt", include_in_schema=False)
+def guide():
+    """How to use this API, for programs and AI agents, with what is covered right now."""
+    return PlainTextResponse(GUIDE.read_text().replace("{{COVERAGE}}", coverage_text()),
+                             headers={"Cache-Control": "public, max-age=3600"})
+
+
+def coverage_text() -> str:
+    lines = []
+    # the embedding backfill runs newest first: until it has every planned row, older years are missing
+    emb = (RELEASE or {}).get("embeddings") or {}
+    plan = json.loads(EMBEDDING_PLAN.read_text()) if EMBEDDING_PLAN.exists() else {}
+    growing = emb.get("rows") is None or emb["rows"] < plan.get("expected_rows", 0)
+    for name, e in SEMANTIC.items():
+        m = e.manifest
+        what = "every paper" if name == "all" else "papers ScienceMadeReadable can open (collection=smr)"
+        lines.append(f"- Search by meaning, {what}: {m['papers']:,} papers published from {m['min_date']}"
+                     + (" (older years are being added)." if growing else "."))
+    if KEYWORDS:
+        lines.append(f"- Search by exact words and paper lookup (/works): {KEYWORDS.searcher.num_docs:,} papers, "
+                     "all years.")
+    if RELEASE:
+        lines.append(f"- Data release {RELEASE['id']}, published {RELEASE.get('published_utc') or RELEASE.get('built_utc')}"
+                     + ("; a new one most nights while older years are added." if growing else "."))
+    lines.append(f"- OpenAlex snapshot of {CORPUS.name.split('-', 1)[-1]} (titles, abstracts, citations, labels).")
+    return "\n".join(lines)
+
+
+@app.get("/openapi.json", include_in_schema=False)
+def openapi_public():
+    if app.openapi_schema is None:
+        spec = get_openapi(title=app.title, version=app.version, description=app.description, routes=app.routes)
+        spec["paths"] = {p: v for p, v in spec["paths"].items() if p in PUBLIC_ROUTES}
+        # first: relative to wherever this spec was fetched from (here, or behind the public door)
+        spec["servers"] = [{"url": ".", "description": "where this spec was loaded from"},
+                           {"url": PUBLIC_BASE, "description": "public (60 requests/minute per address)"}]
+        app.openapi_schema = spec
+    return JSONResponse(app.openapi_schema)
+
+
+@app.get("/docs", include_in_schema=False)
+def docs():
+    return get_swagger_ui_html(openapi_url="openapi.json", title=f"{app.title} · reference")
+
+
 @app.get("/search")
-def search(q: str = Query(..., min_length=2, max_length=2000), k: int = Query(10, ge=1, le=100),
-           mode: str = Query("auto", pattern="^(auto|semantic|keyword)$"), collection: str = "all",
-           year_from: int | None = None, year_to: int | None = None, type: str | None = None,
-           open_access: bool = False, license: str | None = None, pmc_open_access: bool = False,
-           abstracts: bool = True, nprobe: int = Query(NPROBE, ge=1, le=1024),
-           depth: int = Query(DEPTH, ge=10, le=5000), map: bool = False,
-           junk_penalty: float | None = Query(None, ge=0, le=10)):
+def search(q: str = Query(..., min_length=2, max_length=2000,
+                          description="A question, a description, keywords, or keyword syntax: \"phrase\", OR, "
+                                      "NOT/-word, brackets, word*, \"a b\"~5, title:/abstract:/keywords:"),
+           k: int = Query(10, ge=1, le=100, description=D_K),
+           mode: str = Query("auto", pattern="^(auto|semantic|keyword)$",
+                             description="semantic = by meaning; keyword = exact words (English stemming); auto = "
+                                         "keyword when q uses search syntax, else semantic"),
+           collection: str = Query("all", description=D_COLLECTION),
+           year_from: int | None = Query(None, description=D_YEAR_FROM),
+           year_to: int | None = Query(None, description=D_YEAR_TO),
+           type: str | None = Query(None, description=D_TYPE),
+           open_access: bool = Query(False, description=D_OA),
+           license: str | None = Query(None, description=D_LICENSE),
+           pmc_open_access: bool = Query(False, description=D_PMC),
+           abstracts: bool = Query(True, description=D_ABSTRACTS),
+           nprobe: int = Query(NPROBE, ge=1, le=1024, description=D_NPROBE),
+           depth: int = Query(DEPTH, ge=10, le=5000, description=D_DEPTH),
+           map: bool = Query(False, description="Add map-of-science positions (x, y in 0-1) to results and the question."),
+           junk_penalty: float | None = Query(None, ge=0, le=10, description=D_JUNK)):
+    """Search papers by meaning or by exact words. Retracted papers are always left out. Answers: mode, results,
+    filters, timing; by meaning also ranking; by exact words also matches (exact count) and query (as understood)."""
     if junk_penalty is None:
         junk_penalty = DEFAULT_JUNK_PENALTY.get(collection, 0.0)
     f = filters(year_from, year_to, type, open_access, license, pmc_open_access)
@@ -239,11 +324,20 @@ def search(q: str = Query(..., min_length=2, max_length=2000), k: int = Query(10
 
 
 @app.get("/similar/{ref:path}")
-def similar(ref: str, k: int = Query(10, ge=1, le=100), year_from: int | None = None,
-            year_to: int | None = None, type: str | None = None, open_access: bool = False,
-            license: str | None = None, pmc_open_access: bool = False, abstracts: bool = True,
-            nprobe: int = Query(NPROBE, ge=1, le=1024), depth: int = Query(DEPTH, ge=10, le=5000),
-            collection: str = "all", junk_penalty: float | None = Query(None, ge=0, le=10)):
+def similar(ref: str, k: int = Query(10, ge=1, le=100, description=D_K),
+            year_from: int | None = Query(None, description=D_YEAR_FROM),
+            year_to: int | None = Query(None, description=D_YEAR_TO),
+            type: str | None = Query(None, description=D_TYPE),
+            open_access: bool = Query(False, description=D_OA),
+            license: str | None = Query(None, description=D_LICENSE),
+            pmc_open_access: bool = Query(False, description=D_PMC),
+            abstracts: bool = Query(True, description=D_ABSTRACTS),
+            nprobe: int = Query(NPROBE, ge=1, le=1024, description=D_NPROBE),
+            depth: int = Query(DEPTH, ge=10, le=5000, description=D_DEPTH),
+            collection: str = Query("all", description=D_COLLECTION),
+            junk_penalty: float | None = Query(None, ge=0, le=10, description=D_JUNK)):
+    """Papers closest in meaning to one paper. ref: W-number (W2782456798), DOI or PMCID. 404 when the paper is
+    not in the index searched by meaning (older years are still being added)."""
     if junk_penalty is None:
         junk_penalty = DEFAULT_JUNK_PENALTY.get(collection, 0.0)
     e = semantic_engine(collection)
@@ -259,6 +353,7 @@ def similar(ref: str, k: int = Query(10, ge=1, le=100), year_from: int | None = 
 
 @app.get("/map/place")
 def map_place(ids: str = "", q: str | None = Query(None, max_length=2000)):
+    """Map-of-science positions (x, y in 0-1) of up to 200 papers (ids=W1,W2 or DOIs) and/or a question (q)."""
     if ATLAS is None:
         raise HTTPException(503, "no atlas build")
     out = {"atlas": ATLAS.id, "papers": {}, "missing": []}
@@ -278,6 +373,7 @@ def map_place(ids: str = "", q: str | None = Query(None, max_length=2000)):
 
 @app.get("/map/regions")
 def map_regions():
+    """Map-of-science field names, colours and label positions, and the release id used in tile URLs."""
     if ATLAS is None:
         raise HTTPException(503, "no atlas build")
     # "release": the id the tile URLs need (/map/tiles/<release>/...); the site reads it here
@@ -286,6 +382,8 @@ def map_regions():
 
 @app.get("/works/{ref:path}")
 def work(ref: str):
+    """One paper's full record. ref: W2782456798, https://openalex.org/W..., a DOI (10.1038/..., https://doi.org/...,
+    doi:...) or a PMCID (PMC1234567). Covers every paper in the corpus, all years."""
     w = engine.resolve(ref)
     d = engine.details([w]).get(w) if w is not None else None
     if d is None:
@@ -323,9 +421,14 @@ def map_counts():
 
 
 @app.get("/walk")
-def walk(id: str = Query(..., min_length=2, max_length=300), k: int = Query(30, ge=1, le=200),
-         max_refs: int = Query(300, ge=0), max_cites: int = Query(500, ge=0)):
-    """The citation walk from one paper, with each paper's map position and whether the site can open it."""
+def walk(id: str = Query(..., min_length=2, max_length=300, description="W-number or DOI of the starting paper."),
+         k: int = Query(30, ge=1, le=200, description="How many papers sharing its references to walk through."),
+         max_refs: int = Query(300, ge=0, description="Papers listing more references count as outliers (0 = no limit)."),
+         max_cites: int = Query(500, ge=0, description="Papers cited more often count as outliers (0 = no limit).")):
+    """The citation walk from one paper: the k papers citing most of the same references, and what they cite that
+    the starting paper does not. answers = the strongest "should also read / should have cited" candidates
+    (W-numbers); nodes = the papers (title, year, citations, topic, map position, readable on the site); links =
+    citation edges. 0.5-5 s. Returns an error when the paper has no references in the snapshot."""
     params = urllib.parse.urlencode({"id": id, "k": k, "max_refs": max_refs, "max_cites": max_cites})
     t = time.perf_counter()
     try:

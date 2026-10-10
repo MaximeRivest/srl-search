@@ -1,0 +1,146 @@
+# Scholars Reading List search API
+
+> Search ~200 million scholarly papers (OpenAlex titles and abstracts) by meaning or by exact words, find
+> papers similar to a given one, look a paper up by DOI / OpenAlex id / PMCID, and walk its citations.
+> Read-only JSON over HTTPS, no key. Built for ScienceMadeReadable; open to anyone's programs and agents.
+
+Base URL: https://api.sciencemadereadable.com/api/data
+(On Maxime's machines: http://127.0.0.1:8810 on lambda itself, https://lambda.tail69222b.ts.net:18810 on
+the tailnet. Same API and the same data, without the public rate limit.)
+
+Interactive reference (every parameter, try it in the browser): <base>/docs · machine-readable: <base>/openapi.json
+This guide: <base>/llms.txt
+
+## What is covered right now
+
+{{COVERAGE}}
+
+## Quick start
+
+```sh
+B=https://api.sciencemadereadable.com/api/data
+curl -G "$B/search" --data-urlencode "q=does intermittent fasting help weight loss" -d k=5 -d abstracts=false
+curl -G "$B/search" --data-urlencode 'q="gut microbiome" AND (autism OR ASD) NOT mice' -d k=5
+curl "$B/works/10.1126/science.aan8048"            # by DOI (also W123..., PMC123..., https://doi.org/...)
+curl "$B/similar/W2782456798?k=5&abstracts=false"
+curl "$B/walk?id=10.1126/science.aan8048&k=30"      # what papers like this one cite that it does not
+```
+
+```python
+import requests
+B = "https://api.sciencemadereadable.com/api/data"
+r = requests.get(f"{B}/search", params={"q": "microplastics in human placenta", "k": 20,
+                                        "year_from": 2020, "abstracts": "false"}, timeout=30)
+r.raise_for_status()
+for p in r.json()["results"]:
+    print(p["year"], p["citations"], p["title"], p["doi"] or p["openalex"])
+```
+
+## Endpoints
+
+### GET /search?q=...
+The main entry. Returns `{"mode", "results": [...], "filters", "timing", ...}`.
+
+- `q` (2–2000 characters). Plain language works: "why do cats purr", or a paragraph.
+- `mode` = `auto` (default) | `semantic` | `keyword`.
+  - **semantic** (by meaning): finds papers about the idea even without the same words. Best for questions
+    and descriptions. Answers carry `ranking` (how they were ordered).
+  - **keyword** (exact words, English stemming): plain words are ANDed; `"exact phrase"`, `OR`, `NOT` or
+    `-word`, brackets, `word*`, `"a b"~5` (within 5 words), `title:`, `abstract:`, `keywords:`. Answers carry
+    `matches` (exact count of matching papers) and `query` (how it was understood).
+  - **auto** picks keyword when `q` contains search syntax (quotes, AND/OR/NOT in capitals, brackets, `*`,
+    `-word`, `field:`), else semantic. If an auto keyword search matches nothing it searches by meaning and
+    says so in `fallback`.
+- `k` results, 1–100 (default 10). There is no paging: ask for up to 100 at once.
+- Filters: `year_from`, `year_to`, `type` (article, review, preprint, book, book-chapter, conference-paper,
+  dissertation, report, letter, editorial, ...), `open_access=true`, `license` (e.g. `cc-by`),
+  `pmc_open_access=true` (full text in PubMed Central's open-access set).
+- `collection` = `all` (default) | `smr`: only papers ScienceMadeReadable can open and rewrite (PubMed
+  Central, CC BY, research articles).
+- `abstracts=false` drops abstracts from the answer (about 10x smaller). Use it unless you need them.
+- `junk_penalty` (semantic only): ranking is similarity − junk_penalty × `junk`; default 0.3 for `all`,
+  0 for `smr`. 0 = pure similarity.
+- `map=true` adds each result's position on the map of science (`x`, `y`, both 0–1) and where the
+  question lands (`map`).
+
+Identical records appear once; a preprint and its published version are different records and can both
+appear (merge by `doi` or title if that matters). Left out unless you ask with `type=`: datasets, figures, covers and other non-publications. Always left out:
+retracted papers (OpenAlex flag, or titles starting "[RETRACTED]" / "Retraction Note:").
+
+### GET /similar/{ref}
+Papers closest in meaning to one paper. `ref` = W-number, DOI or PMCID. Same `k`, filters, `abstracts`,
+`collection` and `junk_penalty` as /search. 404 if the paper is not in the semantic index (see coverage).
+
+### GET /works/{ref}
+One paper's full record (fields below). `ref` = `W2782456798`, `https://openalex.org/W...`, a DOI
+(`10.1126/science.aan8048`, `https://doi.org/...`, `doi:...`) or a PMCID (`PMC1234567`). 404 if unknown.
+
+### GET /walk?id=...
+A citation walk from one paper (W-number or DOI): the papers that cite most of the same references (`k`
+of them, default 30) and, among what *they* cite, what the starting paper does not: `answers` (W-numbers)
+are the strongest candidates for "what this paper should also have cited / what to read next". Also
+returns `nodes` (title, year, citations, topic per paper), `columns`, `links` (citation edges), `stats`.
+Papers listing more than `max_refs` (300) references or with more than `max_cites` (500) citations count
+as outliers. Slow: 0.5–5 s. Fails with an `error` when the paper has no references in the snapshot.
+
+### GET /map/place?ids=W1,W2&q=...   ·   GET /map/regions   ·   GET /map/counts
+Positions on the map of science for up to 200 papers and/or a question; field names, colours and label
+positions; exact publication counts per year and subfield. Mostly for drawing maps.
+
+## Result fields
+
+| field | meaning |
+|---|---|
+| `id` | OpenAlex W-number, e.g. `W2782456798`; `openalex` is its URL. Use it to cite and to call /works, /similar, /walk |
+| `doi`, `pmcid` | identifiers when known (DOI without `https://doi.org/`) |
+| `title`, `abstract` | as OpenAlex has them; abstracts can contain HTML/JATS tags |
+| `date`, `year` | publication date |
+| `type` | article, review, preprint, book-chapter, ... |
+| `authors`, `authors_count` | first 12 names joined with `" | "`, and the full count |
+| `venue`, `publisher` | journal / repository / book and its publisher |
+| `citations` | times cited (OpenAlex, at the snapshot date) |
+| `is_oa`, `oa_status`, `license`, `url`, `pdf_url` | open access; links to the landing page and PDF when known |
+| `topic`, `field`, `keywords`, `mesh` | OpenAlex's subject labels and MeSH terms (see limits) |
+| `pmc_oa`, `pmc_license`, `pmc_type` | PubMed Central open-access copy: present, its licence, article type |
+| `smr` | 1 if ScienceMadeReadable can open it: https://sciencemadereadable.com |
+| `score` | semantic: cosine similarity (≈0.3–0.7; compare within one search only). keyword: BM25 |
+| `junk` | 0–1, how likely the record is spam, an advert or not scholarship (semantic results only) |
+| `is_retracted` | always 0 in search results (retracted papers are left out); can be 1 in /works |
+
+## Using it well (for agents)
+
+- **Plain questions go to semantic, precise needs to keyword.** "effects of screen time on toddlers' sleep"
+  → semantic. A named gene, drug, acronym, author's exact phrase, or "everything that mentions X" →
+  keyword with quotes. For a literature review, run both and merge by `id`.
+- **Phrase like a paper, not like a search box.** Semantic search matches writing style too. "how to loose
+  weight" pulls in blog-like records; "effectiveness of dietary and exercise interventions for weight loss
+  in adults" pulls in trials and reviews. Rewriting a casual question into research language before
+  searching is the single biggest quality gain; the junk penalty handles most of the rest.
+- **Snowball**: take the best 2–3 results → `/similar/{id}` for more of the same, `/walk?id=` for the
+  literature around them. Deduplicate by `id`.
+- **Judge papers from the record**: `type` (review vs article), `citations` relative to `year`, `venue`,
+  `junk`. Citation counts favour older papers and big fields; do not treat them as quality alone.
+- **Save tokens**: `abstracts=false` for screening, then `/works/{id}` only for the papers you keep.
+- **Cite** with DOI when present, else the `openalex` URL. Do not invent details the record lacks.
+- **Be gentle**: the public door allows 60 requests per minute per address (HTTP 429 beyond; wait a
+  minute). Do not run searches in parallel loops; ask for `k=100` once rather than paging.
+
+## Limits and honesty
+
+- Search covers English titles + abstracts only (no full texts); papers without an English abstract are
+  not in it. Search by meaning reaches back only as far as the coverage above says; exact-word search and
+  /works cover the whole corpus.
+- Data is an OpenAlex snapshot (see coverage): very recent papers and corrections arrive later.
+- `topic` / `field` labels come from that snapshot and are often wrong: OpenAlex has since relabelled more
+  than half of a random sample. Don't rely on them for classification; the text is more reliable.
+- `junk` is a model (trained on labels from an AI judge, validated on 60 test questions): it pushes
+  junk down, but it also pushes down some real papers with thin records (no authors or references listed),
+  and it does not judge whether a paper is *right* (crank papers can score clean).
+- Errors: 400/422 bad parameters (the body says which), 404 unknown paper or route, 429 too many requests,
+  502/503 search briefly unavailable (e.g. during a nightly data update, ~1–3 minutes): retry later.
+
+## Sources
+
+Paper records: OpenAlex (CC0). Full-text flags: PubMed Central (NCBI). Embeddings: DenseOn
+(lightonai/DenseOn). Operated for ScienceMadeReadable. Requests (including search words) appear in the
+server's request log, which does not record your address.
