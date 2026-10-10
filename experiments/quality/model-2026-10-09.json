@@ -1,0 +1,23 @@
+{
+ "training_papers": 14087,
+ "junk_share": 0.15404273443600483,
+ "dropped_eval_overlap": 126,
+ "cv": {
+  "record": {
+   "average_precision": 0.698,
+   "roc_auc": 0.9094,
+   "C": 0.01
+  },
+  "text": {
+   "average_precision": 0.8631,
+   "roc_auc": 0.9603,
+   "C": 1.0
+  },
+  "both": {
+   "average_precision": 0.8972,
+   "roc_auc": 0.9713,
+   "C": 1.0
+  }
+ },
+ "note": "class_weight=balanced: probabilities are relative scores, not calibrated rates"
+}

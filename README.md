@@ -28,7 +28,8 @@ Filters: `year_from`, `year_to`, `type`, `open_access`, `license`, `pmc_open_acc
 (the article's full text is in our PMC mirror), `abstracts=false`. Retracted works and
 paratext (covers, tables of contents) are left out unless asked for. Each result carries
 OpenAlex id, DOI, PMCID, title, authors (first 12 + count), venue, year, type, licence,
-open-access status, citations, links, abstract and a similarity score. `timing` shows where the
+open-access status, citations, links, abstract, a similarity score and `junk` (how likely the record is spam
+or not scholarship). `timing` shows where the
 time went.
 
 How a search works: DenseOn encodes the question on CPU (`query:` prompt) → exact comparison
@@ -82,6 +83,18 @@ Lessons from the first build:
 - 2.9M of the 63.8M rows (4.6%) are exact duplicate texts (BacDive strain templates x65,210,
   DEPRECATED Zenodo records, journal covers). Results collapse identical records; the next
   build should index each distinct text once and leave boilerplate out.
+
+## Ranking: junk sinks (since 2026-10-09)
+
+Search by meaning ranks by similarity − `junk_penalty` × P(junk) (default 0.3 for `all`, 0 for the curated
+`smr`; `junk_penalty=0` gives pure similarity, `ranking` in the answer says which). P(junk) comes from a
+small model over record signals OpenAlex has but the details store lacked (expansion-pack flag, source type,
+core/DOAJ lists, references, authors, the venue's habits) and the paper's own embedding:
+`build_quality.py` (11 min per snapshot) → `fit_quality.py` → `srl_search/quality.py`. On 60 judged questions,
+junk in the top 10 went from 27% to 1% (everyday-advice questions: 54% to 0%) and useful nDCG@10 from
+0.57 to 0.78. Method, costs and what was tried instead (question rewriting): `experiments/quality/README.md`.
+Exact-word results are not re-ranked. Titles marked "[RETRACTED]" / "Retraction Note:" are treated as
+retracted. In auto mode, a query that looked like search syntax but matched nothing is searched by meaning.
 
 ## The shared corpus (since 2026-10-08)
 

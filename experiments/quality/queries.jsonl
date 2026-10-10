@@ -1,0 +1,60 @@
+{"qid": "q01", "style": "lay", "q": "how to loose weight", "need": "What actually works for losing weight (diet, exercise, behaviour), as studied."}
+{"qid": "q02", "style": "lay", "q": "best diet to lose belly fat", "need": "Which diets reduce abdominal/visceral fat, per studies."}
+{"qid": "q03", "style": "lay", "q": "does keto work", "need": "Evidence on ketogenic diets for weight loss or health."}
+{"qid": "q04", "style": "lay", "q": "how to get rid of acne", "need": "Effective acne treatments, per clinical evidence."}
+{"qid": "q05", "style": "lay", "q": "hair loss treatment that works", "need": "Treatments for hair loss (e.g. androgenetic alopecia) with evidence of efficacy."}
+{"qid": "q06", "style": "lay", "q": "how to sleep better", "need": "Interventions that improve sleep quality or insomnia."}
+{"qid": "q07", "style": "lay", "q": "is CBD oil good for anxiety", "need": "Evidence on cannabidiol for anxiety."}
+{"qid": "q08", "style": "lay", "q": "best supplements for joint pain", "need": "Dietary supplements (glucosamine, curcumin, etc.) for joint pain or osteoarthritis, evidence."}
+{"qid": "q09", "style": "lay", "q": "how to make money with crypto", "need": "Research on returns, risks, trading or investing in cryptocurrencies."}
+{"qid": "q10", "style": "lay", "q": "how to invest in stocks for beginners", "need": "Research on individual/retail investor strategies, returns, financial literacy."}
+{"qid": "q11", "style": "lay", "q": "how to learn a language fast", "need": "Research on effective second-language learning methods."}
+{"qid": "q12", "style": "lay", "q": "how to improve my SEO ranking", "need": "Research on search engine optimisation and ranking factors."}
+{"qid": "q13", "style": "lay", "q": "how to stop snoring", "need": "Treatments for snoring or mild sleep apnea."}
+{"qid": "q14", "style": "lay", "q": "natural remedies for high blood pressure", "need": "Non-drug interventions (diet, exercise, supplements) for hypertension, evidence."}
+{"qid": "q15", "style": "lay", "q": "how to build muscle fast", "need": "Resistance training and nutrition for muscle hypertrophy, evidence."}
+{"qid": "q16", "style": "lay", "q": "intermittent fasting benefits", "need": "Health effects of intermittent fasting / time-restricted eating."}
+{"qid": "q17", "style": "lay", "q": "how to get pregnant faster", "need": "Factors and interventions that improve fertility or time to pregnancy."}
+{"qid": "q18", "style": "lay", "q": "how to quit smoking", "need": "Effective smoking-cessation interventions."}
+{"qid": "q19", "style": "lay", "q": "anti aging skin care that actually works", "need": "Topical or other interventions with evidence against skin ageing."}
+{"qid": "q20", "style": "lay", "q": "how to increase testosterone naturally", "need": "Lifestyle/diet factors that affect testosterone levels, evidence."}
+{"qid": "q21", "style": "lay", "q": "how to write a good essay", "need": "Research on teaching or improving academic essay writing."}
+{"qid": "q22", "style": "lay", "q": "best way to treat type 2 diabetes without medication", "need": "Lifestyle interventions (diet, exercise, weight loss) for type 2 diabetes control or remission."}
+{"qid": "q23", "style": "lay", "q": "how much water should I drink a day", "need": "Research on daily water intake requirements and hydration."}
+{"qid": "q24", "style": "lay", "q": "is coffee bad for you", "need": "Health effects of coffee consumption."}
+{"qid": "q25", "style": "curious", "q": "why do cats purr", "need": "Mechanism or function of purring in cats."}
+{"qid": "q26", "style": "curious", "q": "why is the sky blue", "need": "Physics of sky colour: Rayleigh scattering."}
+{"qid": "q27", "style": "curious", "q": "does reading in dim light damage your eyes", "need": "Whether low light reading harms vision / causes myopia."}
+{"qid": "q28", "style": "curious", "q": "do vaccines cause autism", "need": "Evidence on vaccines (e.g. MMR) and autism risk."}
+{"qid": "q29", "style": "curious", "q": "is screen time bad for kids", "need": "Effects of screen time on children's development or health."}
+{"qid": "q30", "style": "curious", "q": "why do we dream", "need": "Theories and research on the function of dreaming."}
+{"qid": "q31", "style": "curious", "q": "can dogs understand human words", "need": "Research on dogs' comprehension of human speech/words."}
+{"qid": "q32", "style": "curious", "q": "does music help plants grow", "need": "Effects of sound or music on plant growth."}
+{"qid": "q33", "style": "curious", "q": "how do bees find their way home", "need": "Bee navigation and homing mechanisms."}
+{"qid": "q34", "style": "curious", "q": "is climate change making hurricanes worse", "need": "Effect of climate change on tropical cyclone intensity/frequency."}
+{"qid": "q35", "style": "curious", "q": "why do we get goosebumps", "need": "Physiology/function of piloerection in humans."}
+{"qid": "q36", "style": "curious", "q": "does social media make teenagers depressed", "need": "Social media use and adolescent depression or mental health."}
+{"qid": "q37", "style": "research", "q": "effectiveness of cognitive behavioural therapy for insomnia in adults", "need": "CBT-I efficacy in adults."}
+{"qid": "q38", "style": "research", "q": "association between ultra-processed food consumption and all-cause mortality", "need": "Ultra-processed food intake and mortality."}
+{"qid": "q39", "style": "research", "q": "transformer models for protein structure prediction", "need": "Deep learning / transformer methods predicting protein structure."}
+{"qid": "q40", "style": "research", "q": "microplastics in human placenta", "need": "Detection or effects of microplastics in human placenta."}
+{"qid": "q41", "style": "research", "q": "effect of minimum wage increases on employment", "need": "Employment effects of minimum wage."}
+{"qid": "q42", "style": "research", "q": "GLP-1 receptor agonists and weight loss in non-diabetic adults", "need": "GLP-1 RA (semaglutide, liraglutide) for weight loss without diabetes."}
+{"qid": "q43", "style": "research", "q": "graph neural networks for molecular property prediction", "need": "GNN methods for predicting molecular properties."}
+{"qid": "q44", "style": "research", "q": "ocean acidification effects on coral calcification", "need": "Ocean acidification impact on coral calcification."}
+{"qid": "q45", "style": "research", "q": "long-term cognitive outcomes after COVID-19 infection", "need": "Cognitive impairment after COVID-19."}
+{"qid": "q46", "style": "research", "q": "dark matter direct detection experiments", "need": "Direct detection experiments for dark matter (e.g. xenon TPCs)."}
+{"qid": "q47", "style": "research", "q": "machine learning for early sepsis detection in intensive care", "need": "ML models predicting sepsis early in ICU."}
+{"qid": "q48", "style": "research", "q": "urban green space and mental health", "need": "Urban green space exposure and mental health outcomes."}
+{"qid": "q49", "style": "research", "q": "CRISPR base editing for sickle cell disease", "need": "Base editing approaches to treat sickle cell disease."}
+{"qid": "q50", "style": "research", "q": "language model hallucination detection", "need": "Methods for detecting hallucinations in large language models."}
+{"qid": "q51", "style": "terse", "q": "vitamin D depression", "need": "Vitamin D and depression (association or supplementation)."}
+{"qid": "q52", "style": "terse", "q": "turmeric inflammation", "need": "Turmeric/curcumin and inflammation."}
+{"qid": "q53", "style": "terse", "q": "bitcoin price prediction", "need": "Forecasting bitcoin prices."}
+{"qid": "q54", "style": "terse", "q": "perovskite solar cell stability", "need": "Stability/degradation of perovskite solar cells."}
+{"qid": "q55", "style": "terse", "q": "Riemann hypothesis", "need": "Research on the Riemann hypothesis / zeta zeros."}
+{"qid": "q56", "style": "terse", "q": "Roman empire economy", "need": "Economy of the Roman Empire."}
+{"qid": "q57", "style": "terse", "q": "apple cider vinegar", "need": "Health effects of apple cider vinegar."}
+{"qid": "q58", "style": "terse", "q": "yoga back pain", "need": "Yoga for (low) back pain."}
+{"qid": "q59", "style": "terse", "q": "meditation stress", "need": "Meditation / mindfulness and stress reduction."}
+{"qid": "q60", "style": "terse", "q": "essential oils", "need": "Research on essential oils (properties, uses, efficacy)."}
