@@ -4,6 +4,7 @@ from the original float16 vectors -> paper details from SQLite.
 from __future__ import annotations
 
 import json
+import re
 import sqlite3
 import threading
 import time
@@ -12,10 +13,19 @@ from pathlib import Path
 import faiss
 import numpy as np
 
+from srl_search.quality import Quality
 from srl_search.scope import SCHOLARLY_TYPES
 from srl_search.vectors import Vectors
 
 EMBEDDING_PLAN = Path("/mnt/fast/openalex-embeddings/denseon-english-abstracts/manifest.json")
+
+# Ranking: similarity - JUNK_PENALTY * P(junk) (srl_search/quality.py). 0.3 was chosen on the training questions
+# and then measured once on the 60 evaluation questions (experiments/quality/README.md, 2026-10-09).
+JUNK_PENALTY = 0.3
+# Some retracted papers, and retraction notices, are only marked in their title (OpenAlex's is_retracted is
+# not set): "[RETRACTED] ...", "RETRACTED: ...", "Retraction Note: ...". A bracket or colon is required, so a
+# study *about* retractions ("Retracted papers in medicine") is kept.
+RETRACTED_TITLE = re.compile(r"^\W*\[?\s*(retracted(\s+article)?|retraction(\s+(note|notice|statement))?)\s*[\]:]", re.I)
 
 FIELDS = ["id", "doi", "title", "date", "year", "type", "authors", "authors_count", "venue", "publisher",
           "is_oa", "oa_status", "license", "citations", "is_retracted", "url", "pdf_url", "topic",
@@ -57,8 +67,10 @@ class Encoder:
 
 
 class Engine:
-    def __init__(self, index_dir: Path, meta_path: Path, threads: int = 4, encoder: bool = True):
+    def __init__(self, index_dir: Path, meta_path: Path, threads: int = 4, encoder: bool = True,
+                 quality: Quality | None = None):
         self.threads = threads
+        self.quality = quality if quality is not None and quality.model is not None else None
         faiss.omp_set_num_threads(threads)
         self.manifest = json.loads((index_dir / "manifest.json").read_text())
         self.index = faiss.read_index(str(index_dir / "ivf.faiss"))
@@ -126,8 +138,9 @@ class Engine:
         return None
 
     # -------------------------------------------------------------- search
-    def search_vector(self, q: np.ndarray, k: int, nprobe: int, depth: int,
-                      keep=None, exclude: int | None = None) -> tuple[list[tuple[int, float]], dict]:
+    def search_vector(self, q: np.ndarray, k: int, nprobe: int, depth: int, keep=None, exclude: int | None = None,
+                      junk_penalty: float = 0.0) -> tuple[list[tuple], dict]:
+        """Candidates best first, as (W-number, ranking score, similarity, P(junk) or None)."""
         faiss.omp_set_num_threads(self.threads)  # OpenMP thread count is per calling thread
         t = time.perf_counter()
         params = faiss.SearchParametersIVF(nprobe=nprobe)
@@ -135,40 +148,46 @@ class Engine:
         cand = cand[0][cand[0] >= 0]
         t_ivf = time.perf_counter() - t
         t = time.perf_counter()
-        exact = self.vectors.get(cand) @ q.reshape(-1)
-        order = np.argsort(-exact)
-        wids = np.asarray(self.work_ids[cand[order]], dtype=np.int64)
-        scores = exact[order]
+        vecs = self.vectors.get(cand)
+        exact = vecs @ q.reshape(-1)
+        wids = np.asarray(self.work_ids[cand], dtype=np.int64)
         t_rerank = time.perf_counter() - t
-        hits = [(int(w), float(s)) for w, s in zip(wids, scores) if w != exclude]
+        hits, t_junk = rank(wids, exact, vecs, self.quality, junk_penalty, exclude)
         timing = {"candidates": int(len(cand)), "ivf_ms": round(t_ivf * 1000, 1),
                   "rerank_ms": round(t_rerank * 1000, 1)}
+        if t_junk is not None:
+            timing["junk_ms"] = round(t_junk * 1000, 1)
         return hits, timing
 
     def search(self, text: str, k: int = 10, nprobe: int = 64, depth: int = 300,
-               filters: dict | None = None, abstracts: bool = True) -> dict:
+               filters: dict | None = None, abstracts: bool = True, junk_penalty: float = JUNK_PENALTY) -> dict:
         t0 = time.perf_counter()
         q = self.encoder.encode(text)[0]
         t_enc = time.perf_counter() - t0
-        return self._finish(q, k, nprobe, depth, filters, abstracts, {"encode_ms": round(t_enc * 1000, 1)}, t0)
+        return self._finish(q, k, nprobe, depth, filters, abstracts, {"encode_ms": round(t_enc * 1000, 1)}, t0,
+                            junk_penalty=junk_penalty)
 
     def similar(self, work_id: int, k: int = 10, nprobe: int = 64, depth: int = 300,
-                filters: dict | None = None, abstracts: bool = True) -> dict | None:
+                filters: dict | None = None, abstracts: bool = True, junk_penalty: float = JUNK_PENALTY) -> dict | None:
         t0 = time.perf_counter()
         pos = self.position_of(work_id)
         if pos is None:
             return None
         q = self.vectors.get(np.array([pos]))[0]
-        return self._finish(q, k, nprobe, depth, filters, abstracts, {}, t0, exclude=work_id)
+        return self._finish(q, k, nprobe, depth, filters, abstracts, {}, t0, exclude=work_id,
+                            junk_penalty=junk_penalty)
 
-    def shape(self, hits: list[tuple[int, float]], k: int, filters: dict, abstracts: bool) -> list[dict]:
-        """Details for scored ids, best first: filters applied, identical records once, k at most."""
+    def shape(self, hits: list[tuple], k: int, filters: dict, abstracts: bool) -> list[dict]:
+        """Details for scored ids, best first: filters applied, identical records once, k at most.
+        Hits are (W-number, score) or (W-number, ranking score, similarity, P(junk) or None); "score" stays
+        what it always was (similarity, or the keyword score), "junk" is added when known."""
         results, seen = [], set()
         step = 200 if filters else max(k, 20)
         for start in range(0, len(hits), step):
             page = hits[start:start + step]
-            det = self.details([w for w, _ in page])
-            for w, s in page:
+            det = self.details([h[0] for h in page])
+            for h in page:
+                w, s = h[0], (h[2] if len(h) > 2 else h[1])
                 d = det.get(w)
                 if d is None or not passes(d, filters):
                     continue
@@ -179,6 +198,8 @@ class Engine:
                 if not abstracts:
                     d.pop("abstract", None)
                 d["score"] = round(s, 4)
+                if len(h) > 3 and h[3] is not None:
+                    d["junk"] = round(h[3], 3)
                 d["openalex"] = f"https://openalex.org/W{w}"
                 d["id"] = f"W{w}"
                 results.append(d)
@@ -186,17 +207,21 @@ class Engine:
                     return results
         return results
 
-    def _finish(self, q, k, nprobe, depth, filters, abstracts, timing, t0, exclude=None) -> dict:
+    def _finish(self, q, k, nprobe, depth, filters, abstracts, timing, t0, exclude=None,
+                junk_penalty: float = JUNK_PENALTY) -> dict:
         filters = {f: v for f, v in (filters or {}).items() if v is not None}
         if filters:
             depth = max(depth, 2000)
-        hits, t = self.search_vector(q, k, nprobe, depth, exclude=exclude)
+        hits, t = self.search_vector(q, k, nprobe, depth, exclude=exclude, junk_penalty=junk_penalty)
         timing.update(t)
         t = time.perf_counter()
         results = self.shape(hits, k, filters, abstracts)
         timing["details_ms"] = round((time.perf_counter() - t) * 1000, 1)
         timing["total_ms"] = round((time.perf_counter() - t0) * 1000, 1)
-        return {"results": results, "timing": timing, "filters": filters}
+        on = self.quality is not None and junk_penalty > 0
+        ranking = {"by": "similarity - junk_penalty * junk" if on else "similarity",
+                   "junk_penalty": junk_penalty if on else 0}
+        return {"results": results, "timing": timing, "filters": filters, "ranking": ranking}
 
 
 class ExactEngine(Engine):
@@ -204,8 +229,9 @@ class ExactEngine(Engine):
     OpenAlex W-numbers. Flat (every paper compared) or IVF (the `nprobe` closest groups compared)."""
 
     def __init__(self, collection_dir: Path, threads: int = 4, encoder: "Encoder | None" = None, nprobe: int = 512,
-                 meta_path: Path | None = None):
+                 meta_path: Path | None = None, quality: Quality | None = None):
         self.threads = threads
+        self.quality = quality if quality is not None and quality.model is not None else None
         self.manifest = json.loads((collection_dir / "manifest.json").read_text())
         self.manifest.setdefault("min_date", self.manifest.get("oldest_shard_date"))
         self.index = faiss.read_index(str(collection_dir / "index.faiss"))
@@ -217,21 +243,43 @@ class ExactEngine(Engine):
         self.local = threading.local()
         self.encoder = encoder
 
-    def search_vector(self, q, k, nprobe, depth, keep=None, exclude=None):
+    def search_vector(self, q, k, nprobe, depth, keep=None, exclude=None, junk_penalty: float = 0.0):
         faiss.omp_set_num_threads(self.threads)
         t = time.perf_counter()
         scores, ids = self.index.search(q.reshape(1, -1).astype(np.float32), depth)
         m = ids[0] >= 0
-        hits = [(int(w), float(s)) for w, s in zip(ids[0][m], scores[0][m]) if w != exclude]
-        return hits, {"candidates": int(m.sum()), "exact_ms": round((time.perf_counter() - t) * 1000, 1)}
+        wids, sims = ids[0][m].astype(np.int64), scores[0][m]
+        timing = {"candidates": int(m.sum()), "exact_ms": round((time.perf_counter() - t) * 1000, 1)}
+        vecs = None
+        if self.quality is not None and len(wids):
+            vecs = np.vstack([self.index.reconstruct(int(w)) for w in wids])
+        hits, t_junk = rank(wids, sims, vecs, self.quality, junk_penalty, exclude)
+        if t_junk is not None:
+            timing["junk_ms"] = round(t_junk * 1000, 1)
+        return hits, timing
 
-    def similar(self, work_id, k=10, nprobe=0, depth=300, filters=None, abstracts=True):
+    def similar(self, work_id, k=10, nprobe=0, depth=300, filters=None, abstracts=True, junk_penalty=JUNK_PENALTY):
         t0 = time.perf_counter()
         try:
             q = self.index.reconstruct(int(work_id))
         except RuntimeError:  # not in this collection
             return None
-        return self._finish(q, k, nprobe, depth, filters, abstracts, {}, t0, exclude=work_id)
+        return self._finish(q, k, nprobe, depth, filters, abstracts, {}, t0, exclude=work_id,
+                            junk_penalty=junk_penalty)
+
+
+def rank(wids: np.ndarray, sims: np.ndarray, vecs: np.ndarray | None, quality: Quality | None,
+         junk_penalty: float, exclude: int | None) -> tuple[list[tuple], float | None]:
+    """Order candidates by similarity - junk_penalty * P(junk). P(junk) is computed (and reported) whenever a
+    model is loaded, even with the penalty at 0, so clients can see it; ties keep the similarity order."""
+    t = time.perf_counter()
+    junk = quality.junk(wids, vecs) if quality is not None and len(wids) else None
+    t_junk = time.perf_counter() - t if junk is not None else None
+    score = sims - junk_penalty * junk if junk is not None and junk_penalty else sims
+    order = np.lexsort((-sims, -score))
+    hits = [(int(wids[i]), float(score[i]), float(sims[i]), None if junk is None else float(junk[i]))
+            for i in order if int(wids[i]) != exclude]
+    return hits, t_junk
 
 
 def passes(d: dict, f: dict) -> bool:
@@ -249,6 +297,6 @@ def passes(d: dict, f: dict) -> bool:
         return False
     if f.get("pmc_open_access") and not d["pmc_oa"]:
         return False
-    if f.get("exclude_retracted", True) and d["is_retracted"]:
+    if f.get("exclude_retracted", True) and (d["is_retracted"] or RETRACTED_TITLE.match(d.get("title") or "")):
         return False
     return True

@@ -1,0 +1,44 @@
+top 10; each cell: spam / junk (spam + non-research) / useful nDCG / useful results
+run                                                all                   curious                       lay                  research                     terse
+baseline                        15%   27% 0.569   6.5     2%   17% 0.651   7.0    35%   54% 0.285   3.8     0%    4% 0.856   9.1     3%    7% 0.749   8.3
+svc-junk                         0%    1% 0.775   8.7     0%    2% 0.796   8.0     0%    0% 0.676   8.5     0%    0% 0.884   9.3     0%    1% 0.832   9.1
+rewrite_haiku                    1%    7% 0.718   8.2     1%    7% 0.660   6.9     1%    5% 0.681   8.4     0%    4% 0.860   9.2     2%   16% 0.677   7.6
+hyde_haiku                       0%    3% 0.743   8.1     1%    3% 0.768   7.7     0%    4% 0.639   7.3     0%    1% 0.791   8.6     0%    1% 0.895   9.8
+hyde_9b                          3%    9% 0.747   8.3     1%    4% 0.716   7.7     6%   16% 0.664   7.6     0%    2% 0.854   9.3     1%    8% 0.836   9.2
+fuse_rewrite                     5%   11% 0.725   8.1     1%    6% 0.737   7.5    12%   19% 0.633   7.6     0%    4% 0.861   9.2     1%    7% 0.742   8.4
+fuse_rewrite+junk0.3             0%    1% 0.755   8.6     0%    2% 0.713   7.3     0%    0% 0.677   8.5     0%    0% 0.884   9.3     0%    1% 0.810   9.2
+hyde_9b+junk0.3                  0%    0% 0.805   8.9     0%    0% 0.745   8.0     0%    0% 0.773   8.6     0%    0% 0.858   9.4     1%    1% 0.879   9.9
+  svc-junk vs baseline: junk -0.267 (95% -0.348 … -0.192); better on 40, worse on 0 of 60 questions
+  svc-junk vs baseline: ndcg +0.206 (95% +0.144 … +0.267); better on 44, worse on 9 of 60 questions
+  rewrite_haiku vs baseline: junk -0.203 (95% -0.288 … -0.125); better on 30, worse on 4 of 60 questions
+  rewrite_haiku vs baseline: ndcg +0.149 (95% +0.077 … +0.223); better on 33, worse on 16 of 60 questions
+  hyde_haiku vs baseline: junk -0.245 (95% -0.322 … -0.173); better on 40, worse on 3 of 60 questions
+  hyde_haiku vs baseline: ndcg +0.174 (95% +0.086 … +0.256); better on 41, worse on 16 of 60 questions
+  hyde_9b vs baseline: junk -0.180 (95% -0.245 … -0.120); better on 39, worse on 6 of 60 questions
+  hyde_9b vs baseline: ndcg +0.178 (95% +0.118 … +0.243); better on 42, worse on 16 of 60 questions
+  fuse_rewrite vs baseline: junk -0.162 (95% -0.218 … -0.113); better on 31, worse on 1 of 60 questions
+  fuse_rewrite vs baseline: ndcg +0.156 (95% +0.103 … +0.209); better on 39, worse on 8 of 60 questions
+  fuse_rewrite+junk0.3 vs baseline: junk -0.267 (95% -0.348 … -0.193); better on 40, worse on 0 of 60 questions
+  fuse_rewrite+junk0.3 vs baseline: ndcg +0.186 (95% +0.121 … +0.255); better on 41, worse on 13 of 60 questions
+  hyde_9b+junk0.3 vs baseline: junk -0.270 (95% -0.353 … -0.195); better on 42, worse on 0 of 60 questions
+  hyde_9b+junk0.3 vs baseline: ndcg +0.236 (95% +0.166 … +0.310); better on 43, worse on 13 of 60 questions
+
+top 10; each cell: spam / junk (spam + non-research) / useful nDCG / useful results
+run                                                all                   curious                       lay                  research                     terse
+smr-off                          0%    0% 0.672   7.5     0%    0% 0.603   6.5     0%    1% 0.612   7.2     0%    0% 0.723   8.1     0%    0% 0.827   8.7
+smr-junk                         0%    0% 0.665   7.4     0%    0% 0.599   6.5     0%    0% 0.605   7.0     0%    0% 0.718   7.9     0%    0% 0.814   8.6
+  smr-junk vs smr-off: junk -0.003 (95% -0.008 … +0.000); better on 2, worse on 0 of 60 questions
+  smr-junk vs smr-off: ndcg -0.007 (95% -0.017 … +0.004); better on 23, worse on 22 of 60 questions
+
+top 10; each cell: spam / junk (spam + non-research) / useful nDCG / useful results
+run                                                all                   curious                       lay                  research                     terse
+train-baseline                   8%   20% 0.501   5.5     0%   14% 0.494   5.8    16%   30% 0.431   4.2     1%    5% 0.656   7.8     0%    7% 0.571   7.1
+train-junk0.1                    2%    4% 0.611   6.5     0%    2% 0.565   6.3     4%    6% 0.595   5.6     0%    0% 0.681   8.2     0%    0% 0.634   7.7
+train-junk0.3                    1%    1% 0.621   6.5     0%    1% 0.552   6.1     2%    2% 0.617   5.6     0%    0% 0.681   8.2     0%    0% 0.644   7.7
+train-junk1.0                    1%    1% 0.617   6.4     0%    0% 0.555   5.9     2%    2% 0.597   5.6     0%    0% 0.686   8.2     0%    0% 0.671   7.8
+  train-junk0.1 vs train-baseline: junk -0.159 (95% -0.179 … -0.141); better on 235, worse on 0 of 367 questions
+  train-junk0.1 vs train-baseline: ndcg +0.110 (95% +0.094 … +0.128); better on 280, worse on 69 of 367 questions
+  train-junk0.3 vs train-baseline: junk -0.183 (95% -0.206 … -0.161); better on 240, worse on 0 of 367 questions
+  train-junk0.3 vs train-baseline: ndcg +0.120 (95% +0.098 … +0.141); better on 268, worse on 90 of 367 questions
+  train-junk1.0 vs train-baseline: junk -0.183 (95% -0.208 … -0.162); better on 240, worse on 0 of 367 questions
+  train-junk1.0 vs train-baseline: ndcg +0.116 (95% +0.093 … +0.141); better on 256, worse on 105 of 367 questions
