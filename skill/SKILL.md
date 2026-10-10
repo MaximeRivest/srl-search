@@ -47,4 +47,22 @@ sciencemadereadable.com). Filters: `year_from`, `year_to`, `type=review|article|
 - Cite DOI when present, else the `openalex` URL. Never invent details a record lacks.
 - 502/503 for a minute or two = nightly data update or restart: retry later.
 
+## Citing in an answer
+
+Chattering (and anything reading the same format) turns this into paper cards with the real title,
+authors, summary and links, and flags a DOI that does not exist or a retracted paper:
+
+```markdown
+Semaglutide gave about 15% weight loss [1]; tirzepatide about 20% [2][3].
+
+## References
+- [1] https://doi.org/10.1056/nejmoa2032183 — Wilding 2021, NEJM
+- [2] https://doi.org/10.1056/nejmoa2206038 — Jastreboff 2022, NEJM
+- [3] https://doi.org/10.1056/nejmoa2416394 — Aronne 2025, NEJM
+```
+
+- The number goes right after the claim it supports. Number in order of first use; a paper keeps its number.
+- One line per number, the DOI link first (else the OpenAlex link). The label after the dash is optional.
+- Copy every identifier from a record you fetched in this conversation, never from memory.
+
 Source and maintenance: `~/Projects/scholarsreadinglist/search` (README.md, `dev.sh` to change it safely).
