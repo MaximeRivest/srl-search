@@ -102,3 +102,19 @@ def mode_place(sims, nn, Yref, spacing, tau, h, jitter, works=None, iters=3):
         near = ((Y - c[:, None]) ** 2).sum(-1).argmin(1)
         c = c + offsets(works) * (jitter * np.asarray(spacing, np.float64)[nn[rows, near]])[:, None]
     return np.clip(c, 0.0, 1.0).astype(np.float32)
+
+
+def question_spot(pts: np.ndarray, h: float = 0.04, top: int = 20) -> np.ndarray:
+    """Where a question "lands" on the map: the middle of the densest group of its top results (earlier results
+    weigh more; a few mean-shift steps, Gaussian of width h map units). Placing the question itself through the
+    291,556 references put short questions far from every result ("coral reefs": 0.41 map widths away, 0 of 20
+    results within 0.05). On 15 questions (2026-10-10), share of the top 20 within 0.05 of the spot: 0.82 on average
+    and never 0 (the atlas rule: 0.74, worst 0; the old mean rule: 0.62)."""
+    p = np.asarray(pts, np.float64)[:top]
+    w = 1.0 / np.sqrt(1.0 + np.arange(len(p)))
+    d2 = ((p[:, None] - p[None]) ** 2).sum(-1)
+    c = p[(w[None] * np.exp(-d2 / (2 * h * h))).sum(1).argmax()]
+    for _ in range(3):
+        k = w * np.exp(-((p - c) ** 2).sum(1) / (2 * h * h))
+        c = (k[:, None] * p).sum(0) / k.sum()
+    return c

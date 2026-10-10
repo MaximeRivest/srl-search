@@ -49,7 +49,7 @@ from fastapi.responses import FileResponse, JSONResponse
 
 import numpy as np
 
-from srl_search.atlas import Atlas
+from srl_search.atlas import Atlas, question_spot
 from srl_search.engine import JUNK_PENALTY, Engine, ExactEngine
 from srl_search.keyword import KeywordIndex, looks_boolean
 from srl_search.quality import Quality
@@ -139,7 +139,11 @@ def add_positions(out: dict, q: str | None) -> dict:
             r["x"], r["y"] = round(p[0], 5), round(p[1], 5)
             found += 1
     if q and out.get("mode") == "semantic":
-        x, y = ATLAS.place(engine.encoder.encode(q))[0]
+        pts = [(r["x"], r["y"]) for r in out["results"] if "x" in r]
+        if len(pts) >= 3:   # where its results are (atlas.question_spot); the atlas rule only without results
+            x, y = question_spot(np.array(pts, np.float64))
+        else:
+            x, y = ATLAS.place(engine.encoder.encode(q))[0]
         out["map"] = {"x": round(float(x), 5), "y": round(float(y), 5)}
     out["map_placed"] = found
     out.setdefault("timing", {})["map_ms"] = round((time.perf_counter() - t) * 1000, 1)
