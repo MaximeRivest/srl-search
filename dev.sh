@@ -38,7 +38,7 @@ case "${1:-status}" in
     systemctl --user reset-failed srl-search-dev 2>/dev/null || true
     # same settings as the public unit (~/Projects/os/machines/hm/scholarsreadinglist-data.nix), lower priority
     systemd-run --user -q --unit=srl-search-dev --description="search API, dev branch (127.0.0.1:$PORT)" \
-      -p WorkingDirectory="$WT" -p CPUWeight=100 -p IOWeight=100 -p MemoryMax=40G -p LimitNOFILE=65536 \
+      -p WorkingDirectory="$WT" -p CPUWeight=100 -p IOWeight=100 -p MemoryMax=40G -p LimitNOFILE=262144 \
       -E TOKENIZERS_PARALLELISM=false \
       -E SRL_SMR=/mnt/fast/scholarsreadinglist/search/smr-2026-10-08 \
       -E SRL_CORPUS=/mnt/fast/scholarsreadinglist/search/corpus-2026-10-05 \
