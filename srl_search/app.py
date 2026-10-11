@@ -251,7 +251,7 @@ def openapi_public():
         spec["paths"] = {p: v for p, v in spec["paths"].items() if p in PUBLIC_ROUTES}
         # first: relative to wherever this spec was fetched from (here, or behind the public door)
         spec["servers"] = [{"url": ".", "description": "where this spec was loaded from"},
-                           {"url": PUBLIC_BASE, "description": "public (60 requests/minute per address)"}]
+                           {"url": PUBLIC_BASE, "description": "public (10 requests/minute per address)"}]
         app.openapi_schema = spec
     return JSONResponse(app.openapi_schema)
 

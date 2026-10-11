@@ -20,7 +20,7 @@ the same ground for any agent). When you change a route or parameter, update llm
 
 ## The search API (running since 2026-10-06)
 
-Addresses: public `https://api.sciencemadereadable.com/api/data` (60 requests/min per address, through the
+Addresses: public `https://api.sciencemadereadable.com/api/data` (10 requests/min per address for programs, through the
 site's door: `sciencemadereadable/app/server.py` `DATA_ROUTES`), tailnet `https://lambda.tail69222b.ts.net:18810`,
 local `http://127.0.0.1:8810`. What it covers changes with each data release: `/health` (tailnet/local) or the
 top of `/llms.txt`. The first index (2026-10-06) covered 2024+ only (63.8M papers); the measurements below
