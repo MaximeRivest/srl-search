@@ -68,6 +68,10 @@ INDEX = P.get("index") or Path(os.environ.get("SRL_INDEX", ROOT / "index-2024plu
 TILES = P.get("tiles")
 CITEWALK = os.environ.get("SRL_CITEWALK", "http://127.0.0.1:8798")
 WORKS = CORPUS / "works.sqlite"
+# Works OpenAlex added after the base snapshot, fetched daily (pipeline/updates): a small corpus beside the base one.
+UPDATES = P.get("updates")
+UPDATES = UPDATES if UPDATES and (UPDATES / "DONE.json").exists() else None
+UPDATES_INFO = json.loads((UPDATES / "manifest.json").read_text()) if UPDATES else None
 META = WORKS if WORKS.exists() else Path(os.environ.get("SRL_META", ROOT / "meta-2024plus.sqlite"))
 NPROBE = int(os.environ.get("SRL_NPROBE", "128"))  # eval 2026-10-06: recall@10 0.89, ~37 ms search
 DEPTH = int(os.environ.get("SRL_DEPTH", "300"))
@@ -100,11 +104,13 @@ D_DEPTH = "Candidates re-scored exactly before filtering (search by meaning). Ra
 D_JUNK = ("Search by meaning ranks by similarity - junk_penalty x junk (how likely a record is spam or not "
           "scholarship). Default 0.3 for all, 0 for smr; 0 = pure similarity.")
 
-QUALITY = Quality(QUALITY_DIR) if (QUALITY_DIR / "model.npz").exists() else None
+QUALITY = Quality(QUALITY_DIR, more=[UPDATES / "quality"] if UPDATES else []) \
+    if (QUALITY_DIR / "model.npz").exists() else None
 # smr holds PMC research articles under CC BY only; on the 60 evaluation questions it had no junk in the top 10
 # and the penalty changed nothing measurable (useful nDCG -0.007, 95% interval -0.017 … +0.004), so it is off.
 DEFAULT_JUNK_PENALTY = {"all": JUNK_PENALTY, "smr": 0.0}
-engine = Engine(INDEX, META, threads=int(os.environ.get("SRL_THREADS", "4")), quality=QUALITY)
+engine = Engine(INDEX, META, threads=int(os.environ.get("SRL_THREADS", "4")), quality=QUALITY,
+                more_meta=[UPDATES / "works.sqlite"] if UPDATES else [])
 SEMANTIC = {"all": engine}
 SMR = str(P["smr"]) if "smr" in P else os.environ.get("SRL_SMR")
 if SMR:
@@ -112,7 +118,8 @@ if SMR:
     SEMANTIC["smr"] = ExactEngine(Path(SMR), threads=4, encoder=engine.encoder,
                                   nprobe=int(os.environ.get("SRL_SMR_NPROBE", "512")),
                                   meta_path=WORKS if WORKS.exists() else None, quality=QUALITY)
-KEYWORDS = KeywordIndex(CORPUS / "keywords") if (CORPUS / "keywords" / "DONE.json").exists() else None
+KEYWORDS = KeywordIndex([CORPUS / "keywords"] + ([UPDATES / "keywords"] if UPDATES else [])) \
+    if (CORPUS / "keywords" / "DONE.json").exists() else None
 KEYWORD_COLLECTIONS = {"all", "smr"}
 ATLAS_BUILD = P.get("atlas") or Path(os.environ.get("SRL_ATLAS", "/mnt/fast/science-atlas/build/20261008T131030-tsne"))
 ATLAS = Atlas(ATLAS_BUILD, cache_dir=ROOT) if (ATLAS_BUILD / "reference.npz").exists() else None
@@ -203,13 +210,17 @@ def health():
            "model": "lightonai/DenseOn", "searched_text": "English title + abstract (first 512 tokens)",
            "details": str(META.name)}
     if KEYWORDS:
-        out["keyword"] = {"papers": KEYWORDS.searcher.num_docs, "collections": sorted(KEYWORD_COLLECTIONS),
+        out["keyword"] = {"papers": KEYWORDS.num_docs, "collections": sorted(KEYWORD_COLLECTIONS),
                           "searched_text": "title, abstract, OpenAlex keywords + MeSH (English stemming)"}
     # older clients read these top-level fields
     out.update({"papers": engine.manifest["papers"], "published_from": engine.manifest["min_date"],
                 "collections": sorted(SEMANTIC)})
     if RELEASE:
         out["release"] = {k: RELEASE.get(k) for k in ("id", "built_utc", "published_utc", "counts", "embeddings")}
+    if UPDATES_INFO:
+        out["updates"] = {"papers": UPDATES_INFO["works"], "published": UPDATES_INFO.get("dates"),
+                          "fetched_utc": UPDATES_INFO["created_utc"], "base": UPDATES_INFO["base"],
+                          "what": "papers OpenAlex added after the base snapshot, fetched daily"}
     out["ranking"] = ({"junk_model": str(QUALITY_DIR), "default_junk_penalty": DEFAULT_JUNK_PENALTY,
                        "records": QUALITY.manifest["works"], "built_utc": QUALITY.manifest["built_utc"]}
                       if QUALITY else {"junk_model": None})
@@ -235,12 +246,16 @@ def coverage_text() -> str:
         lines.append(f"- Search by meaning, {what}: {m['papers']:,} papers published from {m['min_date']}"
                      + (" (older years are being added)." if growing else "."))
     if KEYWORDS:
-        lines.append(f"- Search by exact words and paper lookup (/works): {KEYWORDS.searcher.num_docs:,} papers, "
+        lines.append(f"- Search by exact words and paper lookup (/works): {KEYWORDS.num_docs:,} papers, "
                      "all years.")
     if RELEASE:
         lines.append(f"- Data release {RELEASE['id']}, published {RELEASE.get('published_utc') or RELEASE.get('built_utc')}"
                      + ("; a new one most nights while older years are added." if growing else "."))
     lines.append(f"- OpenAlex snapshot of {CORPUS.name.split('-', 1)[-1]} (titles, abstracts, citations, labels).")
+    if UPDATES_INFO:
+        lines.append(f"- Plus {UPDATES_INFO['works']:,} papers OpenAlex added since, fetched daily (last fetch "
+                     f"{UPDATES_INFO['created_utc'][:10]}). Their citation counts and labels are as of that fetch; "
+                     "the citation walk does not include them yet.")
     return "\n".join(lines)
 
 

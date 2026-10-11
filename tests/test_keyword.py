@@ -58,3 +58,31 @@ def test_keyword_index(tmp_path):
     assert ids("title:(drinking water)") == [5]
     hits, matches, understood = k.search("sleep OR autism", 1, {})
     assert matches == 4 and len(hits) == 1 and understood == "sleep OR autism"
+
+
+def test_keyword_index_base_and_updates(tmp_path):
+    """The daily updates' index is searched with the base one: hits merged by score, counts added."""
+    import tantivy
+    from srl_search.keyword import KeywordIndex, schema
+
+    def make(path, docs):
+        path.mkdir()
+        ix = tantivy.Index(schema(), path=str(path))
+        w = ix.writer(heap_size=50_000_000, num_threads=1)
+        for i, title, ab in docs:
+            w.add_document(tantivy.Document(id=i, title=title, abstract=ab, keywords="", year=2026, type="article",
+                                            license="", oa=0, retracted=0, pmc_oa=0, smr=0))
+        w.commit(); w.wait_merging_threads()
+        return path
+
+    base = make(tmp_path / "base", [(1, "Sleep in adolescents", "insomnia in teens"),
+                                    (2, "Coral reefs", "bleaching of corals")])
+    upd = make(tmp_path / "upd", [(10, "Sleep sleep sleep", "sleep loss and sleep debt"),
+                                  (11, "Soil carbon", "cover crops")])
+    k = KeywordIndex([base, upd])
+    hits, matches, _ = k.search("sleep", 10, {})
+    assert {h for h, _ in hits} == {1, 10} and matches == 2
+    assert [s for _, s in hits] == sorted([s for _, s in hits], reverse=True)
+    assert k.num_docs == 4
+    assert [h for h, _ in k.search("cover crops", 10, {})[0]] == [11]
+    assert len(k.search("sleep OR coral OR soil", 2, {})[0]) == 2       # k applies to the merged list

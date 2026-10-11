@@ -90,11 +90,23 @@ def normalize(q: str) -> str:
 # ---------------------------------------------------------------- engine
 
 class KeywordIndex:
-    def __init__(self, path: Path):
-        self.index = tantivy.Index.open(str(path))
+    """One tantivy index, or several with the same schema searched as one: the base corpus' and the daily updates'
+    (pipeline/updates). Hits from several are merged by score. Each index ranks with its own word statistics; the
+    updates index is a recent sample of the same literature, so its BM25 scores are close to what the base would
+    give, not identical."""
+
+    def __init__(self, paths: Path | list[Path]):
+        paths = [paths] if isinstance(paths, Path) else list(paths)
+        self.indexes = [tantivy.Index.open(str(p)) for p in paths]
+        self.index = self.indexes[0]
         self.schema = self.index.schema
         self.lock = threading.Lock()
-        self.searcher = self.index.searcher()
+        self.searchers = [i.searcher() for i in self.indexes]
+        self.searcher = self.searchers[0]
+
+    @property
+    def num_docs(self) -> int:
+        return sum(s.num_docs for s in self.searchers)
 
     def filters(self, f: dict, collection: str) -> list[tuple]:
         S, O, Q = self.schema, tantivy.Occur, tantivy.Query
@@ -121,11 +133,12 @@ class KeywordIndex:
     def search(self, q: str, k: int, filters: dict, collection: str = "all") -> tuple[list[tuple[int, float]], int, str]:
         """(id, bm25) best first, number of matching papers, the query as understood."""
         text = normalize(q)
-        query, errors = self.index.parse_query_lenient(text, FIELDS, field_boosts=BOOSTS)
-        clauses = [(tantivy.Occur.Must, query)] + self.filters(filters, collection)
-        full = tantivy.Query.boolean_query(clauses)
-        res = self.searcher.search(full, k, count=True)
-        hits = []
-        for score, addr in res.hits:
-            hits.append((int(self.searcher.doc(addr)["id"][0]), float(score)))
-        return hits, int(res.count or 0), text
+        hits, count = [], 0
+        for index, searcher in zip(self.indexes, self.searchers):
+            query, errors = index.parse_query_lenient(text, FIELDS, field_boosts=BOOSTS)
+            clauses = [(tantivy.Occur.Must, query)] + self.filters(filters, collection)
+            res = searcher.search(tantivy.Query.boolean_query(clauses), k, count=True)
+            hits += [(int(searcher.doc(addr)["id"][0]), float(score)) for score, addr in res.hits]
+            count += int(res.count or 0)
+        hits.sort(key=lambda h: -h[1])
+        return hits[:k], count, text

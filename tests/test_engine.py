@@ -83,3 +83,26 @@ def test_exact_collection(tmp_path):
     only = e._finish(q, 5, 0, 300, {"year_from": 2024}, True, {}, 0.0)["results"]
     assert only and all(r["year"] >= 2024 for r in only)
     assert e.resolve("PMC1007") == 1007 and e.resolve("10.1/1007") == 1007
+
+
+def test_details_from_base_then_updates(tmp_path):
+    """Details and DOI / PMCID lookups fall through from the base corpus to the daily updates corpus."""
+    import sqlite3
+    import threading
+    from srl_search.engine import Engine
+
+    def make(path, rows):
+        db = sqlite3.connect(path)
+        db.execute("CREATE TABLE works (id INTEGER PRIMARY KEY, doi TEXT, pmcid TEXT, title TEXT)")
+        db.executemany("INSERT INTO works VALUES (?,?,?,?)", rows)
+        db.commit(); db.close()
+        return path
+
+    e = Engine.__new__(Engine)       # only the details part: no index needed
+    e.meta_path = make(tmp_path / "base.sqlite", [(1, "10.1/a", "PMC1", "base one"), (2, None, None, "base two")])
+    e.more_meta = [make(tmp_path / "upd.sqlite", [(10, "10.1/New", None, "new one")])]
+    e.local = threading.local()
+    d = e.details([1, 10, 99])
+    assert {k: v["title"] for k, v in d.items()} == {1: "base one", 10: "new one"}
+    assert e.resolve("10.1/new") == 10 and e.resolve("https://doi.org/10.1/A") == 1
+    assert e.resolve("PMC1") == 1 and e.resolve("W10") == 10 and e.resolve("10.9/none") is None

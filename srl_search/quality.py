@@ -28,8 +28,13 @@ FEATURES = (["is_xpac", "is_paratext"] + [f"source_type={i}" for i in range(N_SO
 
 
 class Quality:
-    def __init__(self, root: Path, model: Path | None = None):
+    def __init__(self, root: Path, model: Path | None = None, more: list[Path] | None = None):
         self.root = Path(root)
+        # the daily updates corpus' facts (pipeline/updates: same columns, works the base does not hold)
+        self.more = []
+        for m in more or []:
+            if (Path(m) / "ids.npy").exists() and len(np.load(Path(m) / "ids.npy", mmap_mode="r")):
+                self.more.append((np.load(Path(m) / "ids.npy"), {c: np.load(Path(m) / f"{c}.npy") for c in COLUMNS}))
         self.manifest = json.loads((self.root / "manifest.json").read_text())
         self.ids = np.load(self.root / "ids.npy", mmap_mode="r")
         self.col = {c: np.load(self.root / f"{c}.npy", mmap_mode="r") for c in COLUMNS}
@@ -53,7 +58,17 @@ class Quality:
 
     def raw(self, work_ids) -> dict[str, np.ndarray]:
         r, found = self.rows(work_ids)
-        out = {c: np.asarray(a[r]) for c, a in self.col.items()}
+        out = {c: np.array(a[r]) for c, a in self.col.items()}
+        w = np.asarray(work_ids, dtype=np.int64)
+        for ids, col in self.more:
+            miss = np.flatnonzero(~found)
+            if not len(miss):
+                break
+            i = np.minimum(np.searchsorted(ids, w[miss]), len(ids) - 1)
+            hit = ids[i] == w[miss]
+            for c in COLUMNS:
+                out[c][miss[hit]] = col[c][i[hit]]
+            found[miss[hit]] = True
         out["found"] = found
         return out
 

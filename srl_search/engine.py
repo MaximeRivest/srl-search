@@ -68,7 +68,7 @@ class Encoder:
 
 class Engine:
     def __init__(self, index_dir: Path, meta_path: Path, threads: int = 4, encoder: bool = True,
-                 quality: Quality | None = None):
+                 quality: Quality | None = None, more_meta: list[Path] | None = None):
         self.threads = threads
         self.quality = quality if quality is not None and quality.model is not None else None
         faiss.omp_set_num_threads(threads)
@@ -89,23 +89,43 @@ class Engine:
         self.work_ids = np.load(index_dir / "work_ids.npy", mmap_mode="r")
         self.by_work = np.load(index_dir / "by_work.npy", mmap_mode="r")
         self.meta_path = meta_path
+        self.more_meta = list(more_meta or [])   # the daily updates corpus (works the base does not hold)
         self.local = threading.local()
         self.encoder = Encoder(threads) if encoder else None
 
     # -------------------------------------------------------------- details
     def db(self) -> sqlite3.Connection:
-        c = getattr(self.local, "db", None)
-        if c is None:
-            c = sqlite3.connect(f"file:{self.meta_path}?mode=ro&immutable=1", uri=True, check_same_thread=False)
-            c.row_factory = sqlite3.Row
-            self.local.db = c
-        return c
+        return self.dbs()[0]
+
+    def dbs(self) -> list[sqlite3.Connection]:
+        """The base details, then the daily updates' (one connection each per thread)."""
+        cs = getattr(self.local, "dbs", None)
+        if cs is None:
+            cs = []
+            for path in [self.meta_path, *self.more_meta]:
+                c = sqlite3.connect(f"file:{path}?mode=ro&immutable=1", uri=True, check_same_thread=False)
+                c.row_factory = sqlite3.Row
+                cs.append(c)
+            self.local.dbs = cs
+        return cs
 
     def details(self, work_ids: list[int]) -> dict[int, dict]:
-        if not work_ids:
-            return {}
-        q = f"SELECT * FROM works WHERE id IN ({','.join('?' * len(work_ids))})"
-        return {r["id"]: dict(r) for r in self.db().execute(q, work_ids)}
+        out: dict[int, dict] = {}
+        left = list(work_ids)
+        for c in self.dbs():
+            if not left:
+                break
+            q = f"SELECT * FROM works WHERE id IN ({','.join('?' * len(left))})"
+            out.update({r["id"]: dict(r) for r in c.execute(q, left)})
+            left = [w for w in left if w not in out]
+        return out
+
+    def lookup(self, sql: str, arg) -> int | None:
+        for c in self.dbs():
+            row = c.execute(sql, (arg,)).fetchone()
+            if row:
+                return row[0]
+        return None
 
     def position_of(self, work_id: int) -> int | None:
         lo, hi = 0, len(self.by_work)
@@ -128,13 +148,11 @@ class Engine:
         if r[:1] in "Ww" and r[1:].isdigit():
             return int(r[1:])
         if low.startswith("pmc") and low[3:].isdigit():
-            row = self.db().execute("SELECT id FROM works WHERE pmcid=?", (r.upper(),)).fetchone()
-            return row[0] if row else None
+            return self.lookup("SELECT id FROM works WHERE pmcid=?", r.upper())
         doi = low.removeprefix("https://doi.org/").removeprefix("doi:")
         if doi.startswith("10."):
             # DOIs are case-insensitive; the index is built with COLLATE NOCASE
-            row = self.db().execute("SELECT id FROM works WHERE doi=? COLLATE NOCASE", (doi,)).fetchone()
-            return row[0] if row else None
+            return self.lookup("SELECT id FROM works WHERE doi=? COLLATE NOCASE", doi)
         return None
 
     # -------------------------------------------------------------- search
@@ -240,6 +258,7 @@ class ExactEngine(Engine):
             ivf.nprobe = nprobe
             ivf.set_direct_map_type(faiss.DirectMap.Hashtable)  # reconstruct(W-number) for "similar"
         self.meta_path = meta_path or collection_dir / "meta.sqlite"
+        self.more_meta = []          # the smr collection holds base works only
         self.local = threading.local()
         self.encoder = encoder
 

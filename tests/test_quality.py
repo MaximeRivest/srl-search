@@ -73,3 +73,24 @@ def test_retracted_titles_are_left_out():
     assert not passes({**d, "title": "Retraction Note: Effects of x on y"}, {})
     assert passes({**d, "title": "Retracted papers in medicine: a bibliometric study"}, {})
     assert passes({**d, "title": "[RETRACTED] x"}, {"exclude_retracted": False})
+
+
+def test_updates_facts_fill_in_after_the_base(tmp_path):
+    """A daily-updates work has its own record facts (pipeline/updates), not the 'unknown record' flag."""
+    base = tmp_path / "base"; base.mkdir()
+    make_quality(base)
+    upd = tmp_path / "upd"; upd.mkdir()
+    np.save(upd / "ids.npy", np.array([40, 50], np.int64))
+    for k, v in {"is_xpac": [0, 1], "is_paratext": [0, 0], "source_type": [1, 0], "source_is_core": [1, 0],
+                 "source_in_doaj": [0, 0], "indexed_in": [1, 0], "refs": [12, 0], "authors": [3, 1],
+                 "locations": [2, 1], "citation_pct": [np.nan, np.nan], "source": [7, 0]}.items():
+        dtype = {"source_type": np.uint8, "indexed_in": np.uint8, "refs": np.int16, "authors": np.int16,
+                 "locations": np.int16, "citation_pct": np.float32, "source": np.int64}.get(k, bool)
+        np.save(upd / f"{k}.npy", np.array(v, dtype))
+    q = Quality(base, more=[upd])
+    f = q.features(np.array([10, 40, 50, 99]))
+    col = {name: f[:, i] for i, name in enumerate(FEATURES)}
+    assert list(col["unknown_record"]) == [0, 0, 0, 1]
+    assert list(col["no_refs"]) == [0, 0, 1, 0]
+    assert list(col["is_xpac"]) == [0, 0, 1, 0]
+    assert col["src_log_works"][1] > 0                 # its venue's priors come from the base (source 7)
