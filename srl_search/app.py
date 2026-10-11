@@ -367,13 +367,13 @@ def as_text(q: str, out: dict, k: int) -> str:
              f"{how}. Best first. Titles and abstracts from OpenAlex, not full texts.", "",
              f"Options after `?`, e.g. `?k=30&year_from=2020` (k up to 100; also year_to, type=review, open_access=true, "
              f"abstracts=false). The same search as JSON: {PUBLIC_BASE}/search?q={enc(q)} · "
-             f"guide: {PUBLIC_BASE}/llms.txt", ""]
+             f"guide: {PUBLIC_BASE}/llms.txt"]
     if not out["results"]:
-        lines.append("Nothing found. Try other words, fewer words, or a question in plain language.")
+        lines.append("\nNothing found. Try other words, fewer words, or a question in plain language.")
     for i, r in enumerate(out["results"], 1):
         names = [a.strip() for a in (r.get("authors") or "").split("|") if a.strip()]
         n = r.get("authors_count") or len(names)
-        who = ", ".join(names[:3]) + (f" and {n - 3} more" if n > 3 else "") if names else ""
+        who = "; ".join(names[:3]) + (f"; and {n - 3} more" if n > 3 else "") if names else ""   # names may be "Last, First"
         facts = [str(r["year"]) if r.get("year") else "", r.get("venue") or "", who,
                  f"cited {r['citations']:,} times" if r.get("citations") else "", r.get("type") or ""]
         if r.get("is_oa"):
@@ -387,7 +387,7 @@ def as_text(q: str, out: dict, k: int) -> str:
         if r.get("abstract"):
             lines += ["", r["abstract"]]
     if len(out["results"]) == k:
-        lines += ["", f"More results: add `?k={min(100, k * 3)}` to this address."]
+        lines += ["", f"More results: ask for up to 100 with `k`, e.g. `?k={min(100, max(30, k * 3))}`."]
     return "\n".join(lines) + "\n"
 
 
