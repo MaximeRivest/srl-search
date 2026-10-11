@@ -134,7 +134,7 @@ def main() -> None:
                 t = time.perf_counter()
                 hits, _ = engine.search_vector(Q[i], 10, nprobe, depth)
                 lat.append(time.perf_counter() - t)
-                got = {w for w, _ in hits[:10]}
+                got = {h[0] for h in hits[:10]}   # hits: (W-number, score, similarity, P(junk))
                 want = set(np.asarray(engine.work_ids[gt[i]], dtype=np.int64).tolist())
                 rec.append(len(got & want) / 10)
             rec, lat = np.array(rec), np.array(lat) * 1000

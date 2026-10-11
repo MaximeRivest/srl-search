@@ -1,0 +1,225 @@
+{
+ "papers": 124892915,
+ "queries": {
+  "scifact": 100,
+  "nfcorpus": 100,
+  "scidocs": 100,
+  "trec-covid": 50,
+  "plain questions": 40
+ },
+ "exact_search_seconds_all_queries": 0,
+ "query_encoding_ms_cpu4": 0.0,
+ "threads": 4,
+ "results": [
+  {
+   "nprobe": 16,
+   "depth": 100,
+   "recall@10": 0.802,
+   "by_set": {
+    "scifact": 0.79,
+    "nfcorpus": 0.634,
+    "scidocs": 0.848,
+    "trec-covid": 0.938,
+    "plain questions": 0.963
+   },
+   "p50_ms": 11.3,
+   "p95_ms": 16.8
+  },
+  {
+   "nprobe": 16,
+   "depth": 300,
+   "recall@10": 0.811,
+   "by_set": {
+    "scifact": 0.801,
+    "nfcorpus": 0.649,
+    "scidocs": 0.852,
+    "trec-covid": 0.948,
+    "plain questions": 0.965
+   },
+   "p50_ms": 16.3,
+   "p95_ms": 19.1
+  },
+  {
+   "nprobe": 16,
+   "depth": 1000,
+   "recall@10": 0.812,
+   "by_set": {
+    "scifact": 0.803,
+    "nfcorpus": 0.65,
+    "scidocs": 0.854,
+    "trec-covid": 0.95,
+    "plain questions": 0.965
+   },
+   "p50_ms": 73.3,
+   "p95_ms": 206.6
+  },
+  {
+   "nprobe": 32,
+   "depth": 100,
+   "recall@10": 0.847,
+   "by_set": {
+    "scifact": 0.83,
+    "nfcorpus": 0.701,
+    "scidocs": 0.906,
+    "trec-covid": 0.95,
+    "plain questions": 0.98
+   },
+   "p50_ms": 10.6,
+   "p95_ms": 12.6
+  },
+  {
+   "nprobe": 32,
+   "depth": 300,
+   "recall@10": 0.862,
+   "by_set": {
+    "scifact": 0.849,
+    "nfcorpus": 0.719,
+    "scidocs": 0.915,
+    "trec-covid": 0.968,
+    "plain questions": 0.982
+   },
+   "p50_ms": 14.5,
+   "p95_ms": 16.7
+  },
+  {
+   "nprobe": 32,
+   "depth": 1000,
+   "recall@10": 0.864,
+   "by_set": {
+    "scifact": 0.852,
+    "nfcorpus": 0.721,
+    "scidocs": 0.92,
+    "trec-covid": 0.97,
+    "plain questions": 0.982
+   },
+   "p50_ms": 60.5,
+   "p95_ms": 195.4
+  },
+  {
+   "nprobe": 64,
+   "depth": 100,
+   "recall@10": 0.883,
+   "by_set": {
+    "scifact": 0.878,
+    "nfcorpus": 0.747,
+    "scidocs": 0.94,
+    "trec-covid": 0.966,
+    "plain questions": 0.985
+   },
+   "p50_ms": 13.3,
+   "p95_ms": 15.3
+  },
+  {
+   "nprobe": 64,
+   "depth": 300,
+   "recall@10": 0.899,
+   "by_set": {
+    "scifact": 0.898,
+    "nfcorpus": 0.768,
+    "scidocs": 0.952,
+    "trec-covid": 0.984,
+    "plain questions": 0.988
+   },
+   "p50_ms": 16.9,
+   "p95_ms": 19.2
+  },
+  {
+   "nprobe": 64,
+   "depth": 1000,
+   "recall@10": 0.902,
+   "by_set": {
+    "scifact": 0.9,
+    "nfcorpus": 0.771,
+    "scidocs": 0.957,
+    "trec-covid": 0.986,
+    "plain questions": 0.988
+   },
+   "p50_ms": 68.6,
+   "p95_ms": 205.7
+  },
+  {
+   "nprobe": 128,
+   "depth": 100,
+   "recall@10": 0.904,
+   "by_set": {
+    "scifact": 0.909,
+    "nfcorpus": 0.778,
+    "scidocs": 0.954,
+    "trec-covid": 0.978,
+    "plain questions": 0.993
+   },
+   "p50_ms": 19.1,
+   "p95_ms": 22.4
+  },
+  {
+   "nprobe": 128,
+   "depth": 300,
+   "recall@10": 0.923,
+   "by_set": {
+    "scifact": 0.932,
+    "nfcorpus": 0.801,
+    "scidocs": 0.969,
+    "trec-covid": 0.996,
+    "plain questions": 0.995
+   },
+   "p50_ms": 22.8,
+   "p95_ms": 26.6
+  },
+  {
+   "nprobe": 128,
+   "depth": 1000,
+   "recall@10": 0.926,
+   "by_set": {
+    "scifact": 0.935,
+    "nfcorpus": 0.804,
+    "scidocs": 0.974,
+    "trec-covid": 0.998,
+    "plain questions": 0.995
+   },
+   "p50_ms": 75.0,
+   "p95_ms": 200.2
+  },
+  {
+   "nprobe": 256,
+   "depth": 100,
+   "recall@10": 0.924,
+   "by_set": {
+    "scifact": 0.936,
+    "nfcorpus": 0.819,
+    "scidocs": 0.962,
+    "trec-covid": 0.978,
+    "plain questions": 0.995
+   },
+   "p50_ms": 30.4,
+   "p95_ms": 36.1
+  },
+  {
+   "nprobe": 256,
+   "depth": 300,
+   "recall@10": 0.944,
+   "by_set": {
+    "scifact": 0.96,
+    "nfcorpus": 0.844,
+    "scidocs": 0.98,
+    "trec-covid": 0.996,
+    "plain questions": 0.997
+   },
+   "p50_ms": 34.1,
+   "p95_ms": 39.9
+  },
+  {
+   "nprobe": 256,
+   "depth": 1000,
+   "recall@10": 0.948,
+   "by_set": {
+    "scifact": 0.965,
+    "nfcorpus": 0.848,
+    "scidocs": 0.985,
+    "trec-covid": 0.998,
+    "plain questions": 0.997
+   },
+   "p50_ms": 88.0,
+   "p95_ms": 225.7
+  }
+ ]
+}
