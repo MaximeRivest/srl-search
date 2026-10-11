@@ -12,7 +12,8 @@ Interactive reference (every parameter, try it in the browser): <base>/docs · m
 This guide: <base>/llms.txt
 
 Only able to open a web address (no code, no headers)? Put the question in the address and get the answer as
-plain text: <base>/search/why do cats purr (spaces as %20 or +; options after ?, e.g. ?k=30&year_from=2020).
+plain text: https://ask.sciencemadereadable.com/why do cats purr, or <base>/search/why do cats purr (spaces as %20
+or +; options after ?, e.g. ?k=30&year_from=2020).
 
 ## What is covered right now
 
