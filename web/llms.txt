@@ -122,7 +122,7 @@ positions; exact publication counts per year and subfield. Mostly for drawing ma
   `junk`. Citation counts favour older papers and big fields; do not treat them as quality alone.
 - **Save tokens**: `abstracts=false` for screening, then `/works/{id}` only for the papers you keep.
 - **Cite** with DOI when present, else the `openalex` URL. Do not invent details the record lacks.
-- **Be gentle**: the public door allows 10 requests per minute per address (reading this guide, /docs and
+- **Be gentle**: the public door allows 30 requests per minute per address (reading this guide, /docs and
   /openapi.json does not count). Beyond that: HTTP 429 with a `Retry-After` header (seconds; also
   `retry_after` in the body): wait that long, then retry. Spend calls well: one search with `k=100` rather
   than several small ones, `abstracts=false` then `/works` only for the papers you keep, never in parallel.

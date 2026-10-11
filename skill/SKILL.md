@@ -14,7 +14,7 @@ Read-only JSON over HTTP, no key. Full guide (coverage, every parameter, field m
 |---|---|---|
 | on lambda (`hostname` = lambda) | `http://127.0.0.1:8810` | none (be reasonable) |
 | another tailnet machine (XPSwhite, phone) | `https://lambda.tail69222b.ts.net:18810` | none |
-| anywhere else, or code that ships to users | `https://api.sciencemadereadable.com/api/data` | 10 requests/min per address |
+| anywhere else, or code that ships to users | `https://api.sciencemadereadable.com/api/data` | 30 requests/min per address |
 
 Same data and routes everywhere. Start with `curl -s <base>/llms.txt` when you need details.
 
