@@ -19,8 +19,10 @@ def door_routes() -> re.Pattern:
 def test_the_door_passes_every_documented_route():
     routes = door_routes()
     for path in PUBLIC_ROUTES + PUBLIC_DOCS:
-        example = path.replace("{ref}", "10.1126/science.aan8048")
+        example = path.replace("{ref}", "10.1126/science.aan8048").replace("{q}", "why%20do%20cats%20purr%3F")
         assert routes.match("/api/data" + example), example
+    assert routes.match('/api/data/search/%22gut+microbiome%22+autism+(child*)')
+    assert not routes.match("/api/data/search/a b")   # spaces must be encoded
     assert not routes.match("/api/data/health")
 
 

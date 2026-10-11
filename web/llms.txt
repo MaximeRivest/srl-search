@@ -11,6 +11,9 @@ the tailnet. Same API and the same data, without the public rate limit.)
 Interactive reference (every parameter, try it in the browser): <base>/docs · machine-readable: <base>/openapi.json
 This guide: <base>/llms.txt
 
+Only able to open a web address (no code, no headers)? Put the question in the address and get the answer as
+plain text: <base>/search/why do cats purr (spaces as %20 or +; options after ?, e.g. ?k=30&year_from=2020).
+
 ## What is covered right now
 
 {{COVERAGE}}
@@ -37,6 +40,13 @@ for p in r.json()["results"]:
 ```
 
 ## Endpoints
+
+### GET /search/{question}
+The same search for tools that can only open an address: the question is the rest of the path, the answer is
+plain text (Markdown): each result's title, year, venue, authors, citations, link and abstract. Spaces as
+`%20` or `+` (a `+` counts as a space only when the address has no `%20`). Takes the options of /search after
+`?` (k, mode, year_from, year_to, type, open_access, license, pmc_open_access, collection, abstracts).
+`https://api.sciencemadereadable.com/api/data/search/does%20intermittent%20fasting%20help%20weight%20loss?k=5`
 
 ### GET /search?q=...
 The main entry. Returns `{"mode", "results": [...], "filters", "timing", ...}`.

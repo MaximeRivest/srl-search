@@ -323,6 +323,74 @@ def search(q: str = Query(..., min_length=2, max_length=2000,
     return add_positions(out, q) if map else out
 
 
+SITE = "https://sciencemadereadable.com"
+
+
+@app.get("/search/{q:path}", response_class=PlainTextResponse)
+def search_text(q: str,
+                k: int = Query(10, ge=1, le=100, description=D_K),
+                mode: str = Query("auto", pattern="^(auto|semantic|keyword)$",
+                                  description="As in /search: auto, semantic or keyword."),
+                collection: str = Query("all", description=D_COLLECTION),
+                year_from: int | None = Query(None, description=D_YEAR_FROM),
+                year_to: int | None = Query(None, description=D_YEAR_TO),
+                type: str | None = Query(None, description=D_TYPE),
+                open_access: bool = Query(False, description=D_OA),
+                license: str | None = Query(None, description=D_LICENSE),
+                pmc_open_access: bool = Query(False, description=D_PMC),
+                abstracts: bool = Query(True, description=D_ABSTRACTS)):
+    """The same search with the question in the address and the answer as plain text (Markdown), for AI tools
+    that can only open a web address: /search/why do cats purr. Spaces may be written %20 or +."""
+    # a form-style address (why+do+cats+purr) has no spaces at all; with real spaces a + is the search's own
+    if " " not in q:
+        q = q.replace("+", " ")
+    q = q.strip()
+    if not 2 <= len(q) <= 2000:
+        raise HTTPException(422, "the question must be 2-2000 characters: /search/why do cats purr")
+    out = search(q=q, k=k, mode=mode, collection=collection, year_from=year_from, year_to=year_to, type=type,
+                 open_access=open_access, license=license, pmc_open_access=pmc_open_access, abstracts=abstracts,
+                 nprobe=NPROBE, depth=DEPTH, map=False, junk_penalty=None)
+    return PlainTextResponse(as_text(q, out, k), headers={"Cache-Control": "no-store"})
+
+
+def as_text(q: str, out: dict, k: int) -> str:
+    """A search answer as Markdown: every result with what a reader (or a model) needs to judge and cite it."""
+    enc = urllib.parse.quote
+    if out["mode"] == "keyword":
+        how = f"Exact words, understood as `{out['query']}`: {out['matches']:,} papers match"
+    else:
+        how = "By meaning: the closest papers in what they are about, even in other words"
+        if out.get("fallback"):
+            how = (f"No paper contains all of `{out['fallback']['query']}`, so these are by meaning instead "
+                   "(closest in what they are about)")
+    lines = [f"# Studies about: {q}", "",
+             f"{how}. Best first. Titles and abstracts from OpenAlex, not full texts.", "",
+             f"Options after `?`, e.g. `?k=30&year_from=2020` (k up to 100; also year_to, type=review, open_access=true, "
+             f"abstracts=false). The same search as JSON: {PUBLIC_BASE}/search?q={enc(q)} · "
+             f"guide: {PUBLIC_BASE}/llms.txt", ""]
+    if not out["results"]:
+        lines.append("Nothing found. Try other words, fewer words, or a question in plain language.")
+    for i, r in enumerate(out["results"], 1):
+        names = [a.strip() for a in (r.get("authors") or "").split("|") if a.strip()]
+        n = r.get("authors_count") or len(names)
+        who = ", ".join(names[:3]) + (f" and {n - 3} more" if n > 3 else "") if names else ""
+        facts = [str(r["year"]) if r.get("year") else "", r.get("venue") or "", who,
+                 f"cited {r['citations']:,} times" if r.get("citations") else "", r.get("type") or ""]
+        if r.get("is_oa"):
+            facts.append("open access")
+        lines += ["", f"## {i}. {r['title'] or '(no title)'}", " · ".join(f for f in facts if f)]
+        ref = r.get("doi") or r["id"]
+        lines.append(f"Link: {'https://doi.org/' + r['doi'] if r.get('doi') else r.get('url') or r['openalex']}"
+                     f" · on the map of science, with its citations: {SITE}/?work={enc(ref)}")
+        if r.get("smr"):
+            lines.append(f"Read in plain words: {SITE}/?paper={enc(r.get('doi') or r.get('pmcid') or ref)}")
+        if r.get("abstract"):
+            lines += ["", r["abstract"]]
+    if len(out["results"]) == k:
+        lines += ["", f"More results: add `?k={min(100, k * 3)}` to this address."]
+    return "\n".join(lines) + "\n"
+
+
 @app.get("/similar/{ref:path}")
 def similar(ref: str, k: int = Query(10, ge=1, le=100, description=D_K),
             year_from: int | None = Query(None, description=D_YEAR_FROM),
