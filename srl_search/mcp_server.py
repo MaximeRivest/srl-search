@@ -74,6 +74,10 @@ def readable_link(r: dict) -> str | None:
     return f"{SITE}/?paper={ref}" if r.get("smr") and ref else None
 
 
+def count(n: int) -> str:
+    return f"{n} result" + ("" if n == 1 else "s")
+
+
 def result_block(i: int, r: dict, abstracts: str) -> str:
     """One search hit: what a model needs to judge it, cite it and ask for more."""
     facts = [r.get("venue") or "", authors(r), r.get("type") or "",
@@ -199,7 +203,7 @@ How to search well:
                     "title; for exact words, fewer of them or OR between alternatives.")
         blocks = [result_block(i, r, abstracts) for i, r in enumerate(out["results"], 1)]
         tail = "\n\n(Abstracts shortened: get_papers gives them in full.)" if abstracts == "short" else ""
-        return f"{how} {len(blocks)} results.\n\n" + "\n\n".join(blocks) + tail
+        return f"{how} {count(len(blocks))}.\n\n" + "\n\n".join(blocks) + tail
 
     @server.tool(title="Get papers by identifier", annotations=READ_ONLY, structured_output=False)
     async def get_papers(
@@ -239,7 +243,7 @@ How to search well:
             raise ToolError(f"{paper} is not among the papers searchable by meaning: check the identifier with "
                             "get_papers. Papers without an English abstract cannot be compared by meaning.") from None
         blocks = [result_block(i, r, abstracts) for i, r in enumerate(out["results"], 1)]
-        return f"Closest in meaning to {paper}, most similar first. {len(blocks)} results.\n\n" + "\n\n".join(blocks)
+        return f"Closest in meaning to {paper}, most similar first. {count(len(blocks))}.\n\n" + "\n\n".join(blocks)
 
     @server.tool(title="Citation walk", annotations=READ_ONLY, structured_output=False)
     async def citation_walk(

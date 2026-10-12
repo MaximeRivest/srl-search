@@ -24,7 +24,10 @@ health() { for _ in $(seq 1 ${2:-90}); do curl -sf -o /dev/null "http://127.0.0.
 smoke() {
   curl -sf "http://127.0.0.1:$1/search?q=coral+reef+bleaching&k=3&map=true&abstracts=false" | grep -q '"results":\[{' &&
   curl -sf "http://127.0.0.1:$1/search?q=%22gut+microbiome%22+autism&k=3&abstracts=false" | grep -q '"mode":"keyword"' &&
-  curl -sf "http://127.0.0.1:$1/works/W4410027237" | grep -q '"title"'
+  curl -sf "http://127.0.0.1:$1/works/W4410027237" | grep -q '"title"' &&
+  curl -sf -X POST "http://127.0.0.1:$1/mcp" -H 'Content-Type: application/json' -H 'Accept: application/json, text/event-stream' \
+    -H 'Mcp-Protocol-Version: 2025-11-25' -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"search_papers","arguments":{"query":"coral reef bleaching","limit":1,"abstracts":"none"}}}' \
+    | grep -q 'https://doi.org/'
 }
 
 case "${1:-status}" in
