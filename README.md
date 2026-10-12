@@ -126,7 +126,8 @@ Choices, and what they cost:
   the method, tool and app name of each MCP request (to see who uses it), never the arguments.
 
 Tests: `tests/test_mcp.py` (no indexes: a stand-in search service; in process, and over HTTP in both protocol eras).
-Checked live on 2026-10-12 with Claude Code (2026-07-28) and Codex (handshake) through a copy of the door.
+Checked live on 2026-10-12: Claude Code (2026-07-28) searched, read and walked citations through the public address;
+Codex connected by the handshake and listed the tools (its usage limit stopped it before a call).
 
 ## Ranking: junk sinks (since 2026-10-09)
 
