@@ -2,7 +2,7 @@ import ast
 import re
 from pathlib import Path
 
-from srl_search.public import PUBLIC_DOCS, PUBLIC_ROUTES
+from srl_search.public import PUBLIC_DOCS, PUBLIC_MCP, PUBLIC_ROUTES
 
 GUIDE = Path(__file__).resolve().parents[1] / "web" / "llms.txt"
 DOOR = Path(__file__).resolve().parents[2] / "sciencemadereadable" / "app" / "server.py"
@@ -31,3 +31,13 @@ def test_guide_has_its_coverage_slot_and_mentions_every_route():
     assert text.count("{{COVERAGE}}") == 1
     for path in PUBLIC_ROUTES + ("/llms.txt", "/docs", "/openapi.json"):
         assert path.split("{")[0].rstrip("/") in text, path
+
+
+def test_the_door_passes_the_mcp_endpoint_and_the_guides_name_it():
+    for node in ast.walk(ast.parse(DOOR.read_text())):
+        if isinstance(node, ast.Assign) and getattr(node.targets[0], "id", None) == "MCP_PATHS":
+            assert "/mcp" in ast.literal_eval(node.value)
+            break
+    else:
+        raise AssertionError("MCP_PATHS not found in the door")
+    assert PUBLIC_MCP.endswith("/mcp") and PUBLIC_MCP in GUIDE.read_text()

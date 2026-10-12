@@ -31,6 +31,7 @@ meaning instead ("fallback" says so).
   GET /                             a small test page (web/index.html)
   GET /llms.txt                     the guide for programs and AI agents (web/llms.txt + live coverage)
   GET /docs, /openapi.json          interactive reference and spec of the public routes only
+  POST /mcp                         the same search as an MCP server for AI apps (srl_search/mcp_server.py)
 
 Run: see README.md. With a published data release (pipeline/release, DATA.md) every path comes
 from SRL_RELEASE (default .../release/current); otherwise SRL_CORPUS, SRL_INDEX, SRL_SMR, SRL_ATLAS.
@@ -39,6 +40,7 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 import time
 import urllib.error
 import urllib.parse
@@ -84,8 +86,9 @@ QUALITY_DIR = P.get("quality") or Path(os.environ.get("SRL_QUALITY", ROOT / "qua
 app = FastAPI(title="Scholars Reading List search", version="0.3", docs_url=None, redoc_url=None, openapi_url=None,
               description="Search ~200 million scholarly papers by meaning or exact words. Guide for programs "
                           "and agents: [llms.txt](llms.txt).")
-# Read-only GETs; lets the test page work when opened from another address (e.g. a preview panel).
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["GET"])
+# Read-only GETs, and POSTs to /mcp; lets the test page and browser-based MCP clients work from another address.
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["GET", "POST"], allow_headers=["*"],
+                   expose_headers=["Mcp-Session-Id"])
 PAGE = Path(__file__).resolve().parent.parent / "web" / "index.html"
 GUIDE = Path(__file__).resolve().parent.parent / "web" / "llms.txt"
 
@@ -535,3 +538,9 @@ def walk(id: str = Query(..., min_length=2, max_length=300, description="W-numbe
     out["map"] = {"atlas": ATLAS.id if ATLAS else None, "placed": placed, "papers": len(out.get("nodes", {}))}
     out["timing"] = {"walk_ms": round((t1 - t) * 1000, 1), "map_ms": round((time.perf_counter() - t1) * 1000, 1)}
     return out
+
+
+# Last, once every function above exists: the MCP tools call them.
+from srl_search import mcp_server  # noqa: E402
+
+MCP = mcp_server.mount(app, sys.modules[__name__])

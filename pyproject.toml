@@ -13,6 +13,7 @@ dependencies = [
   "uvicorn==0.34.2",
   "duckdb==1.4.1",
   "tantivy==0.25.0",
+  "mcp==2.3.0",
 ]
 
 [dependency-groups]

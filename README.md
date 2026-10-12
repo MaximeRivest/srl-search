@@ -94,6 +94,40 @@ Lessons from the first build:
   DEPRECATED Zenodo records, journal covers). Results collapse identical records; the next
   build should index each distinct text once and leave boilerplate out.
 
+## MCP server (since 2026-10-12)
+
+`POST /mcp` (`srl_search/mcp_server.py`): the same search for AI apps, public at
+`https://api.sciencemadereadable.com/mcp`, tailnet `https://lambda.tail69222b.ts.net:18810/mcp`, local
+`http://127.0.0.1:8810/mcp`. Four read-only tools (`search_papers`, `get_papers`, `find_similar_papers`,
+`citation_walk`) that call the HTTP routes' own functions, two prompts (`literature_review`, `check_claim`), the
+guide as a resource, and instructions the app reads on connecting (how to search well, how to cite).
+
+```sh
+claude mcp add --transport http --scope user science https://api.sciencemadereadable.com/mcp
+codex mcp add science --url https://api.sciencemadereadable.com/mcp
+```
+
+Choices, and what they cost:
+- **Official SDK** (`mcp` 2.x, `MCPServer`), not a hand-written protocol: it speaks every revision (the initialize
+  handshake 2024-11-05 ... 2025-11-25, and the per-request 2026-07-28) and keeps up with the spec. Cost: 17 more
+  packages in the environment.
+- **Stateless, JSON answers**: no session to keep, so a restart or the nightly release never breaks a connected app,
+  and one request gets one complete answer through the door (which buffers). Cost: no progress messages during a
+  call; the slowest, a citation walk, takes about 5 s. `subscriptions/listen` is not served (nothing here ever
+  changes while running); served, it would hold a connection open per app until the relay's timeout.
+- **Markdown answers, no structured output**: the reader is a model, and structured output must be repeated as
+  JSON text, about three times the tokens for the same facts. Programs that want JSON use the HTTP API.
+- **A small surface**: the tools leave out `nprobe`, `depth`, `junk_penalty`, `license`, `pmc_open_access` and map
+  positions, which help programs more than models. Abstracts default to their first sentences (`abstracts`:
+  short / full / none) so a 30-result screen stays around 6,000 tokens.
+- **Limits at the door**: each `tools/call` counts against the programs' 30 a minute per address (the handshake,
+  listing tools and reading the guide are free). Over it, the door answers with a tool error that says how long to
+  wait, which the model reads and acts on; an HTTP 429 would break many apps' connection instead. The door logs
+  the method, tool and app name of each MCP request (to see who uses it), never the arguments.
+
+Tests: `tests/test_mcp.py` (no indexes: a stand-in search service; in process, and over HTTP in both protocol eras).
+Checked live on 2026-10-12 with Claude Code (2026-07-28) and Codex (handshake) through a copy of the door.
+
 ## Ranking: junk sinks (since 2026-10-09)
 
 Search by meaning ranks by similarity − `junk_penalty` × P(junk) (default 0.3 for `all`, 0 for the curated

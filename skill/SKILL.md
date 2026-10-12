@@ -34,6 +34,13 @@ Results: `id` (W-number), `doi`, `title`, `year`, `type`, `authors` (first 12, "
 sciencemadereadable.com). Filters: `year_from`, `year_to`, `type=review|article|preprint|...`,
 `open_access=true`, `license=cc-by`, `collection=smr`.
 
+## As MCP tools instead
+
+Apps that speak MCP can add `https://api.sciencemadereadable.com/mcp` (no key) and get the same search as tools:
+`search_papers`, `get_papers`, `find_similar_papers`, `citation_walk`. Claude Code:
+`claude mcp add --transport http --scope user science https://api.sciencemadereadable.com/mcp`. If those tools are
+already connected, use them rather than curl: same data, answers ready to cite.
+
 ## Doing it well
 
 - Questions and descriptions → by meaning (default). Exact names, genes, drugs, phrases, "everything

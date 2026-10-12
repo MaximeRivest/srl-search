@@ -15,6 +15,9 @@ Only able to open a web address (no code, no headers)? Put the question in the a
 plain text: https://ask.sciencemadereadable.com/why do cats purr, or <base>/search/why do cats purr (spaces as %20
 or +; options after ?, e.g. ?k=30&year_from=2020).
 
+Using an AI app that speaks MCP (Claude, ChatGPT, Cursor, VS Code, Codex...)? Add the MCP server
+https://api.sciencemadereadable.com/mcp instead: the same search as tools, no key (see "MCP server" below).
+
 ## What is covered right now
 
 {{COVERAGE}}
@@ -97,6 +100,29 @@ as outliers. Slow: 0.5–5 s. Fails with an `error` when the paper has no refere
 ### GET /map/place?ids=W1,W2&q=...   ·   GET /map/regions   ·   GET /map/counts
 Positions on the map of science for up to 200 papers and/or a question; field names, colours and label
 positions; exact publication counts per year and subfield. Mostly for drawing maps.
+
+## MCP server
+
+`https://api.sciencemadereadable.com/mcp`: Streamable HTTP, stateless, no authentication; every MCP protocol
+revision from 2024-11-05 to 2026-07-28. Answers are Markdown written for a model to read and cite (DOI links,
+W-numbers). Tool calls count against the same 30 a minute; over that, the call returns a tool error saying
+how long to wait. Opening the address in a browser shows how to add it.
+
+```sh
+claude mcp add --transport http --scope user science https://api.sciencemadereadable.com/mcp   # Claude Code
+codex mcp add science --url https://api.sciencemadereadable.com/mcp                             # Codex
+```
+
+Other apps: add a remote MCP server with that address (setup for each: https://sciencemadereadable.com/?api).
+
+| tool | does |
+|---|---|
+| `search_papers` | /search: `query`, `limit` (1-100), `mode`, `year_from`, `year_to`, `publication_type`, `open_access_only`, `readable_only`, `abstracts` = short (default) / full / none |
+| `get_papers` | /works for up to 20 `ids` at once (DOI, W-number, PMCID, URLs): full records |
+| `find_similar_papers` | /similar: `paper`, `limit`, the same filters |
+| `citation_walk` | /walk: `paper`, `breadth` (neighbours to learn from, default 30), `limit` per section |
+
+Also two prompts, `literature_review(question)` and `check_claim(claim)`, and this guide as a resource.
 
 ## Result fields
 
