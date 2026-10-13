@@ -16,6 +16,7 @@ import json
 import os
 import re
 import shutil
+import sys
 import threading
 import time
 import urllib.parse
@@ -165,10 +166,15 @@ class TopicService:
                 out["timing"]["all_ms"] = round((time.perf_counter() - t0) * 1000)
             finally:
                 self.slots.release()
-            tmp = path.with_suffix(f".tmp{os.getpid()}.{threading.get_ident()}")
-            tmp.write_text(json.dumps(out, ensure_ascii=False, separators=(",", ":"), allow_nan=False))   # never cache a broken answer
-            os.replace(tmp, path)
-            self._prune()
+            body = json.dumps(out, ensure_ascii=False, separators=(",", ":"), allow_nan=False)   # never a broken answer
+            try:                                       # a full disk or a removed folder costs the cache, not the answer
+                self.cache.mkdir(parents=True, exist_ok=True)
+                tmp = path.with_suffix(f".tmp{os.getpid()}.{threading.get_ident()}")
+                tmp.write_text(body)
+                os.replace(tmp, path)
+                self._prune()
+            except OSError as e:
+                print(f"topics: not cached ({e})", file=sys.stderr, flush=True)
         with self.locks_guard:
             self.locks.pop(key, None)
         out["cached"] = False

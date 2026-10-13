@@ -313,3 +313,16 @@ def test_a_group_that_does_not_split_is_still_a_valid_answer():
     out = T.build(one, cit, "x", T.Options(min_size=8, min_groups=2, max_groups=8))
     json.dumps(out, allow_nan=False)
     assert all(math.isfinite(s["stability"]) for s in out["method"]["scan"])
+
+
+def test_service_answers_even_when_the_cache_cannot_be_written(tmp_path, monkeypatch):
+    import shutil
+    svc = TopicService(FakeApi(), tmp_path, FakeCitations({}, [2020], [0]))
+    monkeypatch.setattr(svc, "compute", lambda *a: {"question": "q", "groups": [], "timing": {}, "papers": {}})
+    shutil.rmtree(svc.cache)
+    assert svc.get("again")["cached"] is False and svc.cache.exists()      # the folder comes back
+    svc.cache.chmod(0o500)
+    try:
+        assert svc.get("read only")["cached"] is False
+    finally:
+        svc.cache.chmod(0o700)
