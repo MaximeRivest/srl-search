@@ -239,7 +239,10 @@ def _leiden(g: igraph.Graph, res: float) -> np.ndarray:
 
 
 def _ari(a, b) -> float:
-    return float(igraph.compare_communities(a.tolist(), b.tolist(), method="adjusted_rand"))
+    if np.array_equal(a, b):
+        return 1.0                     # identical, even when one group (where the index itself is undefined)
+    v = float(igraph.compare_communities(a.tolist(), b.tolist(), method="adjusted_rand"))
+    return v if math.isfinite(v) else 0.0
 
 
 def _big(m: np.ndarray, min_size: int) -> int:

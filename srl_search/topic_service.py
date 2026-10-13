@@ -166,7 +166,7 @@ class TopicService:
             finally:
                 self.slots.release()
             tmp = path.with_suffix(f".tmp{os.getpid()}.{threading.get_ident()}")
-            tmp.write_text(json.dumps(out, ensure_ascii=False, separators=(",", ":")))
+            tmp.write_text(json.dumps(out, ensure_ascii=False, separators=(",", ":"), allow_nan=False))   # never cache a broken answer
             os.replace(tmp, path)
             self._prune()
         with self.locks_guard:

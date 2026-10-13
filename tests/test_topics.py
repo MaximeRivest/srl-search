@@ -1,6 +1,7 @@
 """Topic maps (srl_search/topics.py, topic_service.py) on a made-up literature with three planted research groups:
 the groups are found, named by their own words, their reading lists come from their own citations, and the same
 input always gives the same answer. No index is loaded."""
+import math
 import threading
 import time
 from types import SimpleNamespace
@@ -303,3 +304,12 @@ def test_a_preprint_and_its_journal_version_count_once():
     seed.vecs[9] = seed.vecs[5]                     # same words, another first author: a different study
     keep = T.collapse_versions(seed, cit).tolist()
     assert 5 in keep and 7 not in keep and 9 in keep and len(keep) == len(seed.wids) - 1
+
+
+def test_a_group_that_does_not_split_is_still_a_valid_answer():
+    import json
+    seed, cit = literature()
+    one = seed.subset(np.arange(60))                    # one planted group: nothing to split
+    out = T.build(one, cit, "x", T.Options(min_size=8, min_groups=2, max_groups=8))
+    json.dumps(out, allow_nan=False)
+    assert all(math.isfinite(s["stability"]) for s in out["method"]["scan"])
