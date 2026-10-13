@@ -206,7 +206,9 @@ How to search well:
                     "title; for exact words, fewer of them or OR between alternatives.")
         blocks = [result_block(i, r, abstracts) for i, r in enumerate(out["results"], 1)]
         tail = "\n\n(Abstracts shortened: get_papers gives them in full.)" if abstracts == "short" else ""
-        return f"{how} {count(len(blocks))}.\n\n" + "\n\n".join(blocks) + tail
+        hint = ("\n\nTo understand the field rather than list its closest papers: map_topic with this topic shows its "
+                "research groups, each with its key papers, reviews to start with and experts; then read_topic_group.")
+        return f"{how} {count(len(blocks))}.\n\n" + "\n\n".join(blocks) + tail + hint
 
     @server.tool(title="Get papers by identifier", annotations=READ_ONLY, structured_output=False)
     async def get_papers(

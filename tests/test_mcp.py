@@ -105,7 +105,8 @@ def test_tools_answer_in_markdown_the_model_can_cite():
             assert not r.is_error and "Found by meaning" in out and "https://doi.org/10.1126/science.aan8048" in out
             assert "<i>" not in out and "et al. (25 authors)" in out and "probably not a scholarly paper" in out
             assert "plain-language version: https://sciencemadereadable.com/?paper=PMC1" in out
-            assert len(out.split("Tropical")[1]) < 400                          # short abstracts by default
+            assert len(out.split("Tropical")[1].split("(Abstracts")[0]) < 400   # short abstracts by default
+            assert "map_topic" in out                                           # points to the field's map
             assert calls[-1]["collection"] == "all" and calls[-1]["abstracts"] is True
 
             await c.call_tool("search_papers", {"query": "x y", "readable_only": True, "abstracts": "none",

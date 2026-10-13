@@ -387,6 +387,11 @@ def as_text(q: str, out: dict, k: int) -> str:
             how = (f"No paper contains all of `{out['fallback']['query']}`, so these are by meaning instead "
                    "(closest in what they are about)")
     lines = [f"# Studies about: {q}", "",
+             f"Learning about a field or a topic, rather than looking for one fact? Open its map instead: "
+             f"https://ask.sciencemadereadable.com/map/{enc(q)} gives the research groups inside it, each with its "
+             "key papers, rising work, reviews to start with and experts; then read the groups that matter in full "
+             "(every paper with its abstract), as that page explains. A list like the one below shows only the "
+             "closest papers, not how the field divides.", "",
              f"{how}. Best first. Titles and abstracts from OpenAlex, not full texts.", "",
              f"Options after `?`, e.g. `?k=30&year_from=2020` (k up to 100; also year_to, type=review, open_access=true, "
              f"abstracts=false). The same search as JSON: {PUBLIC_BASE}/search?q={enc(q)} · "
