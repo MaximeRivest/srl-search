@@ -37,6 +37,42 @@ WAIT_S = 25                    # a request waits this long for a free slot, then
 NPROBE = 512                   # the 1000th-closest paper needs a wider scan than the top 10
 JUNK_MAX = 0.5
 CACHE_KEEP = 20000             # files per release (~150 KB each)
+# One answer about a group stays under ~64k characters (~16-20k tokens): AI apps cap a tool's answer (Claude Code at
+# 25k tokens by default) and cut what is over, so pages carry the rest instead.
+PAGE_CHARS = 64_000
+
+
+def clean_abstract(a: str | None) -> str | None:
+    a = " ".join(T.TAG.sub(" ", a).split()) if a else ""
+    return a or None
+
+
+def shorten(a: str | None, mode: str) -> str | None:
+    if not a or mode == "none":
+        return None
+    if mode == "short" and len(a) > 320:
+        return a[:320].rsplit(" ", 1)[0] + "…"
+    return a
+
+
+def size_of(p: dict) -> int:
+    """Characters this paper takes in a text answer (title, facts, link, abstract)."""
+    return 220 + len(p.get("title") or "") + len(p.get("venue") or "") + len(p.get("why") or "") + len(p.get("abstract") or "")
+
+
+def paginate(sizes: list[int], budget: int | None = None) -> list[list[int]]:
+    """Consecutive items into pages of at most `budget` characters (an item bigger than that alone on its page)."""
+    budget = budget or PAGE_CHARS
+    pages, cur, used = [], [], 0
+    for i, sz in enumerate(sizes):
+        if cur and used + sz > budget:
+            pages.append(cur)
+            cur, used = [], 0
+        cur.append(i)
+        used += sz
+    if cur or not pages:
+        pages.append(cur)
+    return pages
 
 
 def norm_title(t: str | None) -> str:
@@ -132,7 +168,9 @@ class TopicService:
 
     # ------------------------------------------------------------------------------------------ the answer
     def get(self, q: str, papers: int = 1000, mode: str = "auto", year_from=None, year_to=None,
-            group: int | None = None) -> dict:
+            group: int | None = None, cached_only: bool = False) -> dict:
+        """The map (cached or made now). cached_only: reading a group uses a map already made (it is priced as
+        one request, so it must never cost a map's work): 409 if there is none."""
         q = " ".join(q.split())
         if mode == "auto":
             mode = "keyword" if self.api.KEYWORDS and self.api.looks_boolean(q) else "semantic"
@@ -145,6 +183,10 @@ class TopicService:
             out = json.loads(path.read_text())
             out["cached"] = True
             return out
+        if cached_only:
+            what = f"group {group} split into its own groups" if group else "this topic"
+            raise HTTPException(409, f"Map {what} first (map_topic, or /topics with the same question and options): "
+                                     "reading a group uses that map. Maps are kept until the next nightly data update.")
         with self.locks_guard:
             lock = self.locks.setdefault(key, threading.Lock())
         with lock:                                     # the same map asked twice at once: computed once
@@ -275,6 +317,80 @@ class TopicService:
         raw["atlas"] = api.ATLAS.id if api.ATLAS is not None else None
         return raw
 
+    def read(self, out: dict, group: int, part: str = "lists", page: int = 1, abstracts: str = "full") -> dict:
+        """One group of a map in depth, with abstracts: its reading lists ("lists"), or all of its papers, most
+        central first ("papers"). Pages are filled up to PAGE_CHARS of text (abstracts vary 10x in length), so
+        every answer fits what AI apps accept from one tool call, and nothing is cut: the rest is on the next page.
+        A paper on several lists is given in full once."""
+        g = next((x for x in out["groups"] if x["id"] == group), None)
+        if g is None:
+            raise HTTPException(404, f"no group {group}; this map has groups 1-{len(out['groups'])}")
+        eng = self.api.engine
+        res = {"question": out["question"], "group": {k: g.get(k) for k in ("id", "name", "phrases", "size", "years",
+                                                                         "cites_groups", "between", "openalex_topics")},
+               "groups": {x["id"]: x["name"] for x in out["groups"]}, "part": part, "parent": out.get("parent"),
+               "abstracts": abstracts}
+        if part == "lists":
+            entries = []                               # (lens, item) in reading order
+            for key, _ in LENS_TITLES:
+                entries += [(key, p) for p in g["lenses"].get(key, [])]
+            entries += [("experts", e) for e in g["lenses"].get("experts", [])]
+            ids = {int(p["id"][1:]) for k, p in entries if k != "experts"}
+            ids |= {int(e[x]["id"][1:]) for k, e in entries if k == "experts" for x in ("top", "latest") if e.get(x)}
+            det = eng.details(sorted(ids))
+            seen: set = set()
+            items = []
+            for k, p in entries:
+                if k == "experts":
+                    e = {**p, "top": self._with_abstract(p["top"], det, abstracts, seen),
+                         "latest": self._with_abstract(p["latest"], det, abstracts, seen) if p.get("latest") else None}
+                    items.append((k, e, size_of(e["top"]) + (size_of(e["latest"]) if e["latest"] else 0) + 200))
+                else:
+                    q = self._with_abstract(p, det, abstracts, seen)
+                    items.append((k, q, size_of(q)))
+            pages = paginate([sz for _, _, sz in items])
+            if not 1 <= page <= len(pages):
+                raise HTTPException(404, f"the lists of group {group} have {len(pages)} pages")
+            lenses: dict = {}
+            for k, q, _ in (items[i] for i in pages[page - 1]):
+                lenses.setdefault(k, []).append(q)
+            res.update({"page": page, "pages": len(pages), "lenses": lenses})
+            return res
+        P = out["papers"]
+        members = [i for i, gg in enumerate(P["group"]) if gg == group]
+        cen = P.get("centrality") or [0] * len(P["id"])
+        members.sort(key=lambda i: (-cen[i], i))
+        det = eng.details([int(P["id"][i][1:]) for i in members])
+        rows = [{**self._paper(int(P["id"][i][1:]), det, abstracts), "centrality": cen[i], "between": P["between"][i],
+                 "rank": n} for n, i in enumerate(members, 1) if int(P["id"][i][1:]) in det]
+        pages = paginate([size_of(r) for r in rows])
+        if not 1 <= page <= len(pages):
+            raise HTTPException(404, f"group {group} has {len(pages)} pages of papers")
+        res.update({"page": page, "pages": len(pages), "total": len(rows),
+                    "papers": [rows[i] for i in pages[page - 1]]})
+        return res
+
+    def _paper(self, w: int, det: dict, abstracts: str = "full") -> dict:
+        d = det[w]
+        names = [a.strip() for a in (d.get("authors") or "").split("|") if a.strip()]
+        out = {"id": f"W{w}", "title": T.TAG.sub("", d.get("title") or "") or "(no title)", "year": d.get("year"),
+               "type": d.get("type"), "venue": d.get("venue"), "authors": names[:3],
+               "authors_count": d.get("authors_count") or len(names), "citations": d.get("citations"),
+               "doi": d.get("doi"), "pmcid": d.get("pmcid"), "abstract": shorten(clean_abstract(d.get("abstract")), abstracts)}
+        if self.api.readable(w):
+            out["readable"] = True
+        return {k: v for k, v in out.items() if v not in (None, [], "")}
+
+    def _with_abstract(self, p: dict, det: dict, abstracts: str = "full", seen: set | None = None) -> dict:
+        """The item with its abstract, the first time it is given (later: marked as given above)."""
+        if seen is not None and p["id"] in seen:
+            return {**p, "given_above": True}
+        if seen is not None:
+            seen.add(p["id"])
+        d = det.get(int(p["id"][1:]))
+        a = shorten(clean_abstract(d.get("abstract")) if d else None, abstracts)
+        return {**p, "abstract": a} if a else dict(p)
+
     def _prune(self):
         self.writes += 1
         if self.writes % 200:
@@ -285,6 +401,8 @@ class TopicService:
 
 
 # ------------------------------------------------------------------------------------------------ as text
+# Written for a model to read and act on. Complete: every group, every reading list, every item; what is not
+# here (abstracts, every member paper) is one call away, and each answer says which call.
 SITE = "https://sciencemadereadable.com"
 
 
@@ -292,57 +410,170 @@ def _link(p: dict) -> str:
     return f"https://doi.org/{p['doi']}" if p.get("doi") else f"https://openalex.org/{p['id']}"
 
 
-def _line(p: dict, why: str = "") -> str:
+def _line(p: dict, why: str = "", full: bool = True) -> str:
+    """One paper on one line. full: with first author and venue (reading a group); else the map's lean line."""
     a = p.get("authors", [])
-    who = (a[0] + (" et al." if p.get("authors_count", 0) > 1 else "")) if a else ""
+    who = (a[0] + (" et al." if p.get("authors_count", 0) > 1 else "")) if a and full else ""
     review = "review" if p.get("type") == "review" and "review" not in why else ""
-    title = p["title"] if len(p["title"]) <= 150 else p["title"][:147].rsplit(" ", 1)[0] + "…"
-    facts = [str(p.get("year") or "n.d."), p.get("venue") or "", who, review, why]
-    return f"- **{title}** · " + " · ".join(f for f in facts if f) + f" · {_link(p)}"
+    cites = f"cited {p['citations']:,}×" if p.get("citations") else ""
+    facts = [str(p.get("year") or "n.d."), (p.get("venue") or "") if full else "", who, review, cites, why]
+    return f"- **{p['title']}** · " + " · ".join(f for f in facts if f) + f" · {_link(p)}"
 
 
-def as_text(out: dict, base: str, per_lens: int = 2) -> str:
-    """A topic map as Markdown: every group with its name, size, years, and the top of each reading list."""
+def _abstract(p: dict) -> list[str]:
+    if p.get("given_above"):
+        return ["  (abstract given above)"]
+    return [f"  {p['abstract']}"] if p.get("abstract") else []
+
+
+LENS_TITLES = [
+    ("start_here", "Start here: recent papers of the group citing most of its key works (often reviews)"),
+    ("core", "Core: what the group's papers cite most (its foundations; may be older or outside the mapped set)"),
+    ("rising", "Rising: works of the last 5 years already cited by many of the group's papers"),
+    ("distinctive", "Only here: cited mostly by this group, not the others (what sets it apart)"),
+    ("bridges", "Bridges: papers of the group with many links to another group"),
+    ("newest", "Newest papers of the group"),
+]
+
+
+def _ref(out: dict, enc) -> str:
+    q = enc(out["question"])
+    return q + (f", within group {out['parent']['group']}" if out.get("parent") else "")
+
+
+def as_text(out: dict, base: str, page: int = 1) -> str:
+    """The whole map as Markdown: the groups at a glance, then every group with every reading list and expert,
+    whole groups per page (pages of ~PAGE_CHARS). Raises 404 for a page that does not exist."""
     enc = urllib.parse.quote
     q = out["question"]
     cov = out["coverage"]
-    head = (f"# Research groups in: {out['parent']['name']} (group {out['parent']['group']} of “{q}”)"
+    names = {x["id"]: x["name"] for x in out["groups"]}
+    blocks = [_group_block(g, names) for g in out["groups"]]
+    pages = paginate([len(b) for b in blocks], PAGE_CHARS - 9000) if blocks else [[]]   # room for the glance + next
+    if not 1 <= page <= len(pages):
+        raise HTTPException(404, f"this map has {len(pages)} pages")
+    head = (f"# Research groups in: {out['parent']['name']} (group {out['parent']['group']} of “{q}”, split further)"
             if out.get("parent") else f"# Research groups in: {q}")
     how = ("closest in meaning to the question" if out["mode"] == "semantic"
            else f"best matches for the exact words (`{out.get('query') or q}`)")
-    lines = [head, "",
-             f"{cov['papers']:,} papers {how}, grouped by the works they cite and the words they use "
-             f"({cov['in_groups']:,} in {len(out['groups'])} groups, {cov['other']:,} in small groups or alone). "
-             "Group names are the phrases most over-represented in each group (automatic). Each list is computed from "
-             "the citations made by the group's own papers, so it shows what matters to that group.",
-             ""]
-    if cov.get("references_thin"):
-        lines += [f"Note: only {cov['with_references']:,} of these papers have references in OpenAlex, so the groups "
-                  "lean more on wording than on citations here.", ""]
-    for g in out["groups"]:
-        yrs = g.get("years")
-        span = f", mostly {yrs[0]}–{yrs[2]}" if yrs else ""
-        lines += [f"## Group {g['id']}: {g['name']} ({g['size']} papers{span})"]
-        uses = g.get("cites_groups") or {}
-        if uses:
-            names = {x["id"]: x["name"] for x in out["groups"]}
-            top = list(uses.items())[:2]
-            lines.append("Builds on: " + "; ".join(f"group {k} ({names.get(int(k), '')}, {v} citations)" for k, v in top))
-        L = g["lenses"]
-        for key, title, k in (("start_here", "Start here (recent papers citing most of the group's key works)", per_lens),
-                              ("core", "Core (what this group cites most)", per_lens + 1),
-                              ("rising", "Rising (recent works gathering citations fast here)", per_lens)):
-            if L.get(key):
-                lines += [f"{title}:"] + [_line(p, p.get("why", "")) for p in L[key][:k]]
-        if L.get("experts"):
-            lines.append("Experts here (h-index inside the group, position-weighted): " + "; ".join(
-                f"{e['name']} (h = {e['h']}, https://openalex.org/{e['author']})" for e in L["experts"][:3]))
-        if L.get("bridges"):
-            lines += ["Bridge to other groups:"] + [_line(p, p.get("why", "")) for p in L["bridges"][:1]]
+    lines = [head, ""]
+    if page == 1:
+        lines += [f"{cov['papers']:,} papers {how}, grouped by the works they cite and the words they use: "
+                  f"{cov['in_groups']:,} in {len(out['groups'])} groups, {cov['other']:,} in small groups or alone. "
+                  "Group names are the phrases most over-represented in each group (automatic, sometimes rough: judge "
+                  "a group by its papers). Each reading list comes from the citations made by the group's own papers, "
+                  "so it shows what matters to that group, not what is famous overall.", ""]
+        if cov.get("references_thin"):
+            lines += [f"Note: only {cov['with_references']:,} of these papers have references in OpenAlex, so here the "
+                      "groups lean more on wording than on citations.", ""]
+        lines.append("## The groups at a glance")
+        for g in out["groups"]:
+            yrs = g.get("years")
+            uses = ", ".join(f"{k}" for k in list((g.get("cites_groups") or {}))[:3])
+            lines.append(f"- Group {g['id']}: {g['name']} · {g['size']} papers"
+                         + (f" · mostly {yrs[0]}–{yrs[2]}" if yrs else "")
+                         + (f" · builds most on groups {uses}" if uses else "")
+                         + f" (details on page {next(i for i, pg in enumerate(pages, 1) if g['id'] - 1 in pg)})")
         lines.append("")
-    qs = f"{enc(q)}"
-    lines += [f"Split one group further: {base}/topics/{qs}?group=N · the same map as JSON (every paper, all lists): "
-              f"{base}/topics?q={qs} · on the map of science: {SITE}/?topics={qs}",
-              "Citations come from OpenAlex and only count links between works it holds; a missing group means it was "
-              "not among these papers, not that it does not exist."]
+    else:
+        lines += [f"Page {page} of {len(pages)} of the map (page 1 has the groups at a glance).", ""]
+    for i in pages[page - 1]:
+        lines.append(blocks[i])
+    lines.append("## Next")
+    if page < len(pages):
+        lines.append(f"- **The map continues: page {page + 1} of {len(pages)}** (map_topic with page={page + 1}, or "
+                     f"{base}/topics/{enc(q)}?page={page + 1}). Read every page.")
+    lines += ["- Then read every group that bears on the question in depth, with full abstracts and authors: its "
+              "reading lists (read_topic_group, part=lists), then all of its papers, most central first "
+              "(part=papers), page by page until the last. Over HTTP: "
+              f"{base}/topics/{enc(q)}?read=N&part=lists, then &part=papers&page=1, 2, …",
+              f"- Split a large or mixed group into its own groups: map_topic with group=N, or {base}/topics/{enc(q)}?group=N",
+              f"- Everything as JSON (every mapped paper with its group, centrality and map position): {base}/topics?q={enc(q)}",
+              f"- On the map of science, for people: {SITE}/?topics={enc(q)}",
+              "Limits: citations come from OpenAlex and only count links between works it holds; papers from the last "
+              "few weeks have no references yet. A group that is missing was not among these papers; it may still exist."]
+    return "\n".join(lines) + "\n"
+
+
+def _group_block(g: dict, names: dict) -> str:
+    yrs = g.get("years")
+    span = f", mostly {yrs[0]}–{yrs[2]} (median {yrs[1]})" if yrs else ""
+    lines = [f"## Group {g['id']}: {g['name']} ({g['size']} papers{span})"]
+    extra = []
+    if g.get("phrases") and len(g["phrases"]) > 3:
+        extra.append("also: " + ", ".join(g["phrases"][3:]))
+    uses = g.get("cites_groups") or {}
+    if uses:
+        extra.append("builds on " + "; ".join(f"group {k} ({names.get(int(k), '')}, {v} citations)" for k, v in uses.items()))
+    if g.get("openalex_topics"):
+        extra.append("OpenAlex topics: " + ", ".join(f"{t['topic']} {round(100 * t['share'])}%" for t in g["openalex_topics"]))
+    if g.get("between"):
+        extra.append(f"{g['between']} papers sit between this group and another")
+    if extra:
+        lines.append("; ".join(extra) + ".")
+    L = g["lenses"]
+    shown: set = set()
+    for key, title in LENS_TITLES:
+        if L.get(key):
+            lines.append(f"{title}:")
+            for p in L[key]:
+                if p["id"] in shown:                   # on an earlier list of this group: title and reason only
+                    lines.append(f"- {p['title']} (above) · {p.get('why', '')}".rstrip(" ·"))
+                else:
+                    shown.add(p["id"])
+                    lines.append(_line(p, p.get("why", ""), full=False))
+    if L.get("experts"):
+        lines.append("Experts here (h-index counted inside the group: h of their works each cited by ≥ h of the group's "
+                     "papers; first author full credit, last author half, others less):")
+        for e in L["experts"]:
+            def ref(p):
+                return f"{p['title']} ({p.get('year') or 'n.d.'})" + ("" if p["id"] in shown else f" {_link(p)}")
+            lines.append(f"- {e['name']} (h = {e['h']}, https://openalex.org/{e['author']}) · most cited here: "
+                         + ref(e["top"]) + (f" · latest here: {ref(e['latest'])}"
+                                            if e.get("latest") and e["latest"]["id"] != e["top"]["id"] else ""))
+    return "\n".join(lines) + "\n"
+
+
+def read_text(r: dict, base: str, abstracts: str | None = None) -> str:
+    """One group in depth, one page: its reading lists with abstracts, or its papers with abstracts."""
+    enc = urllib.parse.quote
+    g = r["group"]
+    yrs = g.get("years")
+    span = f", mostly {yrs[0]}–{yrs[2]}" if yrs else ""
+    where = f" (within group {r['parent']['group']} of “{r['question']}”)" if r.get("parent") else f" of “{r['question']}”"
+    lines = [f"# Group {g['id']}{where}: {g['name']} ({g['size']} papers{span})", ""]
+    qs = enc(r["question"])
+    more = r["page"] < r["pages"]
+    if r["part"] == "lists":
+        nxt = (f"Next: page={r['page'] + 1} (part=lists)." if more else
+               f"Next: all of the group's papers, most central first: part=papers, page=1 "
+               f"({base}/topics/{qs}?read={g['id']}&part=papers&page=1).")
+        lines += [f"Its reading lists, each paper with its abstract (given once when it is on several lists). "
+                  f"Page {r['page']} of {r['pages']}. {nxt}", ""]
+        for key, title in LENS_TITLES:
+            items = r["lenses"].get(key) or []
+            if items:
+                lines += [f"## {title}", ""]
+                for p in items:
+                    lines += [_line(p, p.get("why", ""))] + _abstract(p) + [""]
+        ex = r["lenses"].get("experts") or []
+        if ex:
+            lines += ["## Experts here (h-index counted inside the group, position-weighted)", ""]
+            for e in ex:
+                lines.append(f"- {e['name']} (h = {e['h']}, https://openalex.org/{e['author']}"
+                             + (f", author of {e['papers_in_group']} of the group's papers" if e.get("papers_in_group") else "") + ")")
+                lines += ["  Most cited here: " + _line(e["top"])[2:]] + [f"  {x.strip()}" for x in _abstract(e["top"])]
+                if e.get("latest") and e["latest"]["id"] != e["top"]["id"]:
+                    lines += ["  Latest here: " + _line(e["latest"])[2:]] + [f"  {x.strip()}" for x in _abstract(e["latest"])]
+                lines.append("")
+        if more:
+            lines.append(f"(Continued on page {r['page'] + 1}.)")
+        return "\n".join(lines) + "\n"
+    ps = r["papers"]
+    lines += [f"Papers {ps[0]['rank']}–{ps[-1]['rank']} of {r['total']}, most central first (most linked to the rest of "
+              f"the group by shared references and meaning). Page {r['page']} of {r['pages']}. "
+              + (f"Next: page={r['page'] + 1}." if more else "This is the last page: you have read the whole group."), ""]
+    for p in ps:
+        mark = " · between groups" if p.get("between") else ""
+        lines += [f"{p['rank']}. " + _line(p)[2:] + mark] + _abstract(p) + [""]
     return "\n".join(lines) + "\n"

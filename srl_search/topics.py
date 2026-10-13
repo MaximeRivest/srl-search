@@ -66,7 +66,7 @@ class Options:
     max_groups: int = 9            # a person scans 5-9 groups; any group can be split further (group=N)
     min_size: int | None = None    # smallest group shown (default max(12, n/50)); smaller ones are "other papers"
     seed: int = 20161028           # Scimeetr's first commit day
-    lens_size: int = 6
+    lens_size: int = 8              # per reading list (experts too)
 
 
 @dataclass
@@ -561,6 +561,15 @@ def experts_for(idx: np.ndarray, local: np.ndarray, gr: Graph, seed: Seed, cit, 
     return out
 
 
+def centrality(WG: np.ndarray, group: np.ndarray) -> list[float]:
+    out = np.zeros(len(group))
+    for c in set(group.tolist()) - {-1}:
+        idx = np.flatnonzero(group == c)
+        s = WG[idx, c]
+        out[idx] = s / s.max() if s.max() > 0 else 0
+    return [round(float(x), 3) for x in out]
+
+
 # -------------------------------------------------------------------------------------------------- the map
 def build(seed: Seed, cit, query: str = "", opt: Options | None = None) -> dict:
     """The topic map of these papers: groups, names, lenses, links between groups. Works are given as OpenAlex
@@ -615,7 +624,7 @@ def build(seed: Seed, cit, query: str = "", opt: Options | None = None) -> dict:
         idx = np.flatnonzero(group == c)
         lens, local = lenses_for(c, idx, gr, seed, group, cit, opt, ref_year, ref_ok, total_local)
         lens["bridges"] = bridges_for(c, idx, WG, G, opt.lens_size, seed)
-        lens["experts"] = experts_for(idx, local, gr, seed, cit, 5)
+        lens["experts"] = experts_for(idx, local, gr, seed, cit, opt.lens_size)
         strength = WG[idx, c]
         years = [d.get("year") for d in (seed.details[i] for i in idx) if d.get("year")]
         topics = Counter(seed.details[i].get("topic") for i in idx if seed.details[i].get("topic"))
@@ -640,7 +649,9 @@ def build(seed: Seed, cit, query: str = "", opt: Options | None = None) -> dict:
     return {
         "groups": groups,
         "papers": {"w": [int(w) for w in seed.wids], "group": [int(g) + 1 if g >= 0 else 0 for g in group],
-                   "between": [bool(group[i] >= 0 and agree[i] < 0.6) for i in range(n)]},
+                   "between": [bool(group[i] >= 0 and agree[i] < 0.6) for i in range(n)],
+                   # how central each paper is in its group: its link weight into the group / the group's highest
+                   "centrality": centrality(WG, group)},
         "coverage": {"papers": n, "with_references": int((nrefs > 0).sum()),
                      "median_references": float(np.median(nrefs)) if n else 0.0,
                      "without_text_vector": int((~seed.has_vec).sum()),

@@ -98,8 +98,8 @@ Lessons from the first build:
 
 `POST /mcp` (`srl_search/mcp_server.py`): the same search for AI apps, public at
 `https://api.sciencemadereadable.com/mcp`, tailnet `https://lambda.tail69222b.ts.net:18810/mcp`, local
-`http://127.0.0.1:8810/mcp`. Five read-only tools (`search_papers`, `get_papers`, `find_similar_papers`,
-`citation_walk`, and since 2026-10-13 `map_topic`) that call the HTTP routes' own functions, two prompts (`literature_review`, `check_claim`), the
+`http://127.0.0.1:8810/mcp`. Six read-only tools (`search_papers`, `get_papers`, `find_similar_papers`,
+`citation_walk`, and since 2026-10-13 `map_topic` and `read_topic_group`) that call the HTTP routes' own functions, two prompts (`literature_review`, `check_claim`), the
 guide as a resource, and instructions the app reads on connecting (how to search well, how to cite).
 
 ```sh
@@ -149,6 +149,14 @@ cache, load limits, titles and map positions) `srl_search/topic_service.py`, cit
   asked twice at once is computed once. The public door counts a map as 5 requests.
 - Deterministic: the same question, options and release give the same map (seeded; igraph's generator is global,
   so clustering runs one map at a time, ~1-3 s).
+- Nothing is trimmed for models: `map_topic` / `/topics/{q}` give every group (all at a glance on page 1), every
+  reading list (8 per list) and every expert; `read_topic_group` / `?read=N` give one group's lists with full
+  abstracts, then all of its papers with full abstracts, most central first. Every text answer is a page of at most
+  ~64k characters (~16-20k tokens; `PAGE_CHARS`, filled by size since abstracts vary tenfold), so it stays under
+  what apps accept per tool call (Claude Code: 25k tokens by default) and nothing is cut; each page says what to
+  call next. Measured: a map is 1-3 pages, a group's lists 1-2, a 355-paper group's papers 13. The instructions
+  (MCP server, tools, `field_overview` prompt, llms.txt, skill) teach models to map first, then read every relevant
+  group in full.
 - Tests: `tests/test_topics.py` (a made-up literature with three planted groups; no index loaded).
 
 ## Ranking: junk sinks (since 2026-10-09)

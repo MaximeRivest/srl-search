@@ -64,7 +64,7 @@ from srl_search.engine import EMBEDDING_PLAN, JUNK_PENALTY, Engine, ExactEngine
 from srl_search.keyword import KeywordIndex, looks_boolean
 from srl_search.public import PUBLIC_BASE, PUBLIC_ROUTES
 from srl_search.quality import Quality
-from srl_search.topic_service import TopicService, as_text as topic_text
+from srl_search.topic_service import TopicService, as_text as topic_text, read_text as topic_read_text
 
 ROOT = Path("/mnt/fast/scholarsreadinglist/search")
 RELEASE_LINK = Path(os.environ.get("SRL_RELEASE", "/mnt/fast/scholarsreadinglist/release/current"))
@@ -556,6 +556,12 @@ D_TOPIC_Q = ("A question or topic in plain words (by meaning), or exact-words sy
              "as in /search.")
 D_PAPERS = "How many papers to map: the closest in meaning, or the best exact-word matches. More = broader, slower."
 D_GROUP = "Split this group of the map (its id, from a previous answer) into its own groups."
+D_READ = ("Read this group of the map in depth, with abstracts: its reading lists (part=lists) or all of its papers, "
+          "most central first (part=papers), in pages of ~64k characters (page=N). The map must exist (409 if not: "
+          "call /topics first). Counts as 1 request, not 5.")
+D_PART = "With read: lists (its reading lists) or papers (all its papers, page by page)."
+D_PAGE = ("Which page: of the map itself (as text), or with read of the group's lists or papers. Each answer says "
+          "how many pages there are and what to call next.")
 
 
 def topics_service() -> TopicService:
@@ -570,7 +576,12 @@ def topics(q: str = Query(..., min_length=2, max_length=2000, description=D_TOPI
            mode: str = Query("auto", pattern="^(auto|semantic|keyword)$", description="As in /search."),
            year_from: int | None = Query(None, description=D_YEAR_FROM),
            year_to: int | None = Query(None, description=D_YEAR_TO),
-           group: int | None = Query(None, ge=1, le=50, description=D_GROUP)):
+           group: int | None = Query(None, ge=1, le=50, description=D_GROUP),
+           read: int | None = Query(None, ge=1, le=50, description=D_READ),
+           part: str = Query("lists", pattern="^(lists|papers)$", description=D_PART),
+           page: int = Query(1, ge=1, le=100, description=D_PAGE),
+           abstracts: str = Query("full", pattern="^(full|short|none)$",
+                                  description="With read: full abstracts, their first sentences, or none.")):
     """The research groups inside a topic, and what to read in each. The papers (closest in meaning, or exact-word
     matches) are grouped by the works they cite and the words they use; each group gets a name (the phrases most
     over-represented in it) and reading lists computed from its own papers' citations: core (most cited by the
@@ -578,8 +589,11 @@ def topics(q: str = Query(..., min_length=2, max_length=2000, description=D_TOPI
     (recent papers citing most of the group's key works, often reviews), bridges (papers linking to another group),
     newest, and experts (authors with the highest position-weighted h-index inside the group). Every paper comes
     with its group and map position. 2-6 s the first time (up to ~30 s when the disk cache is cold), then instant
-    (cached for the data release). Counts as 5 requests at the public door."""
-    return topics_service().get(q, papers, mode, year_from, year_to, group)
+    (cached for the data release). Counts as 5 requests at the public door. With read=N: one group in depth, with
+    abstracts (part=lists: its reading lists; part=papers&page=N: all of its papers, most central first)."""
+    svc = topics_service()
+    out = svc.get(q, papers, mode, year_from, year_to, group, cached_only=bool(read))
+    return svc.read(out, read, part, page, abstracts) if read else out
 
 
 @app.get("/topics/{q:path}", response_class=PlainTextResponse)
@@ -588,16 +602,24 @@ def topics_text(q: str,
                 mode: str = Query("auto", pattern="^(auto|semantic|keyword)$", description="As in /search."),
                 year_from: int | None = Query(None, description=D_YEAR_FROM),
                 year_to: int | None = Query(None, description=D_YEAR_TO),
-                group: int | None = Query(None, ge=1, le=50, description=D_GROUP)):
-    """The same topic map with the question in the address and the answer as plain text (Markdown): each group's
-    name, size and years, and the top of its reading lists. /topics/intermittent fasting"""
+                group: int | None = Query(None, ge=1, le=50, description=D_GROUP),
+                read: int | None = Query(None, ge=1, le=50, description=D_READ),
+                part: str = Query("lists", pattern="^(lists|papers)$", description=D_PART),
+                page: int = Query(1, ge=1, le=100, description=D_PAGE),
+                abstracts: str = Query("full", pattern="^(full|short|none)$",
+                                       description="With read: full abstracts, their first sentences, or none.")):
+    """The same topic map with the question in the address and the answer as plain text (Markdown): every group,
+    every reading list, every expert. /topics/intermittent fasting. With read=N: one group in depth, with abstracts
+    (?read=2&part=lists, then ?read=2&part=papers&page=1, 2, ...)."""
     if " " not in q:
         q = q.replace("+", " ")
     q = q.strip()
     if not 2 <= len(q) <= 2000:
         raise HTTPException(422, "the question must be 2-2000 characters: /topics/intermittent fasting")
-    out = topics_service().get(q, papers, mode, year_from, year_to, group)
-    return PlainTextResponse(topic_text(out, PUBLIC_BASE), headers={"Cache-Control": "no-store"})
+    svc = topics_service()
+    out = svc.get(q, papers, mode, year_from, year_to, group, cached_only=bool(read))
+    text = topic_read_text(svc.read(out, read, part, page, abstracts), PUBLIC_BASE) if read else topic_text(out, PUBLIC_BASE, page)
+    return PlainTextResponse(text, headers={"Cache-Control": "no-store"})
 
 
 # Last, once every function above exists: the MCP tools call them.

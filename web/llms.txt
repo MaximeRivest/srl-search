@@ -123,6 +123,22 @@ weighted by rarity + nearest neighbours in meaning, half each; Leiden, consensus
 next data release (`cached: true`). **Counts as 5 requests.** Importance here is local: "core" means cited by
 this group's papers, which is the point (what matters to this conversation), not citations overall.
 
+**Reading a group in depth** (counts as 1 request): `read=N` with `part=lists` gives group N's reading lists,
+each paper with its abstract; `part=papers&page=1, 2, …` gives *all* of its papers with abstracts, most central
+first (most linked to the rest of the group). Add `group=M` to read a group of the split of group M.
+As text: `/topics/{question}?read=N&part=lists` (`abstracts=full|short|none`).
+
+**Pages, never cuts.** Text answers are pages of at most ~64k characters (~16-20k tokens: under what AI apps
+accept from one call), so nothing is shortened: the map itself (`/topics/{question}?page=2`; page 1 opens with every
+group at a glance), a group's lists and a group's papers each come in as many pages as they need. Every answer
+says which page it is, how many there are, and what to call next. A busy group of 350 papers is ~13 pages.
+
+**How to use it (agents)**: map first, then read. For a question about a field, call `/topics/{question}`: it
+lists every group and every reading list. Then, for every group that bears on the question, read `part=lists`
+and every page of `part=papers`: hundreds of abstracts, which a large context holds easily, and which is what
+lets you explain the field rather than repeat a ranked list. Split big or mixed groups (`group=N`), search inside
+a group with its own phrases, walk citations from its key papers, and answer organised by group.
+
 ### GET /map/place?ids=W1,W2&q=...   ·   GET /map/regions   ·   GET /map/counts
 Positions on the map of science for up to 200 papers and/or a question; field names, colours and label
 positions; exact publication counts per year and subfield. Mostly for drawing maps.
@@ -147,9 +163,11 @@ Other apps: add a remote MCP server with that address (setup for each: https://s
 | `get_papers` | /works for up to 20 `ids` at once (DOI, W-number, PMCID, URLs): full records |
 | `find_similar_papers` | /similar: `paper`, `limit`, the same filters |
 | `citation_walk` | /walk: `paper`, `breadth` (neighbours to learn from, default 30), `limit` per section |
-| `map_topic` | /topics: `topic`, `papers` (default 1000), `group` (split one group), `year_from`, `year_to`. Counts as 5 calls |
+| `map_topic` | /topics: `topic`, `papers` (default 1000), `group` (split one group), `year_from`, `year_to`. Every group, every reading list, every expert. Counts as 5 calls |
+| `read_topic_group` | /topics with `read`: `topic`, `group`, `part` = lists / papers, `page`, `abstracts` (full by default), `within` (a group of a split). Counts as 1 call |
 
-Also two prompts, `literature_review(question)` and `check_claim(claim)`, and this guide as a resource.
+Also three prompts, `field_overview(topic)`, `literature_review(question)` and `check_claim(claim)`, and this guide
+as a resource.
 
 ## Result fields
 
@@ -180,9 +198,10 @@ Also two prompts, `literature_review(question)` and `check_claim(claim)`, and th
   weight" pulls in blog-like records; "effectiveness of dietary and exercise interventions for weight loss
   in adults" pulls in trials and reviews. Rewriting a casual question into research language before
   searching is the single biggest quality gain; the junk penalty handles most of the rest.
-- **New to a field, or asked for an overview / reading list?** Start with `/topics?q=` (or `map_topic`): the
-  groups show how the field divides, and each group's `start_here`, `core` and `rising` lists are a reading
-  plan. Then search inside the group that matters.
+- **Start from the landscape, not a flat list.** For any question about a field, a topic or "what research
+  says": `/topics/{question}` (or `map_topic`) first, then read the groups that bear on it in full
+  (`read=N`, `part=lists`, then every page of `part=papers`). Read hundreds of abstracts if needed: that is
+  what turns a list of hits into an understanding of the field. Then search inside groups and walk citations.
 - **Snowball**: take the best 2–3 results → `/similar/{id}` for more of the same, `/walk?id=` for the
   literature around them. Deduplicate by `id`.
 - **Judge papers from the record**: `type` (review vs article), `citations` relative to `year`, `venue`,

@@ -10,8 +10,9 @@ Tools (read-only, Markdown answers written for a model to read and cite):
     get_papers           full records of up to 20 papers (DOI, W-number, PMCID, URLs)
     find_similar_papers  closest in meaning to one paper
     citation_walk        what the papers sharing its references cite that it does not
-    map_topic            the research groups inside a topic, named, with what to read in each
-Also: the guide (llms.txt) as a resource, and two prompts (literature review, check a claim).
+    map_topic            the research groups inside a topic, named, with every reading list of every group
+    read_topic_group     one group in depth: its reading lists with abstracts, then all its papers, page by page
+Also: the guide (llms.txt) as a resource, and three prompts (field overview, literature review, check a claim).
 
 Why Markdown and not structured JSON: the answers go into a model's context, and the spec asks a tool that
 returns structured content to repeat it as JSON text, which costs about three times the tokens for the same
@@ -161,10 +162,10 @@ How to search well:
 - Rewrite casual questions in the language of a paper before searching ("how to lose weight" -> "effectiveness of dietary and exercise interventions for weight loss in adults"). This is the biggest quality gain.
 - Questions and descriptions: search by meaning (the default). Exact names, genes, drugs, acronyms, phrases: quotes or AND / OR / NOT, which search exact words. For a review, do both.
 - Screen with abstracts="short" or "none", then get_papers for the ones you keep. Snowball from the best 2-3 with find_similar_papers and citation_walk.
-- New to a field, or asked for an overview or reading list: map_topic first. It shows the research groups inside the topic and, for each, its classics, rising works, the recent papers to start with and its experts. It counts as 5 calls.
+- Start with the landscape, not a flat list. For any question about a field, a topic, "what does research say", a review or a reading list, call map_topic first: it groups the ~1,000 papers closest to the topic into research groups (by what they cite and what they say) and gives every group's reading lists (start here, core, rising, only here, bridges, newest) and experts. Then go deep: read_topic_group on every group that bears on the question, part="lists" (the lists with full abstracts) and part="papers" page by page (all of the group's papers with full abstracts, most central first) until you have read the group. Split a large or mixed group with map_topic group=N. Then search_papers with each group's own phrases, citation_walk from its key papers, get_papers for full records. You have the context to read hundreds of abstracts: do it, and answer from what you read, organised by group (how the field divides, what each group found, where they disagree, who the experts are), citing every claim.
 - Judge papers from the record: reviews vs single studies, citations relative to age, venue. A record flagged as junk is probably not scholarship. Citation counts are not proof that a paper is right.
 - Cite the DOI link when there is one, else the OpenAlex link, copied from these results. Never invent details a record lacks.
-- Each tool call counts against 30 a minute per address. One search with a larger limit beats several small ones.""",
+- Each tool call counts against 30 a minute per address (map_topic counts as 5, read_topic_group as 1). One search with a larger limit beats several small ones. If told to wait, wait that long and continue: the maps are cached, nothing is lost.""",
     )
 
     @server.tool(title="Search scientific papers", annotations=READ_ONLY, structured_output=False)
@@ -308,21 +309,51 @@ How to search well:
             "The topic or question, in the language of papers (\"intermittent fasting for weight loss\"), or "
             "exact-words syntax (quotes, AND/OR/NOT) to map the papers containing those words."))],
         papers: Annotated[int, Field(ge=200, le=2000, description=(
-            "How many of the closest papers to map (default 1000). More = broader, slower."))] = 1000,
+            "How many of the closest papers to map (default 1000; up to 2000 for a broad field)."))] = 1000,
         group: Annotated[int | None, Field(ge=1, le=50, description=(
-            "Split this group of a previous map of the same topic into its own groups."))] = None,
+            "Split this group of the map of the same topic into its own groups (a new, finer map)."))] = None,
         year_from: Annotated[int | None, Field(description="Only papers published this year or later.")] = None,
         year_to: Annotated[int | None, Field(description="Only papers published this year or earlier.")] = None,
+        page: Annotated[int, Field(ge=1, le=20, description=(
+            "Page of the map (~16-20k tokens each). Page 1 opens with all groups at a glance; the answer says if "
+            "there are more pages: read them all."))] = 1,
     ) -> str:
-        """The research groups inside a topic, and what to read in each: the papers closest to the topic are
-        grouped by the works they cite and the words they use. Each group gets a name (its most distinctive
-        phrases), its size and years, which groups it builds on, and reading lists computed from its own papers'
-        citations: start here (recent papers citing most of the group's key works, often reviews), core (what the
-        group cites most), rising (recent works gathering citations fast), experts (authors with the highest
-        position-weighted h-index inside the group) and bridges to other groups. Use it to get the lay of a field
-        before searching in detail. Takes 3-30 seconds the first time (then cached); counts as 5 calls."""
+        """The landscape of a research topic: the papers closest to it, grouped into research groups by the works
+        they cite and the words they use. For every group: its name (its most distinctive phrases), size, years,
+        which groups it builds on, and its full reading lists computed from its own papers' citations — start here
+        (recent papers citing most of the group's key works, often reviews), core (its foundations), rising,
+        only here (what sets it apart), bridges (to other groups), newest — and its experts (authors with the
+        highest position-weighted h-index inside the group). Use it first for any question about a field, then
+        read the relevant groups in depth with read_topic_group. Long maps come in pages (page 1 lists every group
+        at a glance): read every page. 3-30 s the first time (then cached); counts as 5 calls."""
         out = await call(api.topics_service().get, topic, papers, "auto", year_from, year_to, group)
-        return api.topic_text(out, PUBLIC_BASE)
+        return await call(api.topic_text, out, PUBLIC_BASE, page)
+
+    @server.tool(title="Read one research group in depth", annotations=READ_ONLY, structured_output=False)
+    async def read_topic_group(
+        topic: Annotated[str, Field(min_length=2, max_length=2000, description="The same topic as in map_topic.")],
+        group: Annotated[int, Field(ge=1, le=50, description="The group to read (its number in the map).")],
+        part: Annotated[Literal["lists", "papers"], Field(description=(
+            "lists: the group's reading lists, each paper with its abstract (read this first). papers: all of the "
+            "group's papers with abstracts, most central first."))] = "lists",
+        page: Annotated[int, Field(ge=1, le=100, description=(
+            "Pages of ~16-20k tokens; each answer says which page it is, how many there are and what to call next."))] = 1,
+        abstracts: Annotated[Abstracts, Field(description="full (default), short (first sentences) or none.")] = "full",
+        within: Annotated[int | None, Field(ge=1, le=50, description=(
+            "If the map was a split of a group (map_topic with group=N), that N: then `group` is a group of the split."))] = None,
+        papers: Annotated[int, Field(ge=200, le=2000, description="As given to map_topic (default 1000).")] = 1000,
+        year_from: Annotated[int | None, Field(description="As given to map_topic.")] = None,
+        year_to: Annotated[int | None, Field(description="As given to map_topic.")] = None,
+    ) -> str:
+        """Read one group of a topic map in depth, with abstracts: first its reading lists (part="lists"), then all
+        of its papers, most central first (part="papers", page 1, 2, ... until an answer says it is the last page). This is how
+        to build real knowledge of a field before answering: read every group that bears on the question. Uses
+        the cached map (call map_topic first, with the same topic and options); counts as 1 call."""
+        def go():
+            svc = api.topics_service()
+            out = svc.get(topic, papers, "auto", year_from, year_to, within, cached_only=True)
+            return api.topic_read_text(svc.read(out, group, part, page, abstracts), PUBLIC_BASE)
+        return await call(go)
 
     @server.resource(f"{PUBLIC_BASE}/llms.txt", name="guide", title="Search API guide",
                      description="Every call, what is covered today, result fields, limits and how to search well.",
@@ -330,16 +361,27 @@ How to search well:
     def guide() -> str:
         return api.guide().body.decode()
 
+    @server.prompt(title="Field overview")
+    def field_overview(topic: Annotated[str, Field(description="The field or topic, e.g. 'microplastics in rivers'.")]) -> str:
+        """Learn a research field in depth and explain it: its groups, foundations, open questions and experts."""
+        return f"""Build a thorough understanding of this research field with the science search tools, then explain it: {topic}
+
+1. Phrase the topic as a paper would. Call map_topic with it (papers 1000; 2000 if the field is broad).
+2. Read every group: read_topic_group part="lists" (its reading lists with full abstracts), then part="papers" page by page until the last page. Take notes per group: what it studies, its methods, its main findings, its key papers and people.
+3. A group that mixes several things or has more than ~250 papers: map_topic with group=N, and read its subgroups the same way.
+4. Fill gaps: search_papers with each group's own phrases (and publication_type "review"), citation_walk from its 1-2 key papers.
+5. Explain the field: how it divides (the groups, and which builds on which), what each group has established and how strongly (reviews and trials vs single studies, as the abstracts say), where groups disagree, what is new and rising, where to start reading, and who the experts are. Cite every claim with the DOI link (else OpenAlex link) from the results. Say that it rests on titles and abstracts, and that the group names are automatic."""
+
     @server.prompt(title="Literature review")
     def literature_review(question: Annotated[str, Field(description="The research question.")]) -> str:
         """Find and summarise what the research says about a question, with citations."""
         return f"""Review the scientific literature on this question, with the science search tools: {question}
 
 1. Restate the question in the language a paper would use; note 2-3 alternative phrasings and the key exact terms (names, acronyms).
-2. Search by meaning with each phrasing (limit 30, abstracts "short"), and by exact words for the key terms. Add a search with publication_type "review".
-3. Snowball from the 2-3 most relevant papers with find_similar_papers and citation_walk.
-4. Read the most relevant 10-20 in full with get_papers.
-5. Write the answer: what the evidence shows, how strong it is (reviews vs single studies, sample sizes and designs stated in the abstracts), where studies disagree, and what is not known. Number each claim's source [1] and end with a References list of DOI links (else OpenAlex links) copied from the results. Say plainly that this is based on titles and abstracts, not full texts."""
+2. Map the landscape: map_topic with the main phrasing. Read every group that bears on the question with read_topic_group (part "lists", then part "papers" page by page): this is your evidence base, read all of it.
+3. Search by meaning with each phrasing (limit 30, abstracts "short"), and by exact words for the key terms. Add a search with publication_type "review".
+4. Snowball from the 2-3 most relevant papers with find_similar_papers and citation_walk. Read the most relevant in full with get_papers.
+5. Write the answer, organised by the groups of the map where that helps: what the evidence shows, how strong it is (reviews vs single studies, sample sizes and designs stated in the abstracts), where studies disagree, and what is not known. Number each claim's source [1] and end with a References list of DOI links (else OpenAlex links) copied from the results. Say plainly that this is based on titles and abstracts, not full texts."""
 
     @server.prompt(title="Check a claim")
     def check_claim(claim: Annotated[str, Field(description="The claim to check, e.g. 'coffee stunts growth'.")]) -> str:

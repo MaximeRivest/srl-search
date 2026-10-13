@@ -11,7 +11,7 @@ import pytest
 from fastapi import HTTPException
 
 from srl_search import topics as T
-from srl_search.topic_service import TopicService, as_text
+from srl_search.topic_service import TopicService, as_text, read_text
 
 TYPES = ["article", "dataset", "review", "software"]
 WORDS = {0: ("coral bleaching", "symbiont loss"), 1: ("reef restoration", "coral gardening"),
@@ -232,7 +232,8 @@ class FakeApi:
 
     def __init__(self):
         self.engine = SimpleNamespace(details=lambda ws: {w: {"title": f"T{w}", "year": 2020, "type": "article",
-                                                               "authors": "A | B | C", "authors_count": 3} for w in ws})
+                                                               "authors": "A | B | C", "authors_count": 3,
+                                                               "abstract": f"<p>Abstract of {w}.</p>"} for w in ws})
 
     @staticmethod
     def looks_boolean(q):
@@ -293,6 +294,59 @@ def test_finish_and_text_on_the_planted_map(tmp_path):
     text = as_text(out, "https://api.example")
     assert text.startswith("# Research groups in: coral reefs") and "## Group 1:" in text and "Start here" in text
     assert "https://api.example/topics/coral%20reefs?group=N" in text
+    # complete: every item of every list and every expert is in the text (small pages: across all of them)
+    import srl_search.topic_service as S0
+    keep = S0.PAGE_CHARS
+    S0.PAGE_CHARS = 9000 + 2500
+    try:
+        p1 = as_text(out, "https://api.example")
+        pages = [p1]
+        while "The map continues" in pages[-1]:
+            pages.append(as_text(out, "https://api.example", len(pages) + 1))
+        assert len(pages) > 1 and "groups at a glance" in pages[0]
+        assert all(f"Group {g['id']}:" in pages[0] for g in out["groups"])
+        with pytest.raises(HTTPException):
+            as_text(out, "x", len(pages) + 1)
+        text = "".join(pages)
+    finally:
+        S0.PAGE_CHARS = keep
+    for g in out["groups"]:
+        for name, items in g["lenses"].items():
+            for it in items:
+                assert (it["name"] if name == "experts" else it["title"]) in text
+    # one group in depth: the lists with abstracts, then every paper, page by page, most central first
+    import srl_search.topic_service as S
+    r = svc.read(out, 1, "lists")
+    assert r["pages"] == 1 and all(p.get("abstract", "").startswith("Abstract of") for p in r["lenses"]["core"])
+    given = [p["id"] for items in r["lenses"].values() for p in items if "id" in p and not p.get("given_above")]
+    assert len(given) == len(set(given))                     # each paper's abstract once
+    t = read_text(r, "https://api.example")
+    assert "Abstract of" in t and "<p>" not in t and "part=papers, page=1" in t
+    first = svc.read(out, 1, "papers", 1)
+    members = sum(1 for g in out["papers"]["group"] if g == 1)
+    assert first["total"] == members
+    cen = [p["centrality"] for p in first["papers"]]
+    assert cen == sorted(cen, reverse=True) and cen[0] == 1.0
+    seen = [p["id"] for pg in range(1, first["pages"] + 1) for p in svc.read(out, 1, "papers", pg)["papers"]]
+    assert len(seen) == len(set(seen)) == members              # every paper, once
+    # small pages: everything is still there, on more pages, each within the budget
+    old_budget = S.PAGE_CHARS
+    S.PAGE_CHARS = 3000
+    try:
+        p1 = svc.read(out, 1, "papers", 1)
+        assert p1["pages"] > 1 and "Next: page=2" in read_text(p1, "x")
+        all_pages = [svc.read(out, 1, "papers", pg) for pg in range(1, p1["pages"] + 1)]
+        assert sum(len(x["papers"]) for x in all_pages) == members
+        assert all(len(read_text(x, "x")) < 3000 + 1500 for x in all_pages)
+        assert "last page" in read_text(all_pages[-1], "x")
+        lp = svc.read(out, 1, "lists", 1)
+        n_items = sum(len(v) for v in out["groups"][0]["lenses"].values())
+        got = sum(len(v) for pg in range(1, lp["pages"] + 1) for v in svc.read(out, 1, "lists", pg)["lenses"].values())
+        assert lp["pages"] > 1 and got == n_items                # every list item, across pages
+    finally:
+        S.PAGE_CHARS = old_budget
+    with pytest.raises(HTTPException):
+        svc.read(out, 99, "lists")
 
 
 def test_a_preprint_and_its_journal_version_count_once():
@@ -326,3 +380,11 @@ def test_service_answers_even_when_the_cache_cannot_be_written(tmp_path, monkeyp
         assert svc.get("read only")["cached"] is False
     finally:
         svc.cache.chmod(0o700)
+
+
+def test_reading_a_group_never_makes_a_map(tmp_path, monkeypatch):
+    svc = TopicService(FakeApi(), tmp_path, FakeCitations({}, [2020], [0]))
+    monkeypatch.setattr(svc, "compute", lambda *a: (_ for _ in ()).throw(AssertionError("computed")))
+    with pytest.raises(HTTPException) as e:
+        svc.get("never mapped", cached_only=True)
+    assert e.value.status_code == 409 and "first" in e.value.detail

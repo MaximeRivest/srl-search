@@ -30,19 +30,19 @@ curl -s  "$B/walk?id=10.1126/science.aan8048"         # 'answers' = what similar
 curl -s  "$B/topics/intermittent fasting for weight loss"   # research groups + what to read in each (plain text)
 ```
 
-`/topics?q=` (JSON) maps the 1,000 closest papers into named research groups with reading lists per group:
-`core`, `distinctive`, `rising`, `start_here` (often reviews), `bridges`, `newest`, `experts`; `group=N` splits
-a group. 3-30 s the first time, then cached; counts as 5 requests at the public door.
-
-Results: `id` (W-number), `doi`, `title`, `year`, `type`, `authors` (first 12, " | "), `venue`, `citations`,
-`abstract`, `score`, `junk` (0-1, spam/not-scholarship likelihood), `openalex`, `pmcid`, `smr` (readable on
-sciencemadereadable.com). Filters: `year_from`, `year_to`, `type=review|article|preprint|...`,
-`open_access=true`, `license=cc-by`, `collection=smr`.
+**Start with the landscape.** `/topics/{question}` maps the 1,000 closest papers into named research groups and
+gives every group's full reading lists (`start_here`, `core`, `rising`, `distinctive`, `bridges`, `newest`) and
+experts; `?group=N` splits a group (5 requests; 3-30 s the first time, then cached). Then read each group that
+bears on the question in depth (1 request each): `?read=N&part=lists` (the lists with full abstracts), then
+`?read=N&part=papers&page=1, 2, ...` (all its papers with abstracts, most central first). Everything comes in pages of
+~16-20k tokens, never cut: each answer says what to call next (the map too: `?page=2`). You can hold
+hundreds of abstracts: read them, and answer organised by group, citing what you read.
 
 ## As MCP tools instead
 
 Apps that speak MCP can add `https://api.sciencemadereadable.com/mcp` (no key) and get the same search as tools:
-`search_papers`, `get_papers`, `find_similar_papers`, `citation_walk`, `map_topic`. Claude Code:
+`search_papers`, `get_papers`, `find_similar_papers`, `citation_walk`, `map_topic`, `read_topic_group` (and a
+`field_overview` prompt). Claude Code:
 `claude mcp add --transport http --scope user science https://api.sciencemadereadable.com/mcp`. If those tools are
 already connected, use them rather than curl: same data, answers ready to cite.
 
@@ -53,7 +53,8 @@ already connected, use them rather than curl: same data, answers ready to cite.
 - Rewrite casual questions into research language first ("how to loose weight" → "effectiveness of dietary
   and exercise interventions for weight loss in adults"): biggest quality gain.
 - Screen with `abstracts=false`, then `/works/{id}` for the papers you keep. Snowball with `/similar` and `/walk`.
-- Overview of an unfamiliar field, or a reading list: `/topics` first, then search inside the group that matters.
+- A field, a topic, a reading list, "what does research say": map it first (`/topics`), read every relevant group in
+  full (`read=N`), then search inside groups and walk citations. Never stop at a flat list of hits.
 - Search by meaning does not reach the oldest years yet (llms.txt says how far); exact words and `/works`
   cover all 203.5M papers. English abstracts only, no full texts.
 - `topic` / `field` labels are often wrong (stale OpenAlex snapshot): judge from title and abstract.

@@ -60,20 +60,28 @@ def fake_api():
 
     engine = SimpleNamespace(details=lambda ws: {w: {"doi": f"10.1/{w}"} for w in ws if w != 12})
 
-    def topics_get(q, papers, mode, year_from, year_to, group):
+    def topics_get(q, papers, mode, year_from, year_to, group, cached_only=False):
         calls.append({"topics": q, "papers": papers, "group": group, "year_from": year_from})
         if q == "nothing":
             raise HTTPException(404, "Only 3 papers found for this; a map needs at least 30.")
         return {"question": q, "mode": "semantic"}
 
-    def topic_text(out, base):
-        return f"# Research groups in: {out['question']} · {base}"
+    def topic_text(out, base, page=1):
+        return f"# Research groups in: {out['question']} · {base}" + (f" · page {page}" if page > 1 else "")
+
+    def topics_read(out, group, part, page, abstracts="full"):
+        calls.append({"read": group, "part": part, "page": page, "of": out["question"]})
+        return {"question": out["question"], "group": group, "part": part, "abstracts": abstracts}
+
+    def topic_read_text(r, base):
+        return f"# Group {r['group']} of “{r['question']}” · {r['part']} · abstracts {r['abstracts']}"
     api = SimpleNamespace(
         SEMANTIC={"all": SimpleNamespace(manifest={"papers": 124_892_915, "min_date": "1800-01-01"})},
         KEYWORDS=SimpleNamespace(num_docs=203_543_614), app=SimpleNamespace(version="0.3"),
         search=search, similar=similar, work=work, walk=walk, engine=engine, NPROBE=128, DEPTH=300,
         guide=lambda: PlainTextResponse("# guide"),
-        topics_service=lambda: SimpleNamespace(get=topics_get), topic_text=topic_text)
+        topics_service=lambda: SimpleNamespace(get=topics_get, read=topics_read), topic_text=topic_text,
+        topic_read_text=topic_read_text)
     return api, calls
 
 
@@ -88,7 +96,7 @@ def test_tools_answer_in_markdown_the_model_can_cite():
     async def go():
         async with Client(server) as c:
             tools = {t.name: t for t in (await c.list_tools()).tools}
-            assert set(tools) == {"search_papers", "get_papers", "find_similar_papers", "citation_walk", "map_topic"}
+            assert set(tools) == {"search_papers", "get_papers", "find_similar_papers", "citation_walk", "map_topic", "read_topic_group"}
             assert all(t.annotations.read_only_hint for t in tools.values())
             assert "review" in str(tools["search_papers"].input_schema)        # the type list reaches the model
 
@@ -127,9 +135,18 @@ def test_tools_answer_in_markdown_the_model_can_cite():
             assert calls[-1] == {"topics": "intermittent fasting", "papers": 1000, "group": 2, "year_from": 2015}
             r = await c.call_tool("map_topic", {"topic": "nothing"})
             assert r.is_error and "at least 30" in text(r)
+            r = await c.call_tool("read_topic_group", {"topic": "intermittent fasting", "group": 3, "part": "papers", "page": 2})
+            assert text(r) == "# Group 3 of “intermittent fasting” · papers · abstracts full"
+            assert calls[-2]["group"] is None and calls[-1] == {"read": 3, "part": "papers", "page": 2, "of": "intermittent fasting"}
+            await c.call_tool("read_topic_group", {"topic": "intermittent fasting", "group": 1, "within": 4})
+            assert calls[-2]["group"] == 4                       # the split map, then its group 1
+            tools = {t.name: t for t in (await c.list_tools()).tools}
+            assert "map_topic first" in tools["map_topic"].description or "first" in tools["map_topic"].description
 
             prompts = {p.name for p in (await c.list_prompts()).prompts}
-            assert prompts == {"literature_review", "check_claim"}
+            assert prompts == {"field_overview", "literature_review", "check_claim"}
+            p = await c.get_prompt("field_overview", {"topic": "microplastics"})
+            assert "read_topic_group" in p.messages[0].content.text
             p = await c.get_prompt("check_claim", {"claim": "coffee stunts growth"})
             assert "coffee stunts growth" in p.messages[0].content.text
             res = (await c.list_resources()).resources
@@ -161,7 +178,7 @@ def test_over_http_in_every_protocol_era(url, mode):
     async def go():
         async with Client(url, mode=mode) as c:
             assert c.protocol_version == ("2025-11-25" if mode == "legacy" else "2026-07-28")
-            assert len((await c.list_tools()).tools) == 5
+            assert len((await c.list_tools()).tools) == 6
             if mode != "2026-07-28":   # (a pinned version skips discovery, so has no capabilities to read)
                 caps = c.session.server_capabilities   # nothing to listen for: no open-ended subscriptions/listen
                 assert caps.tools is not None and not caps.tools.list_changed and not caps.resources.subscribe
