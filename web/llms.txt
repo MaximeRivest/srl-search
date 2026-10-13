@@ -1,7 +1,8 @@
 # Scholars Reading List search API
 
 > Search ~200 million scholarly papers (OpenAlex titles and abstracts) by meaning or by exact words, find
-> papers similar to a given one, look a paper up by DOI / OpenAlex id / PMCID, and walk its citations.
+> papers similar to a given one, look a paper up by DOI / OpenAlex id / PMCID, walk its citations, and map
+> the research groups inside a topic with what to read in each.
 > Read-only JSON over HTTPS, no key. Built for ScienceMadeReadable; open to anyone's programs and agents.
 
 Base URL: https://api.sciencemadereadable.com/api/data
@@ -13,7 +14,8 @@ This guide: <base>/llms.txt
 
 Only able to open a web address (no code, no headers)? Put the question in the address and get the answer as
 plain text: https://ask.sciencemadereadable.com/why do cats purr, or <base>/search/why do cats purr (spaces as %20
-or +; options after ?, e.g. ?k=30&year_from=2020).
+or +; options after ?, e.g. ?k=30&year_from=2020). The research groups of a topic, the same way:
+https://ask.sciencemadereadable.com/map/intermittent fasting, or <base>/topics/intermittent fasting.
 
 Using an AI app that speaks MCP (Claude, ChatGPT, Cursor, VS Code, Codex...)? Add the MCP server
 https://api.sciencemadereadable.com/mcp instead: the same search as tools, no key (see "MCP server" below).
@@ -31,6 +33,7 @@ curl -G "$B/search" --data-urlencode 'q="gut microbiome" AND (autism OR ASD) NOT
 curl "$B/works/10.1126/science.aan8048"            # by DOI (also W123..., PMC123..., https://doi.org/...)
 curl "$B/similar/W2782456798?k=5&abstracts=false"
 curl "$B/walk?id=10.1126/science.aan8048&k=30"      # what papers like this one cite that it does not
+curl -G "$B/topics" --data-urlencode "q=intermittent fasting for weight loss"   # research groups + reading lists
 ```
 
 ```python
@@ -97,6 +100,29 @@ returns `nodes` (title, year, citations, topic per paper), `columns`, `links` (c
 Papers listing more than `max_refs` (300) references or with more than `max_cites` (500) citations count
 as outliers. Slow: 0.5–5 s. Fails with an `error` when the paper has no references in the snapshot.
 
+### GET /topics?q=...   ·   GET /topics/{question} (plain text)
+A topic map: the research groups inside a topic, and what to read in each. The `papers` (default 1000,
+200–2000) closest in meaning to `q` (or the best matches of exact-words syntax; `mode` as in /search;
+`year_from`, `year_to`) are grouped by the works they cite and the words they use (shared references
+weighted by rarity + nearest neighbours in meaning, half each; Leiden, consensus of 20 runs). Answer:
+- `groups`: `id`, `name` (the phrases most over-represented in the group, automatic), `size`, `years`
+  (10th/50th/90th percentile), `typical` (its most central paper), `centre` (map position), `cites_groups`
+  ({group id: citations from this group's papers to that group's}), `between` (papers whose group changes
+  between runs), `openalex_topics`, and `lenses`, each a list of papers with a `why`:
+  `core` (what the group cites most), `distinctive` (cited mostly by this group), `rising` (works of the
+  last 5 years already cited by several of its papers), `start_here` (recent group papers citing most of its
+  key works, often reviews), `bridges` (group papers whose links go largely to another group), `newest`,
+  `experts` (authors by a position-weighted h-index inside the group: h of their works each cited by ≥ h
+  group papers, first author full credit, last author half; OpenAlex's disambiguated authors).
+  Papers in lenses carry `in_map` (true: one of the mapped papers; false: a cited work outside them, e.g. a
+  classic without an English abstract).
+- `papers`: every mapped paper's `id`, `group` (0 = in no group), `between`, `x`, `y`.
+- `coverage` (`with_references`: how many have references in OpenAlex; `references_thin` when under 65%,
+  then the groups lean on wording), `method` (resolution, consensus agreement, ...), `timing`.
+`group=N` splits group N of the same map into its own groups. 3–30 s the first time, then cached until the
+next data release (`cached: true`). **Counts as 5 requests.** Importance here is local: "core" means cited by
+this group's papers, which is the point (what matters to this conversation), not citations overall.
+
 ### GET /map/place?ids=W1,W2&q=...   ·   GET /map/regions   ·   GET /map/counts
 Positions on the map of science for up to 200 papers and/or a question; field names, colours and label
 positions; exact publication counts per year and subfield. Mostly for drawing maps.
@@ -121,6 +147,7 @@ Other apps: add a remote MCP server with that address (setup for each: https://s
 | `get_papers` | /works for up to 20 `ids` at once (DOI, W-number, PMCID, URLs): full records |
 | `find_similar_papers` | /similar: `paper`, `limit`, the same filters |
 | `citation_walk` | /walk: `paper`, `breadth` (neighbours to learn from, default 30), `limit` per section |
+| `map_topic` | /topics: `topic`, `papers` (default 1000), `group` (split one group), `year_from`, `year_to`. Counts as 5 calls |
 
 Also two prompts, `literature_review(question)` and `check_claim(claim)`, and this guide as a resource.
 
@@ -153,6 +180,9 @@ Also two prompts, `literature_review(question)` and `check_claim(claim)`, and th
   weight" pulls in blog-like records; "effectiveness of dietary and exercise interventions for weight loss
   in adults" pulls in trials and reviews. Rewriting a casual question into research language before
   searching is the single biggest quality gain; the junk penalty handles most of the rest.
+- **New to a field, or asked for an overview / reading list?** Start with `/topics?q=` (or `map_topic`): the
+  groups show how the field divides, and each group's `start_here`, `core` and `rising` lists are a reading
+  plan. Then search inside the group that matters.
 - **Snowball**: take the best 2–3 results → `/similar/{id}` for more of the same, `/walk?id=` for the
   literature around them. Deduplicate by `id`.
 - **Judge papers from the record**: `type` (review vs article), `citations` relative to `year`, `venue`,
@@ -161,7 +191,7 @@ Also two prompts, `literature_review(question)` and `check_claim(claim)`, and th
 - **Cite** with DOI when present, else the `openalex` URL. Do not invent details the record lacks.
 - **Be gentle**: the public door allows 30 requests per minute per address (reading this guide, /docs and
   /openapi.json does not count). Beyond that: HTTP 429 with a `Retry-After` header (seconds; also
-  `retry_after` in the body): wait that long, then retry. Spend calls well: one search with `k=100` rather
+  `retry_after` in the body): wait that long, then retry. A topic map counts as 5. Spend calls well: one search with `k=100` rather
   than several small ones, `abstracts=false` then `/works` only for the papers you keep, never in parallel.
 
 ## Limits and honesty

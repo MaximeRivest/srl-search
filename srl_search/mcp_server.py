@@ -10,6 +10,7 @@ Tools (read-only, Markdown answers written for a model to read and cite):
     get_papers           full records of up to 20 papers (DOI, W-number, PMCID, URLs)
     find_similar_papers  closest in meaning to one paper
     citation_walk        what the papers sharing its references cite that it does not
+    map_topic            the research groups inside a topic, named, with what to read in each
 Also: the guide (llms.txt) as a resource, and two prompts (literature review, check a claim).
 
 Why Markdown and not structured JSON: the answers go into a model's context, and the spec asks a tool that
@@ -160,6 +161,7 @@ How to search well:
 - Rewrite casual questions in the language of a paper before searching ("how to lose weight" -> "effectiveness of dietary and exercise interventions for weight loss in adults"). This is the biggest quality gain.
 - Questions and descriptions: search by meaning (the default). Exact names, genes, drugs, acronyms, phrases: quotes or AND / OR / NOT, which search exact words. For a review, do both.
 - Screen with abstracts="short" or "none", then get_papers for the ones you keep. Snowball from the best 2-3 with find_similar_papers and citation_walk.
+- New to a field, or asked for an overview or reading list: map_topic first. It shows the research groups inside the topic and, for each, its classics, rising works, the recent papers to start with and its experts. It counts as 5 calls.
 - Judge papers from the record: reviews vs single studies, citations relative to age, venue. A record flagged as junk is probably not scholarship. Citation counts are not proof that a paper is right.
 - Cite the DOI link when there is one, else the OpenAlex link, copied from these results. Never invent details a record lacks.
 - Each tool call counts against 30 a minute per address. One search with a larger limit beats several small ones.""",
@@ -299,6 +301,28 @@ How to search well:
             parts += [line(w, f"shares {nodes[w].get('shared', '?')} references") for w in sim]
         parts += ["", f"See it drawn on the map of science: {SITE}/?work={fd.get('doi') or out['focus']}"]
         return "\n".join(parts)
+
+    @server.tool(title="Map the research groups in a topic", annotations=READ_ONLY, structured_output=False)
+    async def map_topic(
+        topic: Annotated[str, Field(min_length=2, max_length=2000, description=(
+            "The topic or question, in the language of papers (\"intermittent fasting for weight loss\"), or "
+            "exact-words syntax (quotes, AND/OR/NOT) to map the papers containing those words."))],
+        papers: Annotated[int, Field(ge=200, le=2000, description=(
+            "How many of the closest papers to map (default 1000). More = broader, slower."))] = 1000,
+        group: Annotated[int | None, Field(ge=1, le=50, description=(
+            "Split this group of a previous map of the same topic into its own groups."))] = None,
+        year_from: Annotated[int | None, Field(description="Only papers published this year or later.")] = None,
+        year_to: Annotated[int | None, Field(description="Only papers published this year or earlier.")] = None,
+    ) -> str:
+        """The research groups inside a topic, and what to read in each: the papers closest to the topic are
+        grouped by the works they cite and the words they use. Each group gets a name (its most distinctive
+        phrases), its size and years, which groups it builds on, and reading lists computed from its own papers'
+        citations: start here (recent papers citing most of the group's key works, often reviews), core (what the
+        group cites most), rising (recent works gathering citations fast), experts (authors with the highest
+        position-weighted h-index inside the group) and bridges to other groups. Use it to get the lay of a field
+        before searching in detail. Takes 3-30 seconds the first time (then cached); counts as 5 calls."""
+        out = await call(api.topics_service().get, topic, papers, "auto", year_from, year_to, group)
+        return api.topic_text(out, PUBLIC_BASE)
 
     @server.resource(f"{PUBLIC_BASE}/llms.txt", name="guide", title="Search API guide",
                      description="Every call, what is covered today, result fields, limits and how to search well.",

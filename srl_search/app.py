@@ -23,6 +23,9 @@
   GET /map/counts                   exact publications per year and subfield (whole corpus)
   GET /walk?id=W...|DOI             citation walk (citewalk server) with map positions and "readable"
                                     flags on every paper
+  GET /topics?q=...&papers=1000     topic map: the research groups inside a topic, named, with reading lists
+                                    per group (srl_search/topics.py); &group=N splits one group; cached per release
+  GET /topics/{q}                   the same as plain text (Markdown)
 Without an explicit type=, search leaves out records that are not publications (datasets,
 figures, covers...; srl_search/scope.py), in both modes, and retracted papers (flag or title).
 In auto mode, a query that looked like search syntax but matched no exact words is searched by
@@ -56,10 +59,12 @@ from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
 import numpy as np
 
 from srl_search.atlas import Atlas, question_spot
+from srl_search.citations import Citations
 from srl_search.engine import EMBEDDING_PLAN, JUNK_PENALTY, Engine, ExactEngine
 from srl_search.keyword import KeywordIndex, looks_boolean
 from srl_search.public import PUBLIC_BASE, PUBLIC_ROUTES
 from srl_search.quality import Quality
+from srl_search.topic_service import TopicService, as_text as topic_text
 
 ROOT = Path("/mnt/fast/scholarsreadinglist/search")
 RELEASE_LINK = Path(os.environ.get("SRL_RELEASE", "/mnt/fast/scholarsreadinglist/release/current"))
@@ -538,6 +543,61 @@ def walk(id: str = Query(..., min_length=2, max_length=300, description="W-numbe
     out["map"] = {"atlas": ATLAS.id if ATLAS else None, "placed": placed, "papers": len(out.get("nodes", {}))}
     out["timing"] = {"walk_ms": round((t1 - t) * 1000, 1), "map_ms": round((time.perf_counter() - t1) * 1000, 1)}
     return out
+
+
+# ------------------------------------------------------------------------------------------------ topic maps
+# The citation index of this release, memory-mapped read-only (the citation walk's server maps the same files:
+# shared page cache, no extra memory), and the topic maps over it (srl_search/topics.py, topic_service.py).
+CITATIONS = Citations(P["citations"]) if "citations" in P and (P["citations"] / "meta.json").exists() else None
+# (the dev API, search/dev.sh, keeps its own cache: answers from unpromoted code must never reach the public)
+TOPICS = TopicService(sys.modules[__name__], Path(os.environ.get("SRL_TOPICS_CACHE", ROOT / "topics-cache")),
+                      CITATIONS) if CITATIONS is not None else None
+D_TOPIC_Q = ("A question or topic in plain words (by meaning), or exact-words syntax (quotes, AND/OR/NOT, word*), "
+             "as in /search.")
+D_PAPERS = "How many papers to map: the closest in meaning, or the best exact-word matches. More = broader, slower."
+D_GROUP = "Split this group of the map (its id, from a previous answer) into its own groups."
+
+
+def topics_service() -> TopicService:
+    if TOPICS is None:
+        raise HTTPException(503, "topic maps need the citation index, which this release does not have")
+    return TOPICS
+
+
+@app.get("/topics")
+def topics(q: str = Query(..., min_length=2, max_length=2000, description=D_TOPIC_Q),
+           papers: int = Query(1000, ge=200, le=2000, description=D_PAPERS),
+           mode: str = Query("auto", pattern="^(auto|semantic|keyword)$", description="As in /search."),
+           year_from: int | None = Query(None, description=D_YEAR_FROM),
+           year_to: int | None = Query(None, description=D_YEAR_TO),
+           group: int | None = Query(None, ge=1, le=50, description=D_GROUP)):
+    """The research groups inside a topic, and what to read in each. The papers (closest in meaning, or exact-word
+    matches) are grouped by the works they cite and the words they use; each group gets a name (the phrases most
+    over-represented in it) and reading lists computed from its own papers' citations: core (most cited by the
+    group), distinctive (cited mostly by this group), rising (recent works gathering citations fast), start_here
+    (recent papers citing most of the group's key works, often reviews), bridges (papers linking to another group),
+    newest, and experts (authors with the highest position-weighted h-index inside the group). Every paper comes
+    with its group and map position. 2-6 s the first time (up to ~30 s when the disk cache is cold), then instant
+    (cached for the data release). Counts as 5 requests at the public door."""
+    return topics_service().get(q, papers, mode, year_from, year_to, group)
+
+
+@app.get("/topics/{q:path}", response_class=PlainTextResponse)
+def topics_text(q: str,
+                papers: int = Query(1000, ge=200, le=2000, description=D_PAPERS),
+                mode: str = Query("auto", pattern="^(auto|semantic|keyword)$", description="As in /search."),
+                year_from: int | None = Query(None, description=D_YEAR_FROM),
+                year_to: int | None = Query(None, description=D_YEAR_TO),
+                group: int | None = Query(None, ge=1, le=50, description=D_GROUP)):
+    """The same topic map with the question in the address and the answer as plain text (Markdown): each group's
+    name, size and years, and the top of its reading lists. /topics/intermittent fasting"""
+    if " " not in q:
+        q = q.replace("+", " ")
+    q = q.strip()
+    if not 2 <= len(q) <= 2000:
+        raise HTTPException(422, "the question must be 2-2000 characters: /topics/intermittent fasting")
+    out = topics_service().get(q, papers, mode, year_from, year_to, group)
+    return PlainTextResponse(topic_text(out, PUBLIC_BASE), headers={"Cache-Control": "no-store"})
 
 
 # Last, once every function above exists: the MCP tools call them.

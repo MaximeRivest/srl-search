@@ -98,8 +98,8 @@ Lessons from the first build:
 
 `POST /mcp` (`srl_search/mcp_server.py`): the same search for AI apps, public at
 `https://api.sciencemadereadable.com/mcp`, tailnet `https://lambda.tail69222b.ts.net:18810/mcp`, local
-`http://127.0.0.1:8810/mcp`. Four read-only tools (`search_papers`, `get_papers`, `find_similar_papers`,
-`citation_walk`) that call the HTTP routes' own functions, two prompts (`literature_review`, `check_claim`), the
+`http://127.0.0.1:8810/mcp`. Five read-only tools (`search_papers`, `get_papers`, `find_similar_papers`,
+`citation_walk`, and since 2026-10-13 `map_topic`) that call the HTTP routes' own functions, two prompts (`literature_review`, `check_claim`), the
 guide as a resource, and instructions the app reads on connecting (how to search well, how to cite).
 
 ```sh
@@ -128,6 +128,28 @@ Choices, and what they cost:
 Tests: `tests/test_mcp.py` (no indexes: a stand-in search service; in process, and over HTTP in both protocol eras).
 Checked live on 2026-10-12: Claude Code (2026-07-28) searched, read and walked citations through the public address;
 Codex connected by the handshake and listed the tools (its usage limit stopped it before a call).
+
+## Topic maps (since 2026-10-13)
+
+`GET /topics?q=...` (and `/topics/{q}` as text, MCP tool `map_topic`): the research groups inside a topic and what
+to read in each, Scimeetr's idea (2016) on this data. Method `srl_search/topics.py`, service (paper selection,
+cache, load limits, titles and map positions) `srl_search/topic_service.py`, citation and authorship indexes
+`srl_search/citations.py`. Design, measurements and choices: `experiments/topicmap/README.md`.
+
+- The 1,000 papers closest in meaning (or exact-word matches), one per study (title duplicates and
+  preprint/journal versions merged) → links: shared references (idf-weighted cosine) + text neighbours (UMAP's
+  fuzzy kNN), half the weight each → Leiden, the resolution giving ~7 groups, consensus of 20 runs → names
+  (phrases over-represented in each group) → lenses from the group's own citations: core, distinctive, rising,
+  start_here, bridges, newest, experts (position-weighted local h-index over OpenAlex's disambiguated authors).
+- Reads the release's citation index (`paths.citations`, memory-mapped, shared with citewalk through the page cache)
+  and its authorship index (`<citations>/authors/`, built by `citewalk/build_authors.py`, ~20 min). Without the
+  authorship index the experts lens is empty; without the citation index /topics answers 503.
+- Answers are cached as JSON under `/mnt/fast/scholarsreadinglist/search/topics-cache/<release>/` (other
+  releases' folders are deleted at start); at most 2 computed at once (`SRL_TOPICS_CONCURRENT`), the same request
+  asked twice at once is computed once. The public door counts a map as 5 requests.
+- Deterministic: the same question, options and release give the same map (seeded; igraph's generator is global,
+  so clustering runs one map at a time, ~1-3 s).
+- Tests: `tests/test_topics.py` (a made-up literature with three planted groups; no index loaded).
 
 ## Ranking: junk sinks (since 2026-10-09)
 

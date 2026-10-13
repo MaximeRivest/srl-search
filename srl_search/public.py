@@ -2,7 +2,8 @@
 these routes under PUBLIC_BASE, plus the guide and the reference. A test keeps the two lists in step."""
 PUBLIC_BASE = "https://api.sciencemadereadable.com/api/data"
 # routes in the published OpenAPI spec (FastAPI path templates)
-PUBLIC_ROUTES = ("/search", "/search/{q}", "/similar/{ref}", "/works/{ref}", "/walk", "/map/place", "/map/regions", "/map/counts")
+PUBLIC_ROUTES = ("/search", "/search/{q}", "/similar/{ref}", "/works/{ref}", "/walk", "/map/place", "/map/regions", "/map/counts",
+                 "/topics", "/topics/{q}")
 # the MCP endpoint (POST /mcp here and at the door; srl_search/mcp_server.py)
 PUBLIC_MCP = "https://api.sciencemadereadable.com/mcp"
 # documentation the door also passes

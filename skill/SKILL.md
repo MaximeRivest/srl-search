@@ -1,6 +1,6 @@
 ---
 name: scholars-search
-description: Search ~200 million scientific papers (OpenAlex titles + abstracts) by meaning or exact words, look papers up by DOI / OpenAlex id / PMCID, find similar papers and walk citations, through Maxime's own search API. Use when the task needs scientific literature - finding studies or evidence on a question, a literature review, checking what research says, citing papers, resolving a DOI to title/authors/abstract, building a reading list, or code that calls this API (ScienceMadeReadable, Scholars Reading List).
+description: Search ~200 million scientific papers (OpenAlex titles + abstracts) by meaning or exact words, look papers up by DOI / OpenAlex id / PMCID, find similar papers, walk citations, and map the research groups inside a topic with reading lists for each, through Maxime's own search API. Use when the task needs scientific literature - finding studies or evidence on a question, a literature review, checking what research says, citing papers, resolving a DOI to title/authors/abstract, building a reading list, getting an overview of a field, or code that calls this API (ScienceMadeReadable, Scholars Reading List).
 ---
 
 # Scholars Reading List search API
@@ -18,7 +18,7 @@ Read-only JSON over HTTP, no key. Full guide (coverage, every parameter, field m
 
 Same data and routes everywhere. Start with `curl -s <base>/llms.txt` when you need details.
 
-## The five calls
+## The six calls
 
 ```sh
 B=http://127.0.0.1:8810
@@ -27,7 +27,12 @@ curl -sG "$B/search" --data-urlencode 'q="gut microbiome" AND (autism OR ASD) NO
 curl -s  "$B/works/10.1126/science.aan8048"          # DOI, W123..., PMC123..., or a doi.org / openalex.org URL
 curl -s  "$B/similar/W2782456798?k=10&abstracts=false"
 curl -s  "$B/walk?id=10.1126/science.aan8048"         # 'answers' = what similar papers cite and this one doesn't
+curl -s  "$B/topics/intermittent fasting for weight loss"   # research groups + what to read in each (plain text)
 ```
+
+`/topics?q=` (JSON) maps the 1,000 closest papers into named research groups with reading lists per group:
+`core`, `distinctive`, `rising`, `start_here` (often reviews), `bridges`, `newest`, `experts`; `group=N` splits
+a group. 3-30 s the first time, then cached; counts as 5 requests at the public door.
 
 Results: `id` (W-number), `doi`, `title`, `year`, `type`, `authors` (first 12, " | "), `venue`, `citations`,
 `abstract`, `score`, `junk` (0-1, spam/not-scholarship likelihood), `openalex`, `pmcid`, `smr` (readable on
@@ -37,7 +42,7 @@ sciencemadereadable.com). Filters: `year_from`, `year_to`, `type=review|article|
 ## As MCP tools instead
 
 Apps that speak MCP can add `https://api.sciencemadereadable.com/mcp` (no key) and get the same search as tools:
-`search_papers`, `get_papers`, `find_similar_papers`, `citation_walk`. Claude Code:
+`search_papers`, `get_papers`, `find_similar_papers`, `citation_walk`, `map_topic`. Claude Code:
 `claude mcp add --transport http --scope user science https://api.sciencemadereadable.com/mcp`. If those tools are
 already connected, use them rather than curl: same data, answers ready to cite.
 
@@ -48,6 +53,7 @@ already connected, use them rather than curl: same data, answers ready to cite.
 - Rewrite casual questions into research language first ("how to loose weight" → "effectiveness of dietary
   and exercise interventions for weight loss in adults"): biggest quality gain.
 - Screen with `abstracts=false`, then `/works/{id}` for the papers you keep. Snowball with `/similar` and `/walk`.
+- Overview of an unfamiliar field, or a reading list: `/topics` first, then search inside the group that matters.
 - Search by meaning does not reach the oldest years yet (llms.txt says how far); exact words and `/works`
   cover all 203.5M papers. English abstracts only, no full texts.
 - `topic` / `field` labels are often wrong (stale OpenAlex snapshot): judge from title and abstract.

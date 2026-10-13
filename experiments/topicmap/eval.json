@@ -1,0 +1,4300 @@
+{
+ "summary": {
+  "hybrid": {
+   "groups": 6.967,
+   "in_groups": 0.988,
+   "mesh_lift": 1.149,
+   "venue_lift": 1.666,
+   "seed_ari": 0.902,
+   "seconds": 3.335
+  },
+  "hybrid-noidf": {
+   "groups": 7.467,
+   "in_groups": 0.991,
+   "mesh_lift": 1.156,
+   "venue_lift": 1.774,
+   "seed_ari": 0.836,
+   "seconds": 2.996,
+   "mesh_lift_vs_hybrid": [
+    0.006,
+    -0.004,
+    0.018
+   ],
+   "venue_lift_vs_hybrid": [
+    0.108,
+    -0.038,
+    0.259
+   ],
+   "seed_ari_vs_hybrid": [
+    -0.066,
+    -0.12,
+    -0.016
+   ]
+  },
+  "hybrid-top30": {
+   "groups": 7.167,
+   "in_groups": 0.989,
+   "mesh_lift": 1.162,
+   "venue_lift": 1.781,
+   "seed_ari": 0.875,
+   "seconds": 1.602,
+   "mesh_lift_vs_hybrid": [
+    0.013,
+    -0.003,
+    0.032
+   ],
+   "venue_lift_vs_hybrid": [
+    0.115,
+    -0.13,
+    0.474
+   ],
+   "seed_ari_vs_hybrid": [
+    -0.027,
+    -0.069,
+    0.011
+   ]
+  },
+  "refs": {
+   "groups": 6.533,
+   "in_groups": 0.664,
+   "mesh_lift": 1.123,
+   "venue_lift": 2.166,
+   "seed_ari": 0.916,
+   "seconds": 2.563,
+   "mesh_lift_vs_hybrid": [
+    -0.026,
+    -0.065,
+    0.003
+   ],
+   "venue_lift_vs_hybrid": [
+    0.5,
+    0.089,
+    1.0
+   ],
+   "seed_ari_vs_hybrid": [
+    0.014,
+    -0.03,
+    0.055
+   ]
+  },
+  "text": {
+   "groups": 7.667,
+   "in_groups": 0.99,
+   "mesh_lift": 1.176,
+   "venue_lift": 1.672,
+   "seed_ari": 0.871,
+   "seconds": 1.301,
+   "mesh_lift_vs_hybrid": [
+    0.026,
+    0.01,
+    0.045
+   ],
+   "venue_lift_vs_hybrid": [
+    0.006,
+    -0.193,
+    0.212
+   ],
+   "seed_ari_vs_hybrid": [
+    -0.032,
+    -0.074,
+    0.009
+   ]
+  }
+ },
+ "questions": [
+  {
+   "question": "intermittent fasting for weight loss",
+   "biomedical": true,
+   "papers": 1000,
+   "seed_s": 0.4,
+   "with_mesh": 374,
+   "variants": {
+    "hybrid": {
+     "groups": 7,
+     "in_groups": 0.983,
+     "resolution": 0.75,
+     "mesh_lift": 1.121,
+     "venue_lift": 2.012,
+     "seed_ari": 0.976,
+     "seconds": 3.07,
+     "names": [
+      "continuous energy · overweight · IER",
+      "mechanisms · gut microbiota · immune",
+      "window · TRE · time-restricted eating",
+      "type 2 diabetes · mellitus · HbA1c",
+      "ramadan · performance · strength",
+      "fast day · ADF · alternated",
+      "liver disease · hepatic steatosis · non-alcoholic fatty"
+     ],
+     "timing": {
+      "references_ms": 12,
+      "graph_ms": 43,
+      "grouping_ms": 2253,
+      "names_ms": 648,
+      "lenses_ms": 101,
+      "total_ms": 3056
+     }
+    },
+    "hybrid-noidf": {
+     "groups": 9,
+     "in_groups": 0.987,
+     "resolution": 0.75,
+     "mesh_lift": 1.127,
+     "venue_lift": 2.155,
+     "seed_ari": 0.946,
+     "seconds": 3.11,
+     "names": [
+      "continuous energy · overweight · waist circumference",
+      "mechanisms · inflammation · cellular",
+      "window · TRE · time-restricted eating",
+      "type 2 diabetes · mellitus · HbA1c",
+      "fast day · ADF · alternated",
+      "liver disease · hepatic steatosis · non-alcoholic fatty",
+      "gut microbiota · abundance · fecal",
+      "performance · strength · jump",
+      "ramadan fasting · muslims · religious"
+     ],
+     "timing": {
+      "references_ms": 7,
+      "graph_ms": 43,
+      "grouping_ms": 2310,
+      "names_ms": 658,
+      "lenses_ms": 77,
+      "total_ms": 3096
+     }
+    },
+    "hybrid-top30": {
+     "groups": 7,
+     "in_groups": 0.985,
+     "resolution": 0.75,
+     "mesh_lift": 1.127,
+     "venue_lift": 2.494,
+     "seed_ari": 0.927,
+     "seconds": 1.56,
+     "names": [
+      "mechanisms · mice · gut microbiota",
+      "continuous energy · overweight · IER",
+      "type 2 diabetes · mellitus · HbA1c",
+      "window · TRE · time-restricted eating",
+      "exercise · training · ramadan",
+      "fast day · ADF · alternated",
+      "liver disease · hepatic steatosis · non-alcoholic fatty"
+     ],
+     "timing": {
+      "references_ms": 8,
+      "graph_ms": 50,
+      "grouping_ms": 761,
+      "names_ms": 665,
+      "lenses_ms": 62,
+      "total_ms": 1545
+     }
+    },
+    "refs": {
+     "groups": 5,
+     "in_groups": 0.689,
+     "resolution": 1.0,
+     "mesh_lift": 1.095,
+     "venue_lift": 4.098,
+     "seed_ari": 0.946,
+     "seconds": 2.78,
+     "names": [
+      "gut microbiota · mechanisms · immune",
+      "restriction · intermittent energy · fat mass",
+      "meta-analysis · RCTs · mean difference",
+      "time-restricted eating · window · timing",
+      "diabetes mellitus · HbA1c · patients"
+     ],
+     "timing": {
+      "references_ms": 8,
+      "graph_ms": 18,
+      "grouping_ms": 2034,
+      "names_ms": 665,
+      "lenses_ms": 47,
+      "total_ms": 2772
+     }
+    },
+    "text": {
+     "groups": 8,
+     "in_groups": 0.984,
+     "resolution": 0.5,
+     "mesh_lift": 1.163,
+     "venue_lift": 2.699,
+     "seed_ari": 0.856,
+     "seconds": 1.36,
+     "names": [
+      "body composition · adults · exercise",
+      "mechanisms · inflammation · human",
+      "type 2 diabetes · mellitus · HbA1c",
+      "eating window · TRE · time-restricted",
+      "intermittent energy · CER · weeks",
+      "fast day · ADF · alternated",
+      "liver disease · hepatic steatosis · non-alcoholic fatty",
+      "gut microbiota · abundance · fecal"
+     ],
+     "timing": {
+      "references_ms": 8,
+      "graph_ms": 18,
+      "grouping_ms": 441,
+      "names_ms": 811,
+      "lenses_ms": 71,
+      "total_ms": 1349
+     }
+    }
+   }
+  },
+  {
+   "question": "coral reef bleaching and recovery",
+   "biomedical": false,
+   "papers": 1000,
+   "seed_s": 0.3,
+   "with_mesh": 216,
+   "variants": {
+    "hybrid": {
+     "groups": 5,
+     "in_groups": 0.968,
+     "resolution": 0.75,
+     "mesh_lift": null,
+     "venue_lift": 1.428,
+     "seed_ari": 0.91,
+     "seconds": 5.34,
+     "names": [
+      "sea surface · temperature · SST",
+      "disturbances · coral cover · benthic",
+      "symbiont · host · montipora capitata",
+      "restoration · transplantation · success",
+      "annularis · montastraea · caribbean"
+     ],
+     "timing": {
+      "references_ms": 12,
+      "graph_ms": 37,
+      "grouping_ms": 4468,
+      "names_ms": 763,
+      "lenses_ms": 55,
+      "total_ms": 5334
+     }
+    },
+    "hybrid-noidf": {
+     "groups": 9,
+     "in_groups": 0.985,
+     "resolution": 1.0,
+     "mesh_lift": null,
+     "venue_lift": 1.406,
+     "seed_ari": 0.503,
+     "seconds": 3.92,
+     "names": [
+      "disturbances · cyclones · coral cover",
+      "host · symbiont · montipora capitata",
+      "emission scenarios · projections · resolution",
+      "el ni · ENSO · temperature",
+      "reef restoration · transplantation · success",
+      "acropora · genera · turbid",
+      "atoll · maldives · maldivian reefs",
+      "montastraea · annularis · caribbean",
+      "andaman sea · intercept transect · indonesia"
+     ],
+     "timing": {
+      "references_ms": 8,
+      "graph_ms": 38,
+      "grouping_ms": 3133,
+      "names_ms": 650,
+      "lenses_ms": 78,
+      "total_ms": 3907
+     }
+    },
+    "hybrid-top30": {
+     "groups": 7,
+     "in_groups": 0.985,
+     "resolution": 0.75,
+     "mesh_lift": null,
+     "venue_lift": 1.273,
+     "seed_ari": 0.94,
+     "seconds": 1.76,
+     "names": [
+      "disturbances · cyclones · coral cover",
+      "zooxanthellae · temperature · pigments",
+      "surface temperature · thermal · DHW",
+      "symbiont · montipora capitata · host",
+      "restoration · transplantation · success",
+      "maldives · maldivian reefs · atoll",
+      "images · neural networks · classification"
+     ],
+     "timing": {
+      "references_ms": 8,
+      "graph_ms": 40,
+      "grouping_ms": 987,
+      "names_ms": 652,
+      "lenses_ms": 64,
+      "total_ms": 1752
+     }
+    },
+    "refs": {
+     "groups": 4,
+     "in_groups": 0.743,
+     "resolution": 1.0,
+     "mesh_lift": null,
+     "venue_lift": 2.011,
+     "seed_ari": 0.652,
+     "seconds": 2.89,
+     "names": [
+      "heat stress · thermal · marine heatwaves",
+      "disturbances · coral cover · benthic",
+      "temperature · zooxanthellae · bleached",
+      "restoration · transplantation · success"
+     ],
+     "timing": {
+      "references_ms": 9,
+      "graph_ms": 19,
+      "grouping_ms": 2155,
+      "names_ms": 655,
+      "lenses_ms": 43,
+      "total_ms": 2881
+     }
+    },
+    "text": {
+     "groups": 9,
+     "in_groups": 0.985,
+     "resolution": 0.75,
+     "mesh_lift": null,
+     "venue_lift": 1.443,
+     "seed_ari": 0.875,
+     "seconds": 1.56,
+     "names": [
+      "global · ocean · emissions",
+      "symbiont · host · chlorophyll",
+      "disturbances · cyclones · coral cover",
+      "atoll · indian ocean · maldives",
+      "reef restoration · transplantation · success",
+      "japan · ishigaki island · colonies",
+      "montastraea · caribbean · annularis",
+      "indonesia · intercept transect · weh island",
+      "arabian · saudi · persian gulf"
+     ],
+     "timing": {
+      "references_ms": 8,
+      "graph_ms": 17,
+      "grouping_ms": 601,
+      "names_ms": 849,
+      "lenses_ms": 77,
+      "total_ms": 1552
+     }
+    }
+   }
+  },
+  {
+   "question": "graph neural networks for molecular property prediction",
+   "biomedical": false,
+   "papers": 1000,
+   "seed_s": 0.3,
+   "with_mesh": 143,
+   "variants": {
+    "hybrid": {
+     "groups": 4,
+     "in_groups": 0.972,
+     "resolution": 0.75,
+     "mesh_lift": null,
+     "venue_lift": 1.197,
+     "seed_ari": 0.933,
+     "seconds": 3.55,
+     "names": [
+      "representation learning · propose · self-supervised",
+      "crystal · material properties · energy",
+      "protein · drug · graph-structured",
+      "solubility · descriptors · mass"
+     ],
+     "timing": {
+      "references_ms": 14,
+      "graph_ms": 56,
+      "grouping_ms": 2761,
+      "names_ms": 671,
+      "lenses_ms": 41,
+      "total_ms": 3544
+     }
+    },
+    "hybrid-noidf": {
+     "groups": 4,
+     "in_groups": 1.0,
+     "resolution": 0.75,
+     "mesh_lift": null,
+     "venue_lift": 1.21,
+     "seed_ari": 0.938,
+     "seconds": 3.73,
+     "names": [
+      "representation learning · drug discovery · tasks",
+      "materials · crystal · density functional",
+      "protein · node · drug",
+      "descriptors · mass · chemical"
+     ],
+     "timing": {
+      "references_ms": 7,
+      "graph_ms": 36,
+      "grouping_ms": 3010,
+      "names_ms": 628,
+      "lenses_ms": 36,
+      "total_ms": 3717
+     }
+    },
+    "hybrid-top30": {
+     "groups": 6,
+     "in_groups": 0.984,
+     "resolution": 0.75,
+     "mesh_lift": null,
+     "venue_lift": 1.168,
+     "seed_ari": 0.978,
+     "seconds": 1.47,
+     "names": [
+      "representation learning · self-supervised · propose",
+      "protein · drug discovery · node",
+      "quantum · QM9 · chemistry",
+      "aqueous solubility · molecular descriptors · compounds",
+      "crystal · material properties · formation energy",
+      "few-shot molecular · meta-learning · relation graph"
+     ],
+     "timing": {
+      "references_ms": 7,
+      "graph_ms": 36,
+      "grouping_ms": 835,
+      "names_ms": 529,
+      "lenses_ms": 47,
+      "total_ms": 1455
+     }
+    },
+    "refs": {
+     "groups": 4,
+     "in_groups": 0.767,
+     "resolution": 1.0,
+     "mesh_lift": null,
+     "venue_lift": 0.825,
+     "seed_ari": 0.912,
+     "seconds": 3.25,
+     "names": [
+      "drug discovery · molecular representation · information",
+      "crystal graph · materials · energy",
+      "problem · node · graph convolutional",
+      "group contribution · ligand · binding affinity"
+     ],
+     "timing": {
+      "references_ms": 7,
+      "graph_ms": 17,
+      "grouping_ms": 2531,
+      "names_ms": 653,
+      "lenses_ms": 36,
+      "total_ms": 3245
+     }
+    },
+    "text": {
+     "groups": 6,
+     "in_groups": 0.987,
+     "resolution": 0.5,
+     "mesh_lift": null,
+     "venue_lift": 1.34,
+     "seed_ari": 0.785,
+     "seconds": 1.14,
+     "names": [
+      "representation learning · propose · self-supervised",
+      "molecular descriptors · compounds · chemical",
+      "crystal · materials · formation energy",
+      "link prediction · node · social networks",
+      "attribution · trust · explainability",
+      "few-shot molecular · meta-learning · relation graph"
+     ],
+     "timing": {
+      "references_ms": 7,
+      "graph_ms": 17,
+      "grouping_ms": 525,
+      "names_ms": 528,
+      "lenses_ms": 52,
+      "total_ms": 1129
+     }
+    }
+   }
+  },
+  {
+   "question": "effects of remote work on productivity",
+   "biomedical": false,
+   "papers": 1000,
+   "seed_s": 0.9,
+   "with_mesh": 34,
+   "variants": {
+    "hybrid": {
+     "groups": 6,
+     "in_groups": 0.983,
+     "resolution": 0.75,
+     "mesh_lift": null,
+     "venue_lift": 2.474,
+     "seed_ari": 0.857,
+     "seconds": 2.22,
+     "names": [
+      "communication · challenges · employee engagement",
+      "job · conflict · online",
+      "home · WFH · employee productivity",
+      "firms · COVID-19 pandemic · labor market",
+      "ireland · well-being · psychological",
+      "motivation · interviewees · self-determination theory"
+     ],
+     "timing": {
+      "references_ms": 277,
+      "graph_ms": 22,
+      "grouping_ms": 1325,
+      "names_ms": 526,
+      "lenses_ms": 56,
+      "total_ms": 2206
+     }
+    },
+    "hybrid-noidf": {
+     "groups": 7,
+     "in_groups": 1.0,
+     "resolution": 0.75,
+     "mesh_lift": null,
+     "venue_lift": 2.928,
+     "seed_ari": 0.551,
+     "seconds": 1.78,
+     "names": [
+      "communication · challenges · employee engagement",
+      "job · conflict · outcomes",
+      "WFH · home · COVID-19 pandemic",
+      "ireland · COVID-19 pandemic · irish",
+      "well-being · psychological · social isolation",
+      "potentially exacerbated · telecommuting · telework",
+      "motivation · interviewees · self-determination theory"
+     ],
+     "timing": {
+      "references_ms": 5,
+      "graph_ms": 22,
+      "grouping_ms": 1188,
+      "names_ms": 517,
+      "lenses_ms": 43,
+      "total_ms": 1776
+     }
+    },
+    "hybrid-top30": {
+     "groups": 5,
+     "in_groups": 0.998,
+     "resolution": 0.75,
+     "mesh_lift": null,
+     "venue_lift": 2.463,
+     "seed_ari": 0.951,
+     "seconds": 1.67,
+     "names": [
+      "communication · challenges · hybrid work",
+      "job · telework · satisfaction",
+      "home · WFH · COVID-19 pandemic",
+      "firms · COVID-19 pandemic · substantially",
+      "ireland · motivation · interviewees"
+     ],
+     "timing": {
+      "references_ms": 6,
+      "graph_ms": 26,
+      "grouping_ms": 938,
+      "names_ms": 662,
+      "lenses_ms": 33,
+      "total_ms": 1664
+     }
+    },
+    "refs": {
+     "groups": 5,
+     "in_groups": 0.459,
+     "resolution": 1.0,
+     "mesh_lift": null,
+     "venue_lift": 1.379,
+     "seed_ari": 0.872,
+     "seconds": 1.5,
+     "names": [
+      "questionnaire · sampling · scopus",
+      "relationship · mediation · work engagement",
+      "firms · WFH · home",
+      "authors · originality value · teleworking",
+      "software · developers · engineers"
+     ],
+     "timing": {
+      "references_ms": 6,
+      "graph_ms": 5,
+      "grouping_ms": 905,
+      "names_ms": 549,
+      "lenses_ms": 32,
+      "total_ms": 1496
+     }
+    },
+    "text": {
+     "groups": 9,
+     "in_groups": 1.0,
+     "resolution": 0.75,
+     "mesh_lift": null,
+     "venue_lift": 1.748,
+     "seed_ari": 0.881,
+     "seconds": 1.24,
+     "names": [
+      "challenges · tools · work-life balance",
+      "well-being · psychological · isolation",
+      "WFH · home · work-from-home",
+      "COVID-19 pandemic · labor · costs",
+      "teleworkers · telework · teleworking",
+      "hybrid work · combines remote · arrangements",
+      "post-pandemic · human resource · HR professionals",
+      "motivation · interviewees · self-determination theory",
+      "team · agile · collaboration"
+     ],
+     "timing": {
+      "references_ms": 6,
+      "graph_ms": 25,
+      "grouping_ms": 630,
+      "names_ms": 518,
+      "lenses_ms": 55,
+      "total_ms": 1233
+     }
+    }
+   }
+  },
+  {
+   "question": "gut microbiome and depression",
+   "biomedical": true,
+   "papers": 1000,
+   "seed_s": 0.9,
+   "with_mesh": 441,
+   "variants": {
+    "hybrid": {
+     "groups": 8,
+     "in_groups": 0.991,
+     "resolution": 0.75,
+     "mesh_lift": 1.262,
+     "venue_lift": 1.919,
+     "seed_ari": 0.949,
+     "seconds": 5.59,
+     "names": [
+      "mechanisms · communication · neuroinflammation",
+      "healthy controls · sequencing · differences",
+      "anxiety · autism · spectrum disorder",
+      "probiotics · randomized · placebo",
+      "chronic unpredictable · mice · behavior",
+      "inflammatory bowel disease · IBD · ulcerative colitis",
+      "pregnancy · postpartum depression · maternal",
+      "microbial ecosystem therapeutic-2 · healthy donor · safety"
+     ],
+     "timing": {
+      "references_ms": 607,
+      "graph_ms": 55,
+      "grouping_ms": 4147,
+      "names_ms": 607,
+      "lenses_ms": 160,
+      "total_ms": 5579
+     }
+    },
+    "hybrid-noidf": {
+     "groups": 8,
+     "in_groups": 0.993,
+     "resolution": 0.75,
+     "mesh_lift": 1.275,
+     "venue_lift": 1.491,
+     "seed_ari": 0.963,
+     "seconds": 5.22,
+     "names": [
+      "mechanisms · communication · neuroinflammation",
+      "healthy controls · sequencing · differences",
+      "autism · anxiety · spectrum disorder",
+      "probiotics · randomized · placebo",
+      "mice · chronic unpredictable · behavior",
+      "inflammatory bowel disease · IBD · ulcerative colitis",
+      "pregnancy · postpartum depression · maternal",
+      "healthy donor · microbial ecosystem therapeutic-2 · safety"
+     ],
+     "timing": {
+      "references_ms": 11,
+      "graph_ms": 58,
+      "grouping_ms": 4244,
+      "names_ms": 767,
+      "lenses_ms": 132,
+      "total_ms": 5215
+     }
+    },
+    "hybrid-top30": {
+     "groups": 8,
+     "in_groups": 1.0,
+     "resolution": 0.75,
+     "mesh_lift": 1.231,
+     "venue_lift": 1.73,
+     "seed_ari": 0.702,
+     "seconds": 1.89,
+     "names": [
+      "immune · nervous system · mechanisms",
+      "healthy controls · sequencing · differences",
+      "autism · anxiety · schizophrenia",
+      "probiotics · trials · randomized",
+      "chronic unpredictable · mice · behavior",
+      "pregnancy · postpartum depression · maternal",
+      "IBD · ulcerative colitis · inflammatory bowel disease",
+      "microbial ecosystem therapeutic-2 · safety · healthy donor"
+     ],
+     "timing": {
+      "references_ms": 14,
+      "graph_ms": 52,
+      "grouping_ms": 1061,
+      "names_ms": 620,
+      "lenses_ms": 132,
+      "total_ms": 1878
+     }
+    },
+    "refs": {
+     "groups": 4,
+     "in_groups": 0.833,
+     "resolution": 1.0,
+     "mesh_lift": 1.037,
+     "venue_lift": 1.628,
+     "seed_ari": 0.915,
+     "seconds": 4.78,
+     "names": [
+      "remains · pathways · insights",
+      "human · brain · discussed",
+      "sequencing · rRNA · gene",
+      "probiotics · trials · randomized controlled"
+     ],
+     "timing": {
+      "references_ms": 11,
+      "graph_ms": 30,
+      "grouping_ms": 3833,
+      "names_ms": 802,
+      "lenses_ms": 89,
+      "total_ms": 4765
+     }
+    },
+    "text": {
+     "groups": 8,
+     "in_groups": 1.0,
+     "resolution": 0.5,
+     "mesh_lift": 1.27,
+     "venue_lift": 1.009,
+     "seed_ari": 0.905,
+     "seconds": 1.28,
+     "names": [
+      "mechanisms · immune · neuroinflammation",
+      "healthy controls · sequencing · differences",
+      "anxiety · autism spectrum · schizophrenia",
+      "mice · chronic unpredictable · rats",
+      "trials · randomized · placebo",
+      "inflammatory bowel disease · IBD · ulcerative colitis",
+      "pregnancy · postpartum depression · maternal",
+      "dietary · intake · fiber"
+     ],
+     "timing": {
+      "references_ms": 11,
+      "graph_ms": 18,
+      "grouping_ms": 514,
+      "names_ms": 589,
+      "lenses_ms": 135,
+      "total_ms": 1267
+     }
+    }
+   }
+  },
+  {
+   "question": "CRISPR base editing for genetic diseases",
+   "biomedical": true,
+   "papers": 1000,
+   "seed_s": 0.7,
+   "with_mesh": 433,
+   "variants": {
+    "hybrid": {
+     "groups": 8,
+     "in_groups": 0.991,
+     "resolution": 0.75,
+     "mesh_lift": 1.133,
+     "venue_lift": 2.055,
+     "seed_ari": 0.951,
+     "seconds": 5.05,
+     "names": [
+      "cancer · clustered regularly · applications",
+      "base editors · cytosine · deaminase",
+      "inherited retinal · photoreceptors · retina",
+      "globin gene · fetal hemoglobin · SCD",
+      "muscle · DMD · myotonic dystrophy",
+      "neurodegenerative · neuronal · huntington's disease",
+      "epidermolysis bullosa · recessive dystrophic · genodermatoses",
+      "CFTR · transmembrane conductance · f508del"
+     ],
+     "timing": {
+      "references_ms": 383,
+      "graph_ms": 67,
+      "grouping_ms": 3854,
+      "names_ms": 595,
+      "lenses_ms": 137,
+      "total_ms": 5036
+     }
+    },
+    "hybrid-noidf": {
+     "groups": 8,
+     "in_groups": 1.0,
+     "resolution": 0.75,
+     "mesh_lift": 1.115,
+     "venue_lift": 1.867,
+     "seed_ari": 0.989,
+     "seconds": 4.53,
+     "names": [
+      "cancer · clustered regularly · applications",
+      "base editors · cytosine · deaminase",
+      "inherited retinal · photoreceptors · retina",
+      "globin gene · fetal hemoglobin · hematopoietic stem",
+      "neurodegenerative · neuronal · huntington's disease",
+      "muscle · myotonic dystrophy · DMD",
+      "epidermolysis bullosa · recessive dystrophic · genodermatoses",
+      "CFTR · transmembrane conductance · f508del"
+     ],
+     "timing": {
+      "references_ms": 11,
+      "graph_ms": 61,
+      "grouping_ms": 3753,
+      "names_ms": 573,
+      "lenses_ms": 117,
+      "total_ms": 4515
+     }
+    },
+    "hybrid-top30": {
+     "groups": 7,
+     "in_groups": 1.0,
+     "resolution": 0.5,
+     "mesh_lift": 1.137,
+     "venue_lift": 1.719,
+     "seed_ari": 0.996,
+     "seconds": 1.55,
+     "names": [
+      "cancer · short palindromic · technology",
+      "base editors · cytosine · deaminase",
+      "inherited retinal · photoreceptors · retina",
+      "globin gene · fetal hemoglobin · SCD",
+      "muscle · DMD · myotonic dystrophy",
+      "epidermolysis bullosa · recessive dystrophic · genodermatoses",
+      "CFTR · transmembrane conductance · f508del"
+     ],
+     "timing": {
+      "references_ms": 11,
+      "graph_ms": 52,
+      "grouping_ms": 638,
+      "names_ms": 733,
+      "lenses_ms": 101,
+      "total_ms": 1534
+     }
+    },
+    "refs": {
+     "groups": 9,
+     "in_groups": 0.821,
+     "resolution": 1.25,
+     "mesh_lift": 1.117,
+     "venue_lift": 3.028,
+     "seed_ari": 0.579,
+     "seconds": 4.17,
+     "names": [
+      "base editors · cytosine · adenine",
+      "short palindromic · CRISPR cas9 · genome editing",
+      "challenges · cancer · medicine",
+      "prime editing · deletions · precise",
+      "inherited retinal · eye · degeneration",
+      "hematopoietic stem · globin · hemoglobinopathies",
+      "specificity · detect · off-target",
+      "epidermolysis bullosa · genodermatoses · skin diseases",
+      "muscle · neuromuscular disorder · duchenne muscular dystrophy"
+     ],
+     "timing": {
+      "references_ms": 11,
+      "graph_ms": 31,
+      "grouping_ms": 3397,
+      "names_ms": 582,
+      "lenses_ms": 133,
+      "total_ms": 4154
+     }
+    },
+    "text": {
+     "groups": 7,
+     "in_groups": 0.968,
+     "resolution": 0.5,
+     "mesh_lift": 1.163,
+     "venue_lift": 2.164,
+     "seed_ari": 0.998,
+     "seconds": 1.16,
+     "names": [
+      "cancer · clustered regularly · applications",
+      "base editors · cytosine · deaminase",
+      "neurodegenerative · muscle · duchenne muscular dystrophy",
+      "inherited retinal · photoreceptors · retina",
+      "globin gene · fetal hemoglobin · sickle cell disease",
+      "epidermolysis bullosa · recessive dystrophic · genodermatoses",
+      "CFTR · transmembrane conductance · f508del"
+     ],
+     "timing": {
+      "references_ms": 11,
+      "graph_ms": 19,
+      "grouping_ms": 421,
+      "names_ms": 587,
+      "lenses_ms": 105,
+      "total_ms": 1143
+     }
+    }
+   }
+  },
+  {
+   "question": "microplastics in freshwater ecosystems",
+   "biomedical": false,
+   "papers": 1000,
+   "seed_s": 0.6,
+   "with_mesh": 172,
+   "variants": {
+    "hybrid": {
+     "groups": 8,
+     "in_groups": 0.973,
+     "resolution": 1.0,
+     "mesh_lift": null,
+     "venue_lift": 1.18,
+     "seed_ari": 0.928,
+     "seconds": 3.93,
+     "names": [
+      "organisms · aquatic ecosystems · human health",
+      "sources · river · flow",
+      "fish · gastrointestinal tract · fishes",
+      "china · lakes · india",
+      "mesocosms · experiment · exposure",
+      "freshwater mussels · trichoptera · macroinvertebrates",
+      "biofilm · microbial communities · plastisphere",
+      "south africa · african · vaal river"
+     ],
+     "timing": {
+      "references_ms": 178,
+      "graph_ms": 40,
+      "grouping_ms": 2992,
+      "names_ms": 621,
+      "lenses_ms": 88,
+      "total_ms": 3919
+     }
+    },
+    "hybrid-noidf": {
+     "groups": 8,
+     "in_groups": 0.971,
+     "resolution": 1.0,
+     "mesh_lift": null,
+     "venue_lift": 0.877,
+     "seed_ari": 0.951,
+     "seconds": 3.67,
+     "names": [
+      "river · sources · flow",
+      "organisms · aquatic ecosystems · human health",
+      "fish · gastrointestinal tract · fishes",
+      "china · lakes · india",
+      "mesocosms · experiment · exposure",
+      "freshwater mussels · trichoptera · macroinvertebrates",
+      "biofilm · microbial communities · plastisphere",
+      "south africa · african · vaal river"
+     ],
+     "timing": {
+      "references_ms": 9,
+      "graph_ms": 41,
+      "grouping_ms": 2940,
+      "names_ms": 593,
+      "lenses_ms": 79,
+      "total_ms": 3661
+     }
+    },
+    "hybrid-top30": {
+     "groups": 7,
+     "in_groups": 0.96,
+     "resolution": 1.0,
+     "mesh_lift": null,
+     "venue_lift": 1.048,
+     "seed_ari": 0.874,
+     "seconds": 1.76,
+     "names": [
+      "distribution · china · samples",
+      "fish · gastrointestinal tract · fishes",
+      "human health · aquatic ecosystems · heavy metals",
+      "mesocosms · macroinvertebrates · experiment",
+      "plastic debris · cosmetics · marine",
+      "india · indian · monsoon",
+      "freshwater mussels · bivalves · dreissena polymorpha"
+     ],
+     "timing": {
+      "references_ms": 9,
+      "graph_ms": 39,
+      "grouping_ms": 876,
+      "names_ms": 754,
+      "lenses_ms": 67,
+      "total_ms": 1746
+     }
+    },
+    "refs": {
+     "groups": 7,
+     "in_groups": 0.618,
+     "resolution": 1.25,
+     "mesh_lift": null,
+     "venue_lift": 1.54,
+     "seed_ari": 0.907,
+     "seconds": 3.03,
+     "names": [
+      "fish · gastrointestinal tract · fishes",
+      "microbial · aquatic ecosystems · processes",
+      "china · distribution · spatial",
+      "exposed · daphnia magna · larvae",
+      "marine · plastic debris · organisms",
+      "lakes · sediment · MP concentrations",
+      "india · indian · tamil nadu"
+     ],
+     "timing": {
+      "references_ms": 9,
+      "graph_ms": 23,
+      "grouping_ms": 2337,
+      "names_ms": 579,
+      "lenses_ms": 71,
+      "total_ms": 3020
+     }
+    },
+    "text": {
+     "groups": 6,
+     "in_groups": 0.985,
+     "resolution": 0.75,
+     "mesh_lift": null,
+     "venue_lift": 1.135,
+     "seed_ari": 0.931,
+     "seconds": 1.21,
+     "names": [
+      "river · sediment · water",
+      "organisms · aquatic ecosystems · various",
+      "fish · gastrointestinal tract · fishes",
+      "china · lakes · india",
+      "experiment · mesocosms · communities",
+      "freshwater mussels · trichoptera · macroinvertebrates"
+     ],
+     "timing": {
+      "references_ms": 14,
+      "graph_ms": 26,
+      "grouping_ms": 542,
+      "names_ms": 561,
+      "lenses_ms": 60,
+      "total_ms": 1204
+     }
+    }
+   }
+  },
+  {
+   "question": "perovskite solar cell stability",
+   "biomedical": false,
+   "papers": 1000,
+   "seed_s": 0.8,
+   "with_mesh": 8,
+   "variants": {
+    "hybrid": {
+     "groups": 9,
+     "in_groups": 1.0,
+     "resolution": 1.0,
+     "mesh_lift": null,
+     "venue_lift": 1.504,
+     "seed_ari": 0.814,
+     "seconds": 5.11,
+     "names": [
+      "degradation · mechanisms · testing",
+      "stable perovskite solar · additive · SnO",
+      "phase · cesium · formamidinium",
+      "CH3NH3PbI3 · hybrid perovskite · years",
+      "passivation · defects · surface",
+      "overview · progress · summary",
+      "tin · tin-lead perovskite · lead-free",
+      "encapsulation · encapsulating · encapsulant",
+      "tandem solar · perovskite silicon · residual"
+     ],
+     "timing": {
+      "references_ms": 235,
+      "graph_ms": 44,
+      "grouping_ms": 4357,
+      "names_ms": 376,
+      "lenses_ms": 92,
+      "total_ms": 5104
+     }
+    },
+    "hybrid-noidf": {
+     "groups": 9,
+     "in_groups": 0.996,
+     "resolution": 1.0,
+     "mesh_lift": null,
+     "venue_lift": 1.714,
+     "seed_ari": 0.797,
+     "seconds": 4.9,
+     "names": [
+      "stable perovskite solar · additive · SnO",
+      "degradation · mechanisms · technology",
+      "cesium · phase · formamidinium",
+      "lead-free perovskite · overview · progress",
+      "passivation · defects · surface",
+      "CH3NH3PbI3 · materials · hybrid perovskite",
+      "outdoor · machine learning · prediction",
+      "tandem solar · tin-lead perovskite · all-perovskite",
+      "encapsulation · encapsulating · encapsulant"
+     ],
+     "timing": {
+      "references_ms": 9,
+      "graph_ms": 54,
+      "grouping_ms": 4335,
+      "names_ms": 403,
+      "lenses_ms": 86,
+      "total_ms": 4888
+     }
+    },
+    "hybrid-top30": {
+     "groups": 5,
+     "in_groups": 0.982,
+     "resolution": 1.0,
+     "mesh_lift": null,
+     "venue_lift": 1.287,
+     "seed_ari": 0.904,
+     "seconds": 1.63,
+     "names": [
+      "passivation · defects · stable perovskite solar",
+      "degradation mechanisms · testing · technology",
+      "CH3NH3PbI3 · organic-inorganic hybrid · years",
+      "phase · cation · CsPbI",
+      "tandem solar cells · tin · lead-free"
+     ],
+     "timing": {
+      "references_ms": 9,
+      "graph_ms": 116,
+      "grouping_ms": 1068,
+      "names_ms": 379,
+      "lenses_ms": 53,
+      "total_ms": 1625
+     }
+    },
+    "refs": {
+     "groups": 7,
+     "in_groups": 0.854,
+     "resolution": 1.25,
+     "mesh_lift": null,
+     "venue_lift": 1.334,
+     "seed_ari": 0.96,
+     "seconds": 3.44,
+     "names": [
+      "stable perovskite solar · defects · surface",
+      "prepared · PbI · CH3NH3PbI3",
+      "degradation · testing · outdoor",
+      "two-dimensional · passivation · surface",
+      "cation · formamidinium · cesium",
+      "inorganic perovskite · CsPbI · all-inorganic",
+      "lead-free · tin · toxic"
+     ],
+     "timing": {
+      "references_ms": 10,
+      "graph_ms": 25,
+      "grouping_ms": 2945,
+      "names_ms": 380,
+      "lenses_ms": 71,
+      "total_ms": 3431
+     }
+    },
+    "text": {
+     "groups": 8,
+     "in_groups": 1.0,
+     "resolution": 0.75,
+     "mesh_lift": null,
+     "venue_lift": 1.678,
+     "seed_ari": 0.853,
+     "seconds": 1.27,
+     "names": [
+      "degradation · mechanisms · technology",
+      "stable perovskite solar · additive · SnO",
+      "phase · formamidinium · cesium",
+      "lead-free perovskite · progress · overview",
+      "passivation · defects · surface",
+      "outdoor · machine learning · prediction",
+      "encapsulation · encapsulating · encapsulant",
+      "tandem solar · tin-lead perovskite · all-perovskite"
+     ],
+     "timing": {
+      "references_ms": 9,
+      "graph_ms": 17,
+      "grouping_ms": 774,
+      "names_ms": 380,
+      "lenses_ms": 77,
+      "total_ms": 1257
+     }
+    }
+   }
+  },
+  {
+   "question": "sleep deprivation and memory consolidation",
+   "biomedical": true,
+   "papers": 1000,
+   "seed_s": 0.9,
+   "with_mesh": 444,
+   "variants": {
+    "hybrid": {
+     "groups": 6,
+     "in_groups": 0.991,
+     "resolution": 1.0,
+     "mesh_lift": 1.425,
+     "venue_lift": 0.99,
+     "seed_ari": 0.94,
+     "seconds": 3.44,
+     "names": [
+      "mice · rats · water maze",
+      "memory reactivation · slow oscillations · spindles",
+      "working memory · attention · cognitive",
+      "retention · benefit · wake",
+      "motor · sequence · task",
+      "neutral · emotionally · emotion"
+     ],
+     "timing": {
+      "references_ms": 609,
+      "graph_ms": 44,
+      "grouping_ms": 2127,
+      "names_ms": 575,
+      "lenses_ms": 76,
+      "total_ms": 3431
+     }
+    },
+    "hybrid-noidf": {
+     "groups": 7,
+     "in_groups": 0.992,
+     "resolution": 1.0,
+     "mesh_lift": 1.469,
+     "venue_lift": 1.024,
+     "seed_ari": 0.963,
+     "seconds": 2.91,
+     "names": [
+      "mice · rats · water maze",
+      "retention · benefit · wake",
+      "working memory · attention · cognitive",
+      "brain · system · representations",
+      "neutral · emotionally · emotion",
+      "motor · sequence · skills",
+      "memory reactivation · TMR · spindles"
+     ],
+     "timing": {
+      "references_ms": 9,
+      "graph_ms": 36,
+      "grouping_ms": 2144,
+      "names_ms": 618,
+      "lenses_ms": 91,
+      "total_ms": 2899
+     }
+    },
+    "hybrid-top30": {
+     "groups": 7,
+     "in_groups": 0.991,
+     "resolution": 1.0,
+     "mesh_lift": 1.462,
+     "venue_lift": 1.314,
+     "seed_ari": 0.936,
+     "seconds": 1.45,
+     "names": [
+      "mice · rats · water maze",
+      "working memory · attention · cognitive",
+      "benefit · wake · retention",
+      "REM sleep · stages · SWS",
+      "memory reactivation · sleep spindles · slow oscillations",
+      "motor · sequence · skills",
+      "neutral · emotionally · emotion"
+     ],
+     "timing": {
+      "references_ms": 9,
+      "graph_ms": 37,
+      "grouping_ms": 726,
+      "names_ms": 577,
+      "lenses_ms": 91,
+      "total_ms": 1440
+     }
+    },
+    "refs": {
+     "groups": 8,
+     "in_groups": 0.725,
+     "resolution": 1.25,
+     "mesh_lift": 1.43,
+     "venue_lift": 1.092,
+     "seed_ari": 0.988,
+     "seconds": 2.79,
+     "names": [
+      "rats · mice · hippocampus",
+      "working memory · cognitive · attention",
+      "memory reactivation · slow oscillations · spindles",
+      "declarative memory · enhanced · waking",
+      "sequence · motor · offline",
+      "wake · wakefulness · benefit",
+      "emotional memory · emotionally · negative",
+      "sleep spindles · declarative memory · power"
+     ],
+     "timing": {
+      "references_ms": 9,
+      "graph_ms": 18,
+      "grouping_ms": 1903,
+      "names_ms": 748,
+      "lenses_ms": 93,
+      "total_ms": 2771
+     }
+    },
+    "text": {
+     "groups": 8,
+     "in_groups": 1.0,
+     "resolution": 0.75,
+     "mesh_lift": 1.455,
+     "venue_lift": 1.142,
+     "seed_ari": 0.935,
+     "seconds": 1.12,
+     "names": [
+      "mice · rats · water maze",
+      "retention · wake · benefit",
+      "oscillations · spindles · ripple",
+      "working memory · attention · cognitive",
+      "neutral · emotional memory · valence",
+      "motor · post-training night · virtual",
+      "targeted memory reactivation · TMR · cues",
+      "OSA · older adults · AHI"
+     ],
+     "timing": {
+      "references_ms": 9,
+      "graph_ms": 17,
+      "grouping_ms": 415,
+      "names_ms": 579,
+      "lenses_ms": 86,
+      "total_ms": 1106
+     }
+    }
+   }
+  },
+  {
+   "question": "antibiotic resistance in hospital infections",
+   "biomedical": true,
+   "papers": 1000,
+   "seed_s": 0.7,
+   "with_mesh": 306,
+   "variants": {
+    "hybrid": {
+     "groups": 9,
+     "in_groups": 0.997,
+     "resolution": 0.75,
+     "mesh_lift": 1.149,
+     "venue_lift": 0.79,
+     "seed_ari": 0.77,
+     "seconds": 2.08,
+     "names": [
+      "klebsiella · tertiary care · culture",
+      "china · COVID-19 · regression",
+      "nosocomial infections · iran · urinary tract",
+      "intensive care unit · ICU · ICUs",
+      "mathematical · transmission · vancomycin-resistant enterococci",
+      "surgical site infections · postoperative · SSI",
+      "drug resistance · strains · rational",
+      "aureus strains · erythromycin · MRSA",
+      "hospital wastewater · effluent · ARGs"
+     ],
+     "timing": {
+      "references_ms": 270,
+      "graph_ms": 21,
+      "grouping_ms": 1041,
+      "names_ms": 669,
+      "lenses_ms": 70,
+      "total_ms": 2071
+     }
+    },
+    "hybrid-noidf": {
+     "groups": 9,
+     "in_groups": 1.0,
+     "resolution": 0.75,
+     "mesh_lift": 1.142,
+     "venue_lift": 1.201,
+     "seed_ari": 0.912,
+     "seconds": 1.89,
+     "names": [
+      "AMR · tertiary · trends",
+      "care unit · ICUs · critically ill",
+      "decrease · consumption · defined daily",
+      "nosocomial infections · iran · urinary tract",
+      "surgical site infections · postoperative · SSIs",
+      "HAP · drug resistance · strains",
+      "aureus strains · clindamycin · methicillin",
+      "hospital wastewater · effluent · treatment plants",
+      "structure · microbiological monitoring · microflora"
+     ],
+     "timing": {
+      "references_ms": 7,
+      "graph_ms": 21,
+      "grouping_ms": 1023,
+      "names_ms": 741,
+      "lenses_ms": 74,
+      "total_ms": 1865
+     }
+    },
+    "hybrid-top30": {
+     "groups": 8,
+     "in_groups": 1.0,
+     "resolution": 0.75,
+     "mesh_lift": 1.128,
+     "venue_lift": 1.039,
+     "seed_ari": 0.931,
+     "seconds": 1.58,
+     "names": [
+      "china · acinetobacter baumannii · trends",
+      "surgical · nosocomial infections · postoperative",
+      "tertiary care hospital · resistance patterns · specimens",
+      "mathematical · vancomycin-resistant enterococci · transmission",
+      "intensive care unit · ICU · ICUs",
+      "hospital wastewater · effluent · resistance genes",
+      "drug resistance · accounted · WHONET5",
+      "aureus strains · erythromycin · clindamycin"
+     ],
+     "timing": {
+      "references_ms": 6,
+      "graph_ms": 25,
+      "grouping_ms": 838,
+      "names_ms": 640,
+      "lenses_ms": 58,
+      "total_ms": 1568
+     }
+    },
+    "refs": {
+     "groups": 7,
+     "in_groups": 0.639,
+     "resolution": 1.0,
+     "mesh_lift": 1.102,
+     "venue_lift": 0.884,
+     "seed_ari": 0.978,
+     "seconds": 1.62,
+     "names": [
+      "AMR · health · antimicrobial resistance",
+      "increasing · nosocomial infections · vancomycin-resistant enterococci",
+      "surgical site infections · wound · resistance patterns",
+      "intensive care unit · ICU · ICUs",
+      "definitions · healthcare-associated infections · healthcare",
+      "systemic · antimicrobial stewardship program · benefit",
+      "aspiration pneumonia · exhibiting resistance · departments"
+     ],
+     "timing": {
+      "references_ms": 7,
+      "graph_ms": 3,
+      "grouping_ms": 915,
+      "names_ms": 629,
+      "lenses_ms": 52,
+      "total_ms": 1606
+     }
+    },
+    "text": {
+     "groups": 8,
+     "in_groups": 1.0,
+     "resolution": 0.5,
+     "mesh_lift": 1.141,
+     "venue_lift": 1.134,
+     "seed_ari": 0.948,
+     "seconds": 1.33,
+     "names": [
+      "resistance patterns · iran · samples",
+      "intensive care unit · ICU · ICUs",
+      "consumption · time · daily doses",
+      "china · distribution · acinetobacter baumannii",
+      "surgical site infections · postoperative · SSI",
+      "aureus strains · erythromycin · MRSA",
+      "hospital wastewater · effluent · ARGs",
+      "structure · microbiological monitoring · microorganisms"
+     ],
+     "timing": {
+      "references_ms": 6,
+      "graph_ms": 28,
+      "grouping_ms": 572,
+      "names_ms": 622,
+      "lenses_ms": 62,
+      "total_ms": 1291
+     }
+    }
+   }
+  },
+  {
+   "question": "social media use and adolescent mental health",
+   "biomedical": true,
+   "papers": 1000,
+   "seed_s": 0.6,
+   "with_mesh": 161,
+   "variants": {
+    "hybrid": {
+     "groups": 5,
+     "in_groups": 0.993,
+     "resolution": 0.75,
+     "mesh_lift": 1.032,
+     "venue_lift": 0.805,
+     "seed_ari": 0.927,
+     "seconds": 3.85,
+     "names": [
+      "association · symptoms · longitudinal",
+      "teenagers · school · parents",
+      "media usage · stress · young adults",
+      "suicide · self-harm · focus group",
+      "body image · dissatisfaction · eating disorders"
+     ],
+     "timing": {
+      "references_ms": 94,
+      "graph_ms": 26,
+      "grouping_ms": 2951,
+      "names_ms": 728,
+      "lenses_ms": 42,
+      "total_ms": 3841
+     }
+    },
+    "hybrid-noidf": {
+     "groups": 5,
+     "in_groups": 1.0,
+     "resolution": 0.75,
+     "mesh_lift": 1.029,
+     "venue_lift": 1.613,
+     "seed_ari": 0.884,
+     "seconds": 2.19,
+     "names": [
+      "teenagers · terhadap · students",
+      "association · symptoms · longitudinal",
+      "young adults · health issues · negative",
+      "suicide · self-harm · suicidal ideation",
+      "body image · dissatisfaction · eating disorders"
+     ],
+     "timing": {
+      "references_ms": 6,
+      "graph_ms": 32,
+      "grouping_ms": 1528,
+      "names_ms": 571,
+      "lenses_ms": 40,
+      "total_ms": 2177
+     }
+    },
+    "hybrid-top30": {
+     "groups": 6,
+     "in_groups": 0.987,
+     "resolution": 0.75,
+     "mesh_lift": 1.096,
+     "venue_lift": 1.314,
+     "seed_ari": 0.89,
+     "seconds": 1.87,
+     "names": [
+      "teenagers · media sosial · terhadap",
+      "association · longitudinal · symptoms",
+      "young adults · sleep · anxiety",
+      "COVID-19 pandemic · social distancing · pandemic-related",
+      "suicide · self-harm · suicidal ideation",
+      "body image · eating disorders · dissatisfaction"
+     ],
+     "timing": {
+      "references_ms": 7,
+      "graph_ms": 31,
+      "grouping_ms": 1054,
+      "names_ms": 725,
+      "lenses_ms": 43,
+      "total_ms": 1860
+     }
+    },
+    "refs": {
+     "groups": 6,
+     "in_groups": 0.593,
+     "resolution": 1.0,
+     "mesh_lift": 1.031,
+     "venue_lift": 1.816,
+     "seed_ari": 0.921,
+     "seconds": 2.06,
+     "names": [
+      "social networking · sites · facebook",
+      "problematic social · PSMU · HBSC",
+      "association · later · nationally representative",
+      "media usage · body image · statistical",
+      "karnataka · personal expression · still",
+      "indonesia · men · jakarta"
+     ],
+     "timing": {
+      "references_ms": 7,
+      "graph_ms": 8,
+      "grouping_ms": 1424,
+      "names_ms": 569,
+      "lenses_ms": 45,
+      "total_ms": 2053
+     }
+    },
+    "text": {
+     "groups": 6,
+     "in_groups": 0.982,
+     "resolution": 0.5,
+     "mesh_lift": 1.064,
+     "venue_lift": 0.806,
+     "seed_ari": 0.868,
+     "seconds": 1.77,
+     "names": [
+      "teenagers · students · school",
+      "symptoms · association · longitudinal",
+      "young adults · facebook · health issues",
+      "COVID-19 pandemic · social distancing · sleep quality",
+      "suicidal ideation · suicide · self-harm",
+      "body image · dissatisfaction · eating disorders"
+     ],
+     "timing": {
+      "references_ms": 7,
+      "graph_ms": 17,
+      "grouping_ms": 971,
+      "names_ms": 724,
+      "lenses_ms": 42,
+      "total_ms": 1761
+     }
+    }
+   }
+  },
+  {
+   "question": "large language models for code generation",
+   "biomedical": false,
+   "papers": 1000,
+   "seed_s": 0.5,
+   "with_mesh": 4,
+   "variants": {
+    "hybrid": {
+     "groups": 8,
+     "in_groups": 1.0,
+     "resolution": 0.75,
+     "mesh_lift": null,
+     "venue_lift": 1.284,
+     "seed_ari": 0.887,
+     "seconds": 1.74,
+     "names": [
+      "benchmarks · evaluating · agents",
+      "developers · due · empirical",
+      "software testing · engineering · automation",
+      "neural · language modeling · instruction",
+      "RAG · retrieval · prompt",
+      "vulnerabilities · risks · secure",
+      "text · language processing · game",
+      "hardware design · verilog code · RTL"
+     ],
+     "timing": {
+      "references_ms": 30,
+      "graph_ms": 21,
+      "grouping_ms": 1112,
+      "names_ms": 521,
+      "lenses_ms": 43,
+      "total_ms": 1728
+     }
+    },
+    "hybrid-noidf": {
+     "groups": 8,
+     "in_groups": 0.999,
+     "resolution": 0.75,
+     "mesh_lift": null,
+     "venue_lift": 1.358,
+     "seed_ari": 0.672,
+     "seconds": 1.63,
+     "names": [
+      "benchmarks · performance · coding",
+      "due · developers · generating",
+      "software · testing · requirements",
+      "RAG · retrieval · prompt",
+      "vulnerabilities · secure · risks",
+      "text · language processing · game",
+      "hardware design · verilog code · RTL",
+      "neural · language modeling · code suggestion"
+     ],
+     "timing": {
+      "references_ms": 5,
+      "graph_ms": 26,
+      "grouping_ms": 1046,
+      "names_ms": 509,
+      "lenses_ms": 32,
+      "total_ms": 1618
+     }
+    },
+    "hybrid-top30": {
+     "groups": 9,
+     "in_groups": 0.998,
+     "resolution": 0.75,
+     "mesh_lift": null,
+     "venue_lift": 1.224,
+     "seed_ari": 0.873,
+     "seconds": 1.51,
+     "names": [
+      "benchmarks · correctness · generation tasks",
+      "retrieval · RAG · retrieval-augmented code",
+      "vulnerabilities · secure code · ChatGPT",
+      "HPC · geospatial code · clone detection",
+      "software engineering · testing · automation",
+      "neural · language modeling · code summarization",
+      "size · instruction · license",
+      "text · language processing · game",
+      "hardware design · verilog code · RTL"
+     ],
+     "timing": {
+      "references_ms": 5,
+      "graph_ms": 25,
+      "grouping_ms": 901,
+      "names_ms": 530,
+      "lenses_ms": 36,
+      "total_ms": 1499
+     }
+    },
+    "refs": {
+     "groups": 7,
+     "in_groups": 0.405,
+     "resolution": 1.25,
+     "mesh_lift": null,
+     "venue_lift": 0.149,
+     "seed_ari": 0.955,
+     "seconds": 1.39,
+     "names": [
+      "software engineering · process · reducing",
+      "tools · natural language · abstract",
+      "security · generated · secure code",
+      "article · BLEU · ROUGE-L",
+      "statistical language · neural · modeling",
+      "dependencies · class-level code · standalone",
+      "hardware design · verilog code · RTL"
+     ],
+     "timing": {
+      "references_ms": 5,
+      "graph_ms": 4,
+      "grouping_ms": 706,
+      "names_ms": 639,
+      "lenses_ms": 29,
+      "total_ms": 1384
+     }
+    },
+    "text": {
+     "groups": 7,
+     "in_groups": 0.993,
+     "resolution": 0.5,
+     "mesh_lift": null,
+     "venue_lift": 1.039,
+     "seed_ari": 0.492,
+     "seconds": 1.24,
+     "names": [
+      "improve · improvement · learning",
+      "benchmarks · evaluating · popular",
+      "software · test generation · engineering",
+      "ChatGPT · gemini · code clones",
+      "vulnerabilities · secure code · risks",
+      "education · language processing · text",
+      "hardware design · verilog code · RTL"
+     ],
+     "timing": {
+      "references_ms": 5,
+      "graph_ms": 18,
+      "grouping_ms": 649,
+      "names_ms": 525,
+      "lenses_ms": 29,
+      "total_ms": 1226
+     }
+    }
+   }
+  },
+  {
+   "question": "urban heat islands and green infrastructure",
+   "biomedical": false,
+   "papers": 1000,
+   "seed_s": 0.8,
+   "with_mesh": 31,
+   "variants": {
+    "hybrid": {
+     "groups": 6,
+     "in_groups": 0.989,
+     "resolution": 1.0,
+     "mesh_lift": null,
+     "venue_lift": 1.571,
+     "seed_ari": 0.817,
+     "seconds": 2.59,
+     "names": [
+      "ecosystem services · biodiversity · flood",
+      "materials · phenomenon · UHI",
+      "thermal comfort · air temperature · simulations",
+      "china · green spaces · spatial",
+      "landsat · LST · satellite",
+      "vulnerable · vulnerability · neighborhoods"
+     ],
+     "timing": {
+      "references_ms": 125,
+      "graph_ms": 28,
+      "grouping_ms": 1679,
+      "names_ms": 680,
+      "lenses_ms": 63,
+      "total_ms": 2575
+     }
+    },
+    "hybrid-noidf": {
+     "groups": 6,
+     "in_groups": 0.978,
+     "resolution": 1.0,
+     "mesh_lift": null,
+     "venue_lift": 1.57,
+     "seed_ari": 0.886,
+     "seconds": 2.28,
+     "names": [
+      "ecosystem services · biodiversity · flood",
+      "materials · energy · building",
+      "china · green spaces · LST",
+      "thermal comfort · simulations · air temperature",
+      "landsat · NDVI · LST",
+      "barcelona · mortality · tree cover"
+     ],
+     "timing": {
+      "references_ms": 7,
+      "graph_ms": 25,
+      "grouping_ms": 1538,
+      "names_ms": 635,
+      "lenses_ms": 60,
+      "total_ms": 2265
+     }
+    },
+    "hybrid-top30": {
+     "groups": 6,
+     "in_groups": 0.976,
+     "resolution": 1.0,
+     "mesh_lift": null,
+     "venue_lift": 1.446,
+     "seed_ari": 0.87,
+     "seconds": 1.84,
+     "names": [
+      "ecosystem services · biodiversity · flood",
+      "materials · phenomenon · building",
+      "thermal comfort · simulations · air temperature",
+      "china · cooling · green spaces",
+      "LST · landsat · NDVI",
+      "barcelona · portugal · tree cover"
+     ],
+     "timing": {
+      "references_ms": 7,
+      "graph_ms": 31,
+      "grouping_ms": 893,
+      "names_ms": 828,
+      "lenses_ms": 62,
+      "total_ms": 1821
+     }
+    },
+    "refs": {
+     "groups": 8,
+     "in_groups": 0.617,
+     "resolution": 1.25,
+     "mesh_lift": null,
+     "venue_lift": 2.728,
+     "seed_ari": 0.787,
+     "seconds": 2.16,
+     "names": [
+      "ecosystem services · management · benefits",
+      "energy · air · cool",
+      "land surface · difference vegetation · landsat",
+      "ENVI-met · thermal comfort · green walls",
+      "UHI · urban design · heat island mitigation",
+      "morphological spatial · circuit theory · core",
+      "cooling · threshold value · park vegetation",
+      "InVEST urban · heat mitigation · HMI"
+     ],
+     "timing": {
+      "references_ms": 7,
+      "graph_ms": 8,
+      "grouping_ms": 1244,
+      "names_ms": 811,
+      "lenses_ms": 74,
+      "total_ms": 2144
+     }
+    },
+    "text": {
+     "groups": 9,
+     "in_groups": 0.995,
+     "resolution": 1.0,
+     "mesh_lift": null,
+     "venue_lift": 1.204,
+     "seed_ari": 0.563,
+     "seconds": 1.58,
+     "names": [
+      "ecosystem services · biodiversity · flood",
+      "scenarios · simulations · cooling",
+      "landsat · LST · satellite",
+      "china · thermal environment · beijing",
+      "materials · phenomenon · UHI",
+      "parks · green areas · spaces",
+      "stormwater · challenges · systematic literature",
+      "vulnerability · vulnerable · inequality",
+      "green roofs · rooftops · building"
+     ],
+     "timing": {
+      "references_ms": 7,
+      "graph_ms": 18,
+      "grouping_ms": 785,
+      "names_ms": 676,
+      "lenses_ms": 86,
+      "total_ms": 1573
+     }
+    }
+   }
+  },
+  {
+   "question": "minimum wage effects on employment",
+   "biomedical": false,
+   "papers": 1000,
+   "seed_s": 0.6,
+   "with_mesh": 2,
+   "variants": {
+    "hybrid": {
+     "groups": 7,
+     "in_groups": 1.0,
+     "resolution": 0.75,
+     "mesh_lift": null,
+     "venue_lift": 1.07,
+     "seed_ari": 0.977,
+     "seconds": 2.61,
+     "names": [
+      "state · canadian · restaurant",
+      "formal · informal sector · indonesia",
+      "NMW · national minimum wage · spain",
+      "teenage employment · teenagers · federal minimum",
+      "welfare · equilibrium · firms",
+      "china · south korea · wage standard",
+      "germany · german · statutory minimum"
+     ],
+     "timing": {
+      "references_ms": 240,
+      "graph_ms": 28,
+      "grouping_ms": 1953,
+      "names_ms": 349,
+      "lenses_ms": 31,
+      "total_ms": 2601
+     }
+    },
+    "hybrid-noidf": {
+     "groups": 8,
+     "in_groups": 1.0,
+     "resolution": 0.75,
+     "mesh_lift": null,
+     "venue_lift": 0.997,
+     "seed_ari": 0.708,
+     "seconds": 2.26,
+     "names": [
+      "state · teen · federal minimum",
+      "formal · informal · indonesia",
+      "equilibrium · welfare · firms",
+      "spain · OECD countries · european",
+      "NMW · UK national · portugal",
+      "china · south korea · wage standard",
+      "germany · german · statutory minimum",
+      "inequality · poverty · training"
+     ],
+     "timing": {
+      "references_ms": 6,
+      "graph_ms": 27,
+      "grouping_ms": 1830,
+      "names_ms": 353,
+      "lenses_ms": 33,
+      "total_ms": 2250
+     }
+    },
+    "hybrid-top30": {
+     "groups": 7,
+     "in_groups": 1.0,
+     "resolution": 0.75,
+     "mesh_lift": null,
+     "venue_lift": 0.93,
+     "seed_ari": 0.917,
+     "seconds": 1.2,
+     "names": [
+      "formal · informal sector · indonesia",
+      "state · restaurant · united",
+      "NMW · national minimum wage · groups",
+      "teenage employment · teenagers · relative",
+      "equilibrium · welfare · firms",
+      "china · south korea · wage standard",
+      "germany · german minimum · statutory"
+     ],
+     "timing": {
+      "references_ms": 6,
+      "graph_ms": 32,
+      "grouping_ms": 758,
+      "names_ms": 362,
+      "lenses_ms": 32,
+      "total_ms": 1189
+     }
+    },
+    "refs": {
+     "groups": 7,
+     "in_groups": 0.558,
+     "resolution": 1.25,
+     "mesh_lift": null,
+     "venue_lift": 0.658,
+     "seed_ari": 0.991,
+     "seconds": 1.77,
+     "names": [
+      "abstract · heterogeneity · german minimum",
+      "teenage employment · federal minimum · relative",
+      "countries · indonesia · formal",
+      "national minimum wage · groups · distribution",
+      "white · wage legislation · brazil",
+      "firms · employment response · possible",
+      "canadian · canada · china"
+     ],
+     "timing": {
+      "references_ms": 6,
+      "graph_ms": 10,
+      "grouping_ms": 1364,
+      "names_ms": 354,
+      "lenses_ms": 29,
+      "total_ms": 1763
+     }
+    },
+    "text": {
+     "groups": 9,
+     "in_groups": 0.997,
+     "resolution": 0.5,
+     "mesh_lift": null,
+     "venue_lift": 1.008,
+     "seed_ari": 0.861,
+     "seconds": 0.97,
+     "names": [
+      "state · federal minimum · teen",
+      "monopsony · search · firms",
+      "spain · youth employment · OECD countries",
+      "indonesia · java · UPAH MINIMUM TERHADAP",
+      "informal · brazil · brazilian",
+      "NMW · national minimum wage · regression discontinuity",
+      "china · chinese · migrant workers",
+      "germany · german · statutory minimum",
+      "south africa · countries · publication"
+     ],
+     "timing": {
+      "references_ms": 6,
+      "graph_ms": 29,
+      "grouping_ms": 517,
+      "names_ms": 373,
+      "lenses_ms": 40,
+      "total_ms": 965
+     }
+    }
+   }
+  },
+  {
+   "question": "long COVID symptoms and mechanisms",
+   "biomedical": true,
+   "papers": 1000,
+   "seed_s": 0.5,
+   "with_mesh": 391,
+   "variants": {
+    "hybrid": {
+     "groups": 8,
+     "in_groups": 0.965,
+     "resolution": 1.0,
+     "mesh_lift": 1.135,
+     "venue_lift": 1.822,
+     "seed_ari": 0.908,
+     "seconds": 4.96,
+     "names": [
+      "survey · participants · cohort",
+      "immune · viral · organ",
+      "syndrome · organ · sequelae",
+      "cognitive · brain fog · neurological",
+      "HIV · ME CFS · EBV",
+      "children · adolescents · pediatric",
+      "systematic · databases · meta-analysis",
+      "exercise · cardiovascular sequelae · cardiac"
+     ],
+     "timing": {
+      "references_ms": 56,
+      "graph_ms": 52,
+      "grouping_ms": 4069,
+      "names_ms": 648,
+      "lenses_ms": 118,
+      "total_ms": 4947
+     }
+    },
+    "hybrid-noidf": {
+     "groups": 9,
+     "in_groups": 0.982,
+     "resolution": 1.0,
+     "mesh_lift": 1.167,
+     "venue_lift": 1.536,
+     "seed_ari": 0.782,
+     "seconds": 4.76,
+     "names": [
+      "survey · participants · cohort",
+      "immune · organ · viral",
+      "syndrome · sequelae · organ",
+      "cognitive · brain fog · neurological",
+      "inflammatory · markers · ME CFS",
+      "children · adolescents · pediatric",
+      "systematic · meta-analysis · databases",
+      "exercise · cardiovascular sequelae · cardiac",
+      "pulmonary function · lung · computed tomography"
+     ],
+     "timing": {
+      "references_ms": 10,
+      "graph_ms": 61,
+      "grouping_ms": 3900,
+      "names_ms": 648,
+      "lenses_ms": 122,
+      "total_ms": 4741
+     }
+    },
+    "hybrid-top30": {
+     "groups": 8,
+     "in_groups": 0.978,
+     "resolution": 1.0,
+     "mesh_lift": 1.141,
+     "venue_lift": 1.297,
+     "seed_ari": 0.941,
+     "seconds": 1.86,
+     "names": [
+      "survey · participants · logistic regression",
+      "immune · viral · dysregulation",
+      "syndrome · sequelae · organ",
+      "cognitive · nervous system · brain",
+      "children · adolescents · pediatric",
+      "cardiovascular · exercise · heart",
+      "systematic · databases · meta-analysis",
+      "IL-6 · genotype · cytokine"
+     ],
+     "timing": {
+      "references_ms": 10,
+      "graph_ms": 57,
+      "grouping_ms": 1016,
+      "names_ms": 653,
+      "lenses_ms": 112,
+      "total_ms": 1848
+     }
+    },
+    "refs": {
+     "groups": 8,
+     "in_groups": 0.818,
+     "resolution": 1.25,
+     "mesh_lift": 1.114,
+     "venue_lift": 1.395,
+     "seed_ari": 0.943,
+     "seconds": 4.56,
+     "names": [
+      "immune · viral · dysregulation",
+      "participants · prevalence · logistic regression",
+      "common · headache · patients",
+      "sociodemographic · logistic regression · female",
+      "cardiac · exercise · ventricular",
+      "cognitive · anxiety · neurological",
+      "children · adolescents · pediatric",
+      "clusters · exploratory factor · hierarchical clustering"
+     ],
+     "timing": {
+      "references_ms": 11,
+      "graph_ms": 23,
+      "grouping_ms": 3629,
+      "names_ms": 777,
+      "lenses_ms": 110,
+      "total_ms": 4549
+     }
+    },
+    "text": {
+     "groups": 6,
+     "in_groups": 1.0,
+     "resolution": 0.5,
+     "mesh_lift": 1.155,
+     "venue_lift": 1.149,
+     "seed_ari": 0.893,
+     "seconds": 1.25,
+     "names": [
+      "organ · immune · system",
+      "survey · participants · cohort",
+      "cognitive · brain · neurological",
+      "IL-6 · inflammatory · markers",
+      "children · adolescents · pediatric",
+      "systematic · meta-analysis · databases"
+     ],
+     "timing": {
+      "references_ms": 9,
+      "graph_ms": 20,
+      "grouping_ms": 489,
+      "names_ms": 643,
+      "lenses_ms": 81,
+      "total_ms": 1243
+     }
+    }
+   }
+  },
+  {
+   "question": "pollinator decline and pesticides",
+   "biomedical": false,
+   "papers": 1000,
+   "seed_s": 0.6,
+   "with_mesh": 280,
+   "variants": {
+    "hybrid": {
+     "groups": 8,
+     "in_groups": 1.0,
+     "resolution": 1.0,
+     "mesh_lift": null,
+     "venue_lift": 3.537,
+     "seed_ari": 0.905,
+     "seconds": 4.08,
+     "names": [
+      "habitat · climate change · pollination",
+      "honey bees · colony collapse · apis mellifera",
+      "samples · pesticide residues · detected",
+      "bombus · bumblebees · terrestris",
+      "visitation · insecticide application · abundance",
+      "birds · danaus plexippus · milkweed leaves",
+      "stingless bees · risk · regulatory",
+      "bumblebee species · bombus · bumble bee"
+     ],
+     "timing": {
+      "references_ms": 162,
+      "graph_ms": 41,
+      "grouping_ms": 3110,
+      "names_ms": 672,
+      "lenses_ms": 80,
+      "total_ms": 4067
+     }
+    },
+    "hybrid-noidf": {
+     "groups": 8,
+     "in_groups": 0.997,
+     "resolution": 1.0,
+     "mesh_lift": null,
+     "venue_lift": 2.684,
+     "seed_ari": 0.948,
+     "seconds": 3.72,
+     "names": [
+      "habitat · climate change · pollination",
+      "apis mellifera · stingless bees · honey",
+      "samples · pesticide residues · detected",
+      "bombus · bumblebees · terrestris",
+      "visitation · abundance · pest",
+      "birds · danaus plexippus · milkweed leaves",
+      "neonicotinoid · colony collapse · parasites",
+      "bumble bees · bombus · north america"
+     ],
+     "timing": {
+      "references_ms": 8,
+      "graph_ms": 41,
+      "grouping_ms": 2904,
+      "names_ms": 670,
+      "lenses_ms": 88,
+      "total_ms": 3710
+     }
+    },
+    "hybrid-top30": {
+     "groups": 8,
+     "in_groups": 0.991,
+     "resolution": 1.0,
+     "mesh_lift": null,
+     "venue_lift": 2.604,
+     "seed_ari": 0.86,
+     "seconds": 1.65,
+     "names": [
+      "habitat · pollination · conservation",
+      "honey bee · apis mellifera · colonies",
+      "birds · danaus plexippus · pest",
+      "osmia · solitary bee · risk",
+      "bombus · bumblebees · terrestris",
+      "neonicotinoid · colony collapse · navigation",
+      "pesticide residues · collected · samples",
+      "bumblebee species · nosema bombi · bombus"
+     ],
+     "timing": {
+      "references_ms": 8,
+      "graph_ms": 39,
+      "grouping_ms": 882,
+      "names_ms": 626,
+      "lenses_ms": 81,
+      "total_ms": 1637
+     }
+    },
+    "refs": {
+     "groups": 7,
+     "in_groups": 0.73,
+     "resolution": 1.25,
+     "mesh_lift": null,
+     "venue_lift": 4.706,
+     "seed_ari": 0.986,
+     "seconds": 3.19,
+     "names": [
+      "habitat · pollination · abundance",
+      "honey bee · colonies · apis mellifera",
+      "osmia · solitary bee · risk",
+      "honey bee · fungicides · apis mellifera",
+      "insect decline · birds · monarch butterfly",
+      "bombus · bumblebees · impatiens",
+      "stingless bees · azadirachtin · pest"
+     ],
+     "timing": {
+      "references_ms": 8,
+      "graph_ms": 19,
+      "grouping_ms": 2496,
+      "names_ms": 581,
+      "lenses_ms": 76,
+      "total_ms": 3182
+     }
+    },
+    "text": {
+     "groups": 7,
+     "in_groups": 1.0,
+     "resolution": 0.75,
+     "mesh_lift": null,
+     "venue_lift": 2.518,
+     "seed_ari": 0.867,
+     "seconds": 1.33,
+     "names": [
+      "apis mellifera · honey bees · toxicity",
+      "habitat · climate change · loss",
+      "samples · pesticide residues · detected",
+      "pest · abundance · insecticide application",
+      "bombus · bumblebees · sublethal",
+      "danaus plexippus · milkweed leaves · birds",
+      "bombus · bumblebee species · bumble bees"
+     ],
+     "timing": {
+      "references_ms": 8,
+      "graph_ms": 21,
+      "grouping_ms": 548,
+      "names_ms": 666,
+      "lenses_ms": 72,
+      "total_ms": 1317
+     }
+    }
+   }
+  },
+  {
+   "question": "dark matter direct detection experiments",
+   "biomedical": false,
+   "papers": 1000,
+   "seed_s": 0.8,
+   "with_mesh": 3,
+   "variants": {
+    "hybrid": {
+     "groups": 5,
+     "in_groups": 1.0,
+     "resolution": 0.5,
+     "mesh_lift": null,
+     "venue_lift": 1.189,
+     "seed_ari": 0.987,
+     "seconds": 2.35,
+     "names": [
+      "DAMA LIBRA · annual modulation · NaI",
+      "sub-GeV dark · electron · MeV",
+      "WIMP-nucleon · xenon · cryogenic dark",
+      "liquid argon · DarkSide · ArDM",
+      "nuclear emulsion · newly developed · NEWSdm experiment"
+     ],
+     "timing": {
+      "references_ms": 254,
+      "graph_ms": 34,
+      "grouping_ms": 1633,
+      "names_ms": 389,
+      "lenses_ms": 34,
+      "total_ms": 2344
+     }
+    },
+    "hybrid-noidf": {
+     "groups": 8,
+     "in_groups": 1.0,
+     "resolution": 0.75,
+     "mesh_lift": null,
+     "venue_lift": 1.09,
+     "seed_ari": 0.987,
+     "seconds": 2.24,
+     "names": [
+      "sub-GeV dark · electron · MeV",
+      "CoGeNT · velocity distribution · uncertainties",
+      "indirect · universe · candidates",
+      "liquid xenon · projection chamber · WIMP-nucleon",
+      "NaI · highly radiopure · crystals",
+      "liquid argon · DarkSide · ArDM",
+      "cryogenic dark · soudan underground · germanium",
+      "directional · nuclear emulsion · direction"
+     ],
+     "timing": {
+      "references_ms": 8,
+      "graph_ms": 31,
+      "grouping_ms": 1716,
+      "names_ms": 417,
+      "lenses_ms": 55,
+      "total_ms": 2227
+     }
+    },
+    "hybrid-top30": {
+     "groups": 6,
+     "in_groups": 1.0,
+     "resolution": 0.5,
+     "mesh_lift": null,
+     "venue_lift": 1.118,
+     "seed_ari": 0.997,
+     "seconds": 1.2,
+     "names": [
+      "indirect · CoGeNT · annihilation",
+      "sub-GeV dark · electron · MeV",
+      "WIMP-nucleon · liquid xenon · WIMP",
+      "liquid argon · DarkSide · ArDM",
+      "NaI · highly radiopure · crystals",
+      "directional · nuclear emulsion · direction"
+     ],
+     "timing": {
+      "references_ms": 62,
+      "graph_ms": 34,
+      "grouping_ms": 606,
+      "names_ms": 434,
+      "lenses_ms": 40,
+      "total_ms": 1175
+     }
+    },
+    "refs": {
+     "groups": 7,
+     "in_groups": 0.636,
+     "resolution": 1.25,
+     "mesh_lift": null,
+     "venue_lift": 1.335,
+     "seed_ari": 0.943,
+     "seconds": 1.94,
+     "names": [
+      "sub-GeV dark · electron · MeV",
+      "weakly interacting · WIMP · cold dark",
+      "CoGeNT · velocity distribution · tension",
+      "DARWIN · neutrino · future",
+      "annual modulation · DAMA LIBRA · NaI",
+      "liquid argon · DarkSide · projection chamber",
+      "beam dump · fermilab · accelerator"
+     ],
+     "timing": {
+      "references_ms": 7,
+      "graph_ms": 12,
+      "grouping_ms": 1498,
+      "names_ms": 378,
+      "lenses_ms": 42,
+      "total_ms": 1937
+     }
+    },
+    "text": {
+     "groups": 8,
+     "in_groups": 0.98,
+     "resolution": 0.5,
+     "mesh_lift": null,
+     "venue_lift": 1.136,
+     "seed_ari": 0.947,
+     "seconds": 0.92,
+     "names": [
+      "sub-GeV dark · electron · MeV",
+      "velocity distribution · uncertainties · CoGeNT",
+      "indirect · universe · searches",
+      "liquid xenon · projection chamber · WIMP-nucleon",
+      "NaI · highly radiopure · crystals",
+      "liquid argon · ArDM · DarkSide-50",
+      "cryogenic dark · soudan underground · germanium",
+      "directional · nuclear emulsion · direction"
+     ],
+     "timing": {
+      "references_ms": 7,
+      "graph_ms": 17,
+      "grouping_ms": 426,
+      "names_ms": 407,
+      "lenses_ms": 50,
+      "total_ms": 907
+     }
+    }
+   }
+  },
+  {
+   "question": "immunotherapy for melanoma",
+   "biomedical": true,
+   "papers": 1000,
+   "seed_s": 0.8,
+   "with_mesh": 497,
+   "variants": {
+    "hybrid": {
+     "groups": 6,
+     "in_groups": 0.963,
+     "resolution": 0.75,
+     "mesh_lift": 1.139,
+     "venue_lift": 1.781,
+     "seed_ari": 0.958,
+     "seconds": 3.21,
+     "names": [
+      "checkpoint inhibitors · targeted therapy · PD-1",
+      "vaccine · BCG · active specific",
+      "phase · grade · weeks",
+      "TIL · tumor-infiltrating lymphocytes · adoptive cell",
+      "neoadjuvant · adjuvant therapy · high-risk",
+      "cancer database · mucosal melanoma · uveal"
+     ],
+     "timing": {
+      "references_ms": 190,
+      "graph_ms": 34,
+      "grouping_ms": 2295,
+      "names_ms": 607,
+      "lenses_ms": 74,
+      "total_ms": 3200
+     }
+    },
+    "hybrid-noidf": {
+     "groups": 6,
+     "in_groups": 0.977,
+     "resolution": 0.75,
+     "mesh_lift": 1.128,
+     "venue_lift": 1.852,
+     "seed_ari": 0.915,
+     "seconds": 2.65,
+     "names": [
+      "checkpoint inhibitors · targeted therapy · PD-1",
+      "vaccine · active specific · BCG",
+      "dose · weeks · grade",
+      "TIL · tumor-infiltrating lymphocytes · TILs",
+      "neoadjuvant · adjuvant therapy · high-risk",
+      "mucosal melanoma · sinonasal · uveal"
+     ],
+     "timing": {
+      "references_ms": 8,
+      "graph_ms": 32,
+      "grouping_ms": 1941,
+      "names_ms": 587,
+      "lenses_ms": 72,
+      "total_ms": 2640
+     }
+    },
+    "hybrid-top30": {
+     "groups": 7,
+     "in_groups": 1.0,
+     "resolution": 0.75,
+     "mesh_lift": 1.156,
+     "venue_lift": 1.782,
+     "seed_ari": 0.877,
+     "seconds": 1.47,
+     "names": [
+      "checkpoint inhibitors · programmed · PD-1",
+      "vaccine · active · BCG",
+      "neoadjuvant · skin cancer · high-risk",
+      "mg kg · fully human · phase",
+      "TIL · adoptive cell · tumor-infiltrating lymphocytes",
+      "stereotactic · cancer database · mucosal melanoma",
+      "oncolytic · intralesional · plasmid"
+     ],
+     "timing": {
+      "references_ms": 19,
+      "graph_ms": 37,
+      "grouping_ms": 715,
+      "names_ms": 606,
+      "lenses_ms": 78,
+      "total_ms": 1456
+     }
+    },
+    "refs": {
+     "groups": 7,
+     "in_groups": 0.71,
+     "resolution": 1.25,
+     "mesh_lift": 1.127,
+     "venue_lift": 0.464,
+     "seed_ari": 0.993,
+     "seconds": 2.5,
+     "names": [
+      "vaccine · active · specific immunotherapy",
+      "checkpoint inhibitors · neoadjuvant · targeted therapy",
+      "programmed · immune checkpoint · PD-1",
+      "intratumoral · oncolytic · laser immunotherapy",
+      "BRAF · MEK inhibitors · MAPK",
+      "adoptive cell · tumor-infiltrating lymphocytes · TIL",
+      "uveal melanoma · mucosal · rare"
+     ],
+     "timing": {
+      "references_ms": 9,
+      "graph_ms": 15,
+      "grouping_ms": 1617,
+      "names_ms": 763,
+      "lenses_ms": 81,
+      "total_ms": 2485
+     }
+    },
+    "text": {
+     "groups": 9,
+     "in_groups": 1.0,
+     "resolution": 0.5,
+     "mesh_lift": 1.219,
+     "venue_lift": 1.983,
+     "seed_ari": 0.935,
+     "seconds": 1.21,
+     "names": [
+      "immune checkpoint · inhibitors · resistance",
+      "phase · grade · dose",
+      "vaccine · dendritic cells · cytokines",
+      "adjuvant therapy · neoadjuvant · high-risk",
+      "TIL · tumor-infiltrating lymphocytes · adoptive cell",
+      "BCG · bacillus Calmette-Gu · malignant melanoma",
+      "uveal melanoma · cancer database · mucosal",
+      "stereotactic · melanoma brain metastases · immunotherapy prior",
+      "oncolytic · talimogene laherparepvec · intratumoral"
+     ],
+     "timing": {
+      "references_ms": 9,
+      "graph_ms": 18,
+      "grouping_ms": 424,
+      "names_ms": 629,
+      "lenses_ms": 110,
+      "total_ms": 1190
+     }
+    }
+   }
+  },
+  {
+   "question": "bilingualism and cognitive control",
+   "biomedical": true,
+   "papers": 1000,
+   "seed_s": 1.1,
+   "with_mesh": 164,
+   "variants": {
+    "hybrid": {
+     "groups": 6,
+     "in_groups": 1.0,
+     "resolution": 0.75,
+     "mesh_lift": 1.118,
+     "venue_lift": 1.277,
+     "seed_ari": 0.926,
+     "seconds": 4.4,
+     "names": [
+      "bilingual advantage · stroop task · young adults",
+      "language control · switch · switching",
+      "bilingual children · development · preschool",
+      "cognitive reserve · aging · decline",
+      "language processing · consequences · chapter",
+      "bilingual aphasia · BPWA · deficits"
+     ],
+     "timing": {
+      "references_ms": 263,
+      "graph_ms": 46,
+      "grouping_ms": 3484,
+      "names_ms": 532,
+      "lenses_ms": 60,
+      "total_ms": 4388
+     }
+    },
+    "hybrid-noidf": {
+     "groups": 6,
+     "in_groups": 1.0,
+     "resolution": 0.75,
+     "mesh_lift": 1.141,
+     "venue_lift": 1.277,
+     "seed_ari": 0.921,
+     "seconds": 4.57,
+     "names": [
+      "bilingual advantage · stroop task · young adults",
+      "language control · switch · switching",
+      "bilingual children · development · monolinguals",
+      "aging · cognitive reserve · decline",
+      "language processing · chapter · consequences",
+      "bilingual aphasia · BPWA · deficits"
+     ],
+     "timing": {
+      "references_ms": 8,
+      "graph_ms": 47,
+      "grouping_ms": 3768,
+      "names_ms": 684,
+      "lenses_ms": 51,
+      "total_ms": 4561
+     }
+    },
+    "hybrid-top30": {
+     "groups": 9,
+     "in_groups": 0.992,
+     "resolution": 1.0,
+     "mesh_lift": 1.211,
+     "venue_lift": 1.283,
+     "seed_ari": 0.576,
+     "seconds": 1.59,
+     "names": [
+      "young adults · bilingual advantage · working memory",
+      "bilingual children · development · monolinguals",
+      "aging · cognitive reserve · decline",
+      "code-switching · reactive control · code-switch",
+      "language control · switch costs · production",
+      "stroop task · incongruent · conflict",
+      "language processing · chapter · cognition",
+      "functional · brain · neural",
+      "bilingual aphasia · BPWA · deficits"
+     ],
+     "timing": {
+      "references_ms": 9,
+      "graph_ms": 45,
+      "grouping_ms": 935,
+      "names_ms": 521,
+      "lenses_ms": 70,
+      "total_ms": 1581
+     }
+    },
+    "refs": {
+     "groups": 8,
+     "in_groups": 0.653,
+     "resolution": 1.25,
+     "mesh_lift": 1.106,
+     "venue_lift": 2.143,
+     "seed_ari": 0.95,
+     "seconds": 3.43,
+     "names": [
+      "monolinguals · bilingual children · advantage",
+      "experience · originality · context",
+      "language control · switch costs · production",
+      "bilingual children · working memory · executive function",
+      "brain · functional · left",
+      "bilingual advantage · shifting · updating",
+      "proficient bilinguals · eye movements · nonlinguistic",
+      "cognitive reserve · symptoms · aging"
+     ],
+     "timing": {
+      "references_ms": 9,
+      "graph_ms": 25,
+      "grouping_ms": 2788,
+      "names_ms": 530,
+      "lenses_ms": 65,
+      "total_ms": 3417
+     }
+    },
+    "text": {
+     "groups": 7,
+     "in_groups": 1.0,
+     "resolution": 0.5,
+     "mesh_lift": 1.225,
+     "venue_lift": 1.329,
+     "seed_ari": 0.851,
+     "seconds": 1.2,
+     "names": [
+      "bilingual advantage · monolinguals · stroop task",
+      "costs · switch · switching",
+      "bilingual children · development · children's",
+      "aging · decline · cognitive reserve",
+      "language processing · consequences · cognition",
+      "functional · fMRI · neural",
+      "bilingual aphasia · BPWA · deficits"
+     ],
+     "timing": {
+      "references_ms": 8,
+      "graph_ms": 19,
+      "grouping_ms": 574,
+      "names_ms": 529,
+      "lenses_ms": 59,
+      "total_ms": 1188
+     }
+    }
+   }
+  },
+  {
+   "question": "blockchain in supply chain management",
+   "biomedical": false,
+   "papers": 1000,
+   "seed_s": 0.7,
+   "with_mesh": 0,
+   "variants": {
+    "hybrid": {
+     "groups": 7,
+     "in_groups": 0.985,
+     "resolution": 0.75,
+     "mesh_lift": null,
+     "venue_lift": 1.174,
+     "seed_ari": 0.881,
+     "seconds": 2.68,
+     "names": [
+      "literature · originality value · systematic",
+      "security · system · integrity",
+      "logistics · change · business",
+      "sustainable supply · sustainability · environmental",
+      "pharmaceutical supply · drugs · patient",
+      "agricultural supply · farmers · food",
+      "supply chain finance · machine learning · artificial intelligence"
+     ],
+     "timing": {
+      "references_ms": 210,
+      "graph_ms": 33,
+      "grouping_ms": 1867,
+      "names_ms": 490,
+      "lenses_ms": 57,
+      "total_ms": 2656
+     }
+    },
+    "hybrid-noidf": {
+     "groups": 7,
+     "in_groups": 0.985,
+     "resolution": 0.75,
+     "mesh_lift": null,
+     "venue_lift": 2.683,
+     "seed_ari": 0.932,
+     "seconds": 2.73,
+     "names": [
+      "literature · systematic · originality value",
+      "system · security · decentralized",
+      "companies · business · bitcoin",
+      "sustainable supply · sustainability · social",
+      "pharmaceutical supply chain · drugs · patient",
+      "agricultural supply · farmers · food",
+      "supply chain finance · machine learning · financing"
+     ],
+     "timing": {
+      "references_ms": 7,
+      "graph_ms": 30,
+      "grouping_ms": 2150,
+      "names_ms": 485,
+      "lenses_ms": 49,
+      "total_ms": 2721
+     }
+    },
+    "hybrid-top30": {
+     "groups": 7,
+     "in_groups": 0.986,
+     "resolution": 0.75,
+     "mesh_lift": null,
+     "venue_lift": 1.836,
+     "seed_ari": 0.549,
+     "seconds": 1.67,
+     "names": [
+      "security · transparency · system",
+      "literature · systematic · originality value",
+      "logistics · basic · areas",
+      "pharmaceutical supply · drugs · medicine",
+      "sustainable supply · sustainability · environmental",
+      "farmers · food supply chain · agricultural",
+      "supply chain finance · financing · artificial intelligence"
+     ],
+     "timing": {
+      "references_ms": 8,
+      "graph_ms": 39,
+      "grouping_ms": 1041,
+      "names_ms": 517,
+      "lenses_ms": 51,
+      "total_ms": 1656
+     }
+    },
+    "refs": {
+     "groups": 4,
+     "in_groups": 0.657,
+     "resolution": 1.0,
+     "mesh_lift": null,
+     "venue_lift": 1.504,
+     "seed_ari": 0.972,
+     "seconds": 2.37,
+     "names": [
+      "information · very · distributed",
+      "literature · originality value · systematic",
+      "security · manufacturers · product",
+      "construction industry · improve · concept"
+     ],
+     "timing": {
+      "references_ms": 7,
+      "graph_ms": 11,
+      "grouping_ms": 1633,
+      "names_ms": 678,
+      "lenses_ms": 30,
+      "total_ms": 2361
+     }
+    },
+    "text": {
+     "groups": 7,
+     "in_groups": 0.985,
+     "resolution": 0.5,
+     "mesh_lift": null,
+     "venue_lift": 1.846,
+     "seed_ari": 0.68,
+     "seconds": 1.22,
+     "names": [
+      "security · system · integrity",
+      "logistics · companies · business",
+      "literature · systematic · originality value",
+      "sustainable supply · sustainability · environmental",
+      "food supply · agricultural · farmers",
+      "pharmaceutical supply · drugs · patient",
+      "supply chain finance · machine learning · financing"
+     ],
+     "timing": {
+      "references_ms": 9,
+      "graph_ms": 24,
+      "grouping_ms": 609,
+      "names_ms": 512,
+      "lenses_ms": 50,
+      "total_ms": 1205
+     }
+    }
+   }
+  },
+  {
+   "question": "exercise as treatment for depression",
+   "biomedical": true,
+   "papers": 1000,
+   "seed_s": 1.0,
+   "with_mesh": 360,
+   "variants": {
+    "hybrid": {
+     "groups": 8,
+     "in_groups": 0.99,
+     "resolution": 0.75,
+     "mesh_lift": 1.151,
+     "venue_lift": 1.135,
+     "seed_ari": 0.8,
+     "seconds": 3.11,
+     "names": [
+      "older adults · meta-analysis · systematic",
+      "rating scale · major depressive · group",
+      "physical activity · mental health · literature",
+      "adolescents · students · children",
+      "mechanisms · brain · neuroplasticity",
+      "beck depression · women · aerobic exercise",
+      "hemodialysis patients · cancer · stroke",
+      "postpartum depression · pregnancy · pregnant women"
+     ],
+     "timing": {
+      "references_ms": 235,
+      "graph_ms": 38,
+      "grouping_ms": 2093,
+      "names_ms": 641,
+      "lenses_ms": 93,
+      "total_ms": 3100
+     }
+    },
+    "hybrid-noidf": {
+     "groups": 7,
+     "in_groups": 0.99,
+     "resolution": 0.75,
+     "mesh_lift": 1.141,
+     "venue_lift": 1.257,
+     "seed_ari": 0.704,
+     "seconds": 3.22,
+     "names": [
+      "rating scale · major depressive · patients",
+      "older adults · meta-analysis · elderly",
+      "mental health · feelings · beck depression",
+      "mechanisms · brain · neuroplasticity",
+      "adolescents · students · children",
+      "cancer · hemodialysis patients · multiple sclerosis",
+      "postpartum depression · pregnant women · pregnancy"
+     ],
+     "timing": {
+      "references_ms": 8,
+      "graph_ms": 31,
+      "grouping_ms": 2259,
+      "names_ms": 831,
+      "lenses_ms": 77,
+      "total_ms": 3207
+     }
+    },
+    "hybrid-top30": {
+     "groups": 7,
+     "in_groups": 0.985,
+     "resolution": 0.75,
+     "mesh_lift": 1.147,
+     "venue_lift": 1.386,
+     "seed_ari": 0.87,
+     "seconds": 1.71,
+     "names": [
+      "beck depression · hamilton · randomly assigned",
+      "older adults · meta-analysis · systematic",
+      "participants · accelerometer · major depressive",
+      "mechanisms · brain · mental health",
+      "adolescents · students · children",
+      "hemodialysis patients · cancer · stroke",
+      "postpartum depression · pregnancy · pregnant women"
+     ],
+     "timing": {
+      "references_ms": 8,
+      "graph_ms": 35,
+      "grouping_ms": 933,
+      "names_ms": 645,
+      "lenses_ms": 80,
+      "total_ms": 1701
+     }
+    },
+    "refs": {
+     "groups": 6,
+     "in_groups": 0.715,
+     "resolution": 1.0,
+     "mesh_lift": 1.115,
+     "venue_lift": 2.016,
+     "seed_ari": 0.913,
+     "seconds": 2.35,
+     "names": [
+      "web · embase · systematic",
+      "subjects · beck depression · scores",
+      "cognitive behavioural · outpatients · bouldering",
+      "older adults · meta-analysis · hemodialysis patients",
+      "adolescents · children · children's depression",
+      "postpartum depression · women · antenatal"
+     ],
+     "timing": {
+      "references_ms": 8,
+      "graph_ms": 12,
+      "grouping_ms": 1622,
+      "names_ms": 634,
+      "lenses_ms": 68,
+      "total_ms": 2344
+     }
+    },
+    "text": {
+     "groups": 6,
+     "in_groups": 0.949,
+     "resolution": 0.5,
+     "mesh_lift": 1.141,
+     "venue_lift": 1.509,
+     "seed_ari": 0.967,
+     "seconds": 1.47,
+     "names": [
+      "mechanisms · physical activity · literature",
+      "older adults · meta-analysis · systematic",
+      "rating scale · major depressive · week",
+      "students · college · university",
+      "adolescents · children · youth",
+      "postpartum depression · pregnant women · pregnancy"
+     ],
+     "timing": {
+      "references_ms": 9,
+      "graph_ms": 18,
+      "grouping_ms": 552,
+      "names_ms": 809,
+      "lenses_ms": 69,
+      "total_ms": 1457
+     }
+    }
+   }
+  },
+  {
+   "question": "glacier retreat and sea level rise",
+   "biomedical": false,
+   "papers": 1000,
+   "seed_s": 0.8,
+   "with_mesh": 17,
+   "variants": {
+    "hybrid": {
+     "groups": 8,
+     "in_groups": 1.0,
+     "resolution": 1.0,
+     "mesh_lift": null,
+     "venue_lift": 1.434,
+     "seed_ari": 0.994,
+     "seconds": 2.46,
+     "names": [
+      "alaska · glacier mass · volume",
+      "tide gauge · steric · thermal expansion",
+      "greenland ice · outlet glaciers · fjord",
+      "pine island · thwaites glacier · antarctic",
+      "himalaya · landsat · tibetan plateau",
+      "greenland · ICESat · altimetry",
+      "svalbard · spitsbergen · tidewater glaciers",
+      "kull · icelandic glaciers · vatnaj"
+     ],
+     "timing": {
+      "references_ms": 192,
+      "graph_ms": 28,
+      "grouping_ms": 1328,
+      "names_ms": 816,
+      "lenses_ms": 85,
+      "total_ms": 2450
+     }
+    },
+    "hybrid-noidf": {
+     "groups": 8,
+     "in_groups": 1.0,
+     "resolution": 1.0,
+     "mesh_lift": null,
+     "venue_lift": 1.694,
+     "seed_ari": 0.922,
+     "seconds": 2.19,
+     "names": [
+      "alaska · glacier mass · volume",
+      "tide gauge · steric · thermal expansion",
+      "greenland ice · outlet glaciers · fjord",
+      "pine island · thwaites glacier · antarctic",
+      "himalaya · landsat · tibetan plateau",
+      "greenland · ICESat · altimetry",
+      "svalbard · spitsbergen · tidewater glaciers",
+      "kull · icelandic glaciers · vatnaj"
+     ],
+     "timing": {
+      "references_ms": 8,
+      "graph_ms": 30,
+      "grouping_ms": 1468,
+      "names_ms": 600,
+      "lenses_ms": 68,
+      "total_ms": 2175
+     }
+    },
+    "hybrid-top30": {
+     "groups": 8,
+     "in_groups": 1.0,
+     "resolution": 1.0,
+     "mesh_lift": null,
+     "venue_lift": 1.152,
+     "seed_ari": 0.966,
+     "seconds": 1.39,
+     "names": [
+      "tide gauge · thermal expansion · coastal",
+      "himalaya · global glacier · area",
+      "outlet glaciers · greenland ice · fjord",
+      "alaska · columbia · terminus",
+      "pine island · antarctic · thwaites glacier",
+      "GRACE · gravity recovery · satellite gravimetry",
+      "svalbard · spitsbergen · tidewater glaciers",
+      "kull · icelandic glaciers · vatnaj"
+     ],
+     "timing": {
+      "references_ms": 8,
+      "graph_ms": 32,
+      "grouping_ms": 661,
+      "names_ms": 604,
+      "lenses_ms": 69,
+      "total_ms": 1375
+     }
+    },
+    "refs": {
+     "groups": 7,
+     "in_groups": 0.696,
+     "resolution": 1.25,
+     "mesh_lift": null,
+     "venue_lift": 2.772,
+     "seed_ari": 0.989,
+     "seconds": 1.82,
+     "names": [
+      "glacier area · km2 · precipitation",
+      "tide gauge · isostatic adjustment · global",
+      "greenland ice · outlet glaciers · fjord",
+      "antarctic ice · shelf · thwaites glacier",
+      "alaska · terminus · tidewater glaciers",
+      "greenland · gain · contribution",
+      "svalbard · spitsbergen · nordenski ld"
+     ],
+     "timing": {
+      "references_ms": 8,
+      "graph_ms": 9,
+      "grouping_ms": 1136,
+      "names_ms": 594,
+      "lenses_ms": 60,
+      "total_ms": 1807
+     }
+    },
+    "text": {
+     "groups": 8,
+     "in_groups": 1.0,
+     "resolution": 0.75,
+     "mesh_lift": null,
+     "venue_lift": 1.573,
+     "seed_ari": 0.822,
+     "seconds": 1.2,
+     "names": [
+      "tide gauge · thermal expansion · steric",
+      "fjord · tidewater glaciers · svalbard",
+      "global glacier · volume · patagonia",
+      "pine island · thwaites glacier · ice shelf",
+      "greenland ice · surface mass · future",
+      "alaska · columbia · terminus",
+      "himalaya · landsat · tibetan plateau",
+      "greenland · ICESat · laser altimetry"
+     ],
+     "timing": {
+      "references_ms": 8,
+      "graph_ms": 17,
+      "grouping_ms": 479,
+      "names_ms": 615,
+      "lenses_ms": 72,
+      "total_ms": 1192
+     }
+    }
+   }
+  },
+  {
+   "question": "misinformation on social media",
+   "biomedical": false,
+   "papers": 1000,
+   "seed_s": 0.8,
+   "with_mesh": 118,
+   "variants": {
+    "hybrid": {
+     "groups": 6,
+     "in_groups": 0.973,
+     "resolution": 1.0,
+     "mesh_lift": null,
+     "venue_lift": 2.584,
+     "seed_ari": 0.842,
+     "seconds": 2.76,
+     "names": [
+      "digital · political · fake news",
+      "dataset · misinformation detection · social networks",
+      "health · patients · cancer",
+      "correction · interventions · reduce",
+      "COVID-19 · coronavirus · crisis",
+      "COVID-19 · tweets · vaccine"
+     ],
+     "timing": {
+      "references_ms": 149,
+      "graph_ms": 34,
+      "grouping_ms": 1900,
+      "names_ms": 570,
+      "lenses_ms": 89,
+      "total_ms": 2743
+     }
+    },
+    "hybrid-noidf": {
+     "groups": 8,
+     "in_groups": 1.0,
+     "resolution": 1.0,
+     "mesh_lift": null,
+     "venue_lift": 2.458,
+     "seed_ari": 0.837,
+     "seconds": 2.85,
+     "names": [
+      "correction · participants · interventions",
+      "digital · fake news · disinformation",
+      "health · patients · cancer",
+      "COVID-19 · infodemic · coronavirus",
+      "misinformation detection · dataset · social networks",
+      "tweets · COVID-19 · retweets",
+      "vaccine · vaccination · uptake",
+      "climate change · disasters · proximity"
+     ],
+     "timing": {
+      "references_ms": 8,
+      "graph_ms": 31,
+      "grouping_ms": 2143,
+      "names_ms": 568,
+      "lenses_ms": 84,
+      "total_ms": 2833
+     }
+    },
+    "hybrid-top30": {
+     "groups": 8,
+     "in_groups": 0.999,
+     "resolution": 1.0,
+     "mesh_lift": null,
+     "venue_lift": 3.594,
+     "seed_ari": 0.867,
+     "seconds": 1.69,
+     "names": [
+      "COVID-19 · coronavirus · outbreak",
+      "misinformation interventions · participants · share",
+      "digital · fake news · disinformation",
+      "health · patients · cancer",
+      "misinformation detection · dataset · machine learning",
+      "correction · correcting · misperceptions",
+      "social networks · algorithms · proposed",
+      "moderated · relationship · personality traits"
+     ],
+     "timing": {
+      "references_ms": 7,
+      "graph_ms": 35,
+      "grouping_ms": 824,
+      "names_ms": 731,
+      "lenses_ms": 84,
+      "total_ms": 1682
+     }
+    },
+    "refs": {
+     "groups": 5,
+     "in_groups": 0.739,
+     "resolution": 1.0,
+     "mesh_lift": null,
+     "venue_lift": 1.726,
+     "seed_ari": 0.677,
+     "seconds": 2.49,
+     "names": [
+      "health · COVID-19 · identified",
+      "social networks · dataset · misinformation detection",
+      "interventions · share · participants",
+      "correction · misperceptions · corrective",
+      "social noise · information overload · media fatigue"
+     ],
+     "timing": {
+      "references_ms": 8,
+      "graph_ms": 12,
+      "grouping_ms": 1843,
+      "names_ms": 561,
+      "lenses_ms": 58,
+      "total_ms": 2481
+     }
+    },
+    "text": {
+     "groups": 8,
+     "in_groups": 0.992,
+     "resolution": 0.75,
+     "mesh_lift": null,
+     "venue_lift": 2.159,
+     "seed_ari": 0.953,
+     "seconds": 1.33,
+     "names": [
+      "digital · political · environment",
+      "health · cancer · patients",
+      "dataset · misinformation detection · social networks",
+      "COVID-19 · coronavirus · infodemic",
+      "correction · reduce · experiments",
+      "tweets · COVID-19 · retweets",
+      "vaccine · vaccination · uptake",
+      "climate change · disasters · proximity"
+     ],
+     "timing": {
+      "references_ms": 7,
+      "graph_ms": 17,
+      "grouping_ms": 505,
+      "names_ms": 712,
+      "lenses_ms": 77,
+      "total_ms": 1319
+     }
+    }
+   }
+  },
+  {
+   "question": "Alzheimer's disease amyloid hypothesis",
+   "biomedical": true,
+   "papers": 1000,
+   "seed_s": 0.7,
+   "with_mesh": 483,
+   "variants": {
+    "hybrid": {
+     "groups": 9,
+     "in_groups": 0.993,
+     "resolution": 1.0,
+     "mesh_lift": 1.062,
+     "venue_lift": 1.261,
+     "seed_ari": 0.893,
+     "seconds": 4.72,
+     "names": [
+      "cholinergic · oxidative stress · loss",
+      "oligomers · soluble · structure",
+      "precursor protein · mutations · APP",
+      "clinical trials · amyloid cascade hypothesis · antibodies",
+      "tau · neurofibrillary tangles · hyperphosphorylated",
+      "immune · innate · antimicrobial",
+      "secretase · inhibitors · enzyme",
+      "cholesterol · lipoproteins · risk factors",
+      "immunotherapy · active · vaccine"
+     ],
+     "timing": {
+      "references_ms": 177,
+      "graph_ms": 34,
+      "grouping_ms": 3186,
+      "names_ms": 1128,
+      "lenses_ms": 170,
+      "total_ms": 4694
+     }
+    },
+    "hybrid-noidf": {
+     "groups": 8,
+     "in_groups": 0.991,
+     "resolution": 1.0,
+     "mesh_lift": 1.04,
+     "venue_lift": 1.258,
+     "seed_ari": 0.911,
+     "seconds": 2.94,
+     "names": [
+      "cholinergic · oxidative stress · symptoms",
+      "clinical trials · amyloid cascade hypothesis · failure",
+      "precursor protein · gene · mutations",
+      "oligomers · fibrils · soluble",
+      "tau · neurofibrillary tangles · hyperphosphorylation",
+      "secretase · immunotherapy · immunization",
+      "immune · innate · inflammatory",
+      "cholesterol · apoe · risk factors"
+     ],
+     "timing": {
+      "references_ms": 10,
+      "graph_ms": 31,
+      "grouping_ms": 2248,
+      "names_ms": 496,
+      "lenses_ms": 143,
+      "total_ms": 2928
+     }
+    },
+    "hybrid-top30": {
+     "groups": 6,
+     "in_groups": 0.979,
+     "resolution": 0.75,
+     "mesh_lift": 1.042,
+     "venue_lift": 1.162,
+     "seed_ari": 0.807,
+     "seconds": 1.62,
+     "names": [
+      "tau · neurofibrillary tangles · cholinergic",
+      "precursor protein · mutations · processing",
+      "amyloid cascade · clinical · trials",
+      "oligomers · structure · fibrils",
+      "immune · innate · antimicrobial",
+      "immunotherapy · immunization · passive"
+     ],
+     "timing": {
+      "references_ms": 10,
+      "graph_ms": 38,
+      "grouping_ms": 939,
+      "names_ms": 509,
+      "lenses_ms": 109,
+      "total_ms": 1605
+     }
+    },
+    "refs": {
+     "groups": 8,
+     "in_groups": 0.73,
+     "resolution": 1.25,
+     "mesh_lift": 1.048,
+     "venue_lift": 1.453,
+     "seed_ari": 0.975,
+     "seconds": 2.75,
+     "names": [
+      "alzheimer s disease · tau · factors",
+      "algorithm improves · mutations · precursor protein",
+      "approaches · immunotherapy · anti-abeta",
+      "oligomers · structure · soluble",
+      "cell cycle · cascade hypothesis · oxidative stress",
+      "precursor protein · presenilin · processing",
+      "c99 · mitochondrial · proteolytic pathway",
+      "transport · apolipoprotein · space"
+     ],
+     "timing": {
+      "references_ms": 10,
+      "graph_ms": 18,
+      "grouping_ms": 1865,
+      "names_ms": 704,
+      "lenses_ms": 141,
+      "total_ms": 2739
+     }
+    },
+    "text": {
+     "groups": 8,
+     "in_groups": 0.989,
+     "resolution": 0.75,
+     "mesh_lift": 1.041,
+     "venue_lift": 0.788,
+     "seed_ari": 0.868,
+     "seconds": 1.46,
+     "names": [
+      "cholinergic · oxidative stress · symptoms",
+      "precursor protein · mutations · gene",
+      "amyloid cascade hypothesis · clinical trials · drugs",
+      "oligomers · soluble · fibrils",
+      "tau · neurofibrillary tangles · hyperphosphorylated",
+      "immune · inflammatory · innate",
+      "immunotherapy · immunization · passive",
+      "apolipoprotein · cholesterol · lipoproteins"
+     ],
+     "timing": {
+      "references_ms": 12,
+      "graph_ms": 19,
+      "grouping_ms": 670,
+      "names_ms": 600,
+      "lenses_ms": 145,
+      "total_ms": 1446
+     }
+    }
+   }
+  },
+  {
+   "question": "soil carbon sequestration in agriculture",
+   "biomedical": false,
+   "papers": 1000,
+   "seed_s": 0.6,
+   "with_mesh": 55,
+   "variants": {
+    "hybrid": {
+     "groups": 7,
+     "in_groups": 0.984,
+     "resolution": 1.0,
+     "mesh_lift": null,
+     "venue_lift": 1.439,
+     "seed_ari": 0.913,
+     "seconds": 3.22,
+     "names": [
+      "atmosphere · atmospheric · CO2",
+      "mitigation · european · scenarios",
+      "tillage · conventional · conservation",
+      "china · straw · fertilizer",
+      "rice · india · followed",
+      "cover cropping · regenerative agriculture · biochar",
+      "economic · cost · payments"
+     ],
+     "timing": {
+      "references_ms": 118,
+      "graph_ms": 32,
+      "grouping_ms": 2284,
+      "names_ms": 690,
+      "lenses_ms": 80,
+      "total_ms": 3204
+     }
+    },
+    "hybrid-noidf": {
+     "groups": 7,
+     "in_groups": 0.972,
+     "resolution": 1.0,
+     "mesh_lift": null,
+     "venue_lift": 2.017,
+     "seed_ari": 0.938,
+     "seconds": 2.87,
+     "names": [
+      "atmosphere · atmospheric · CO2",
+      "mitigation · european · scenarios",
+      "tillage · conventional · conservation",
+      "china · straw · SOC density",
+      "cover cropping · regenerative agriculture · soil health",
+      "rice · india · followed",
+      "economic · cost · payments"
+     ],
+     "timing": {
+      "references_ms": 8,
+      "graph_ms": 29,
+      "grouping_ms": 2097,
+      "names_ms": 646,
+      "lenses_ms": 77,
+      "total_ms": 2857
+     }
+    },
+    "hybrid-top30": {
+     "groups": 7,
+     "in_groups": 0.984,
+     "resolution": 1.0,
+     "mesh_lift": null,
+     "venue_lift": 1.581,
+     "seed_ari": 0.885,
+     "seconds": 1.88,
+     "names": [
+      "atmosphere · atmospheric · global",
+      "european · mitigation · arable",
+      "tillage · conventional · crop rotation",
+      "china · straw · fertilizer",
+      "cover cropping · sustainable · soil health",
+      "india · rice · followed",
+      "cost · economic · payments"
+     ],
+     "timing": {
+      "references_ms": 8,
+      "graph_ms": 34,
+      "grouping_ms": 1079,
+      "names_ms": 665,
+      "lenses_ms": 81,
+      "total_ms": 1866
+     }
+    },
+    "refs": {
+     "groups": 8,
+     "in_groups": 0.683,
+     "resolution": 1.25,
+     "mesh_lift": null,
+     "venue_lift": 2.272,
+     "seed_ari": 0.926,
+     "seconds": 2.75,
+     "names": [
+      "climate change · soil health · mitigation",
+      "tillage · sequestered · c sequestration",
+      "CO2 · land · atmospheric",
+      "conservation agriculture · rice · india",
+      "treatments · experiments · manure",
+      "RothC · japan · rothamsted carbon",
+      "china · carbon density · chinese",
+      "SIC · soil inorganic carbon · green manure"
+     ],
+     "timing": {
+      "references_ms": 8,
+      "graph_ms": 11,
+      "grouping_ms": 1798,
+      "names_ms": 835,
+      "lenses_ms": 88,
+      "total_ms": 2740
+     }
+    },
+    "text": {
+     "groups": 7,
+     "in_groups": 0.983,
+     "resolution": 0.75,
+     "mesh_lift": null,
+     "venue_lift": 1.678,
+     "seed_ari": 0.977,
+     "seconds": 1.53,
+     "names": [
+      "atmosphere · atmospheric · sink",
+      "tillage · conventional · crop rotation",
+      "china · straw · chinese",
+      "scenarios · europe · estimate",
+      "regenerative agriculture · cover cropping · soil health",
+      "rice · india · followed",
+      "economic · cost · market"
+     ],
+     "timing": {
+      "references_ms": 8,
+      "graph_ms": 18,
+      "grouping_ms": 717,
+      "names_ms": 695,
+      "lenses_ms": 82,
+      "total_ms": 1520
+     }
+    }
+   }
+  },
+  {
+   "question": "autism early diagnosis",
+   "biomedical": true,
+   "papers": 1000,
+   "seed_s": 0.5,
+   "with_mesh": 235,
+   "variants": {
+    "hybrid": {
+     "groups": 7,
+     "in_groups": 0.983,
+     "resolution": 1.0,
+     "mesh_lift": 1.098,
+     "venue_lift": 4.031,
+     "seed_ari": 0.941,
+     "seconds": 2.26,
+     "names": [
+      "machine learning · dataset · accuracy",
+      "infants · young children · stability",
+      "age · services · diagnosed",
+      "proteins · interests · communication",
+      "M-CHAT · modified checklist · screening",
+      "magnetic resonance · fMRI · structural",
+      "gaze · eye-tracking · eye movement"
+     ],
+     "timing": {
+      "references_ms": 84,
+      "graph_ms": 30,
+      "grouping_ms": 1495,
+      "names_ms": 584,
+      "lenses_ms": 59,
+      "total_ms": 2251
+     }
+    },
+    "hybrid-noidf": {
+     "groups": 8,
+     "in_groups": 0.98,
+     "resolution": 1.0,
+     "mesh_lift": 1.102,
+     "venue_lift": 4.368,
+     "seed_ari": 0.943,
+     "seconds": 2.16,
+     "names": [
+      "machine learning · random forest · algorithms",
+      "infants · young children · months",
+      "age · services · parents",
+      "social · interests · restricted",
+      "facial · convolutional neural · deep learning",
+      "magnetic resonance · fMRI · brain",
+      "eye-tracking · gaze · eye movement",
+      "M-CHAT · modified checklist · communication surveillance"
+     ],
+     "timing": {
+      "references_ms": 8,
+      "graph_ms": 26,
+      "grouping_ms": 1490,
+      "names_ms": 566,
+      "lenses_ms": 64,
+      "total_ms": 2154
+     }
+    },
+    "hybrid-top30": {
+     "groups": 7,
+     "in_groups": 0.979,
+     "resolution": 1.0,
+     "mesh_lift": 1.103,
+     "venue_lift": 3.027,
+     "seed_ari": 0.934,
+     "seconds": 1.56,
+     "names": [
+      "months · infants · young children",
+      "machine learning · random forest · algorithms",
+      "age · parents · concerns",
+      "facial · deep learning · convolutional neural",
+      "proteins · communication · interests",
+      "magnetic resonance · fMRI · brain",
+      "eye-tracking · eye movement · gaze"
+     ],
+     "timing": {
+      "references_ms": 8,
+      "graph_ms": 32,
+      "grouping_ms": 716,
+      "names_ms": 736,
+      "lenses_ms": 59,
+      "total_ms": 1551
+     }
+    },
+    "refs": {
+     "groups": 9,
+     "in_groups": 0.71,
+     "resolution": 1.5,
+     "mesh_lift": 1.18,
+     "venue_lift": 6.265,
+     "seed_ari": 0.983,
+     "seconds": 1.92,
+     "names": [
+      "machine learning · random forest · dataset",
+      "young children · autistic disorder · pervasive developmental",
+      "care · primary · prevalence",
+      "concerns · age · factors",
+      "deep learning · images · convolutional neural",
+      "infants · months · longitudinal",
+      "gaze · eye · electroencephalography",
+      "longer met · early start denver · intervention group",
+      "s early · lifelong neurodevelopmental · pathology"
+     ],
+     "timing": {
+      "references_ms": 7,
+      "graph_ms": 9,
+      "grouping_ms": 1261,
+      "names_ms": 561,
+      "lenses_ms": 71,
+      "total_ms": 1909
+     }
+    },
+    "text": {
+     "groups": 7,
+     "in_groups": 0.983,
+     "resolution": 0.75,
+     "mesh_lift": 1.114,
+     "venue_lift": 3.194,
+     "seed_ari": 0.941,
+     "seconds": 1.21,
+     "names": [
+      "signs · young children · article",
+      "facial · deep learning · neural network",
+      "machine learning · random forest · support vector",
+      "age · factors · mean",
+      "diagnostic stability · group · months",
+      "magnetic resonance · fMRI · ABIDE",
+      "eye-tracking · gaze · eye movement"
+     ],
+     "timing": {
+      "references_ms": 8,
+      "graph_ms": 22,
+      "grouping_ms": 414,
+      "names_ms": 698,
+      "lenses_ms": 58,
+      "total_ms": 1200
+     }
+    }
+   }
+  },
+  {
+   "question": "medieval monasteries and literacy",
+   "biomedical": false,
+   "papers": 1000,
+   "seed_s": 0.6,
+   "with_mesh": 5,
+   "variants": {
+    "hybrid": {
+     "groups": 6,
+     "in_groups": 0.98,
+     "resolution": 0.75,
+     "mesh_lift": null,
+     "venue_lift": 2.33,
+     "seed_ari": 0.864,
+     "seconds": 1.54,
+     "names": [
+      "literacy skills · town dwellers · writing",
+      "monastic · monasticism · monks",
+      "nuns literacies · convent · book",
+      "liberal arts · bible · schools",
+      "buddhist · buddhism · tibetan",
+      "monks · medieval monasticism · rules"
+     ],
+     "timing": {
+      "references_ms": 49,
+      "graph_ms": 21,
+      "grouping_ms": 650,
+      "names_ms": 742,
+      "lenses_ms": 61,
+      "total_ms": 1523
+     }
+    },
+    "hybrid-noidf": {
+     "groups": 7,
+     "in_groups": 0.97,
+     "resolution": 0.75,
+     "mesh_lift": null,
+     "venue_lift": 2.56,
+     "seed_ari": 0.958,
+     "seconds": 1.3,
+     "names": [
+      "town dwellers · skills · written word",
+      "monastic · monasticism · monks",
+      "nuns literacies · convent · book",
+      "schools · liberal arts · bible",
+      "buddhist · buddhism · tibetan",
+      "literasi · indonesia · qualitative",
+      "rules · monks · monasticism"
+     ],
+     "timing": {
+      "references_ms": 6,
+      "graph_ms": 21,
+      "grouping_ms": 688,
+      "names_ms": 509,
+      "lenses_ms": 61,
+      "total_ms": 1286
+     }
+    },
+    "hybrid-top30": {
+     "groups": 7,
+     "in_groups": 0.977,
+     "resolution": 0.75,
+     "mesh_lift": null,
+     "venue_lift": 2.229,
+     "seed_ari": 0.819,
+     "seconds": 1.18,
+     "names": [
+      "town dwellers · skills · writing",
+      "monastic · monasticism · monks",
+      "nuns literacies · convent · women",
+      "liberal arts · schools · manuscripts",
+      "buddhist · buddhism · tibetan",
+      "literasi · indonesia · qualitative",
+      "monasticism · rules · monks"
+     ],
+     "timing": {
+      "references_ms": 6,
+      "graph_ms": 22,
+      "grouping_ms": 553,
+      "names_ms": 518,
+      "lenses_ms": 64,
+      "total_ms": 1164
+     }
+    },
+    "refs": {
+     "groups": 4,
+     "in_groups": 0.213,
+     "resolution": 1.0,
+     "mesh_lift": null,
+     "venue_lift": 4.792,
+     "seed_ari": 0.997,
+     "seconds": 1.07,
+     "names": [
+      "biblical · monastic · latin",
+      "literacy practices · article · language",
+      "english · houses · books produced",
+      "monasticism · monastic · reform"
+     ],
+     "timing": {
+      "references_ms": 7,
+      "graph_ms": 3,
+      "grouping_ms": 482,
+      "names_ms": 529,
+      "lenses_ms": 40,
+      "total_ms": 1061
+     }
+    },
+    "text": {
+     "groups": 9,
+     "in_groups": 0.971,
+     "resolution": 0.75,
+     "mesh_lift": null,
+     "venue_lift": 2.918,
+     "seed_ari": 0.904,
+     "seconds": 1.42,
+     "names": [
+      "monastic · monasticism · benedictine",
+      "literate · seventeenth centuries · orality",
+      "nuns literacies · convent · women",
+      "schools · education · educational",
+      "interviews · qualitative · students",
+      "town dwellers · written law · personal documents",
+      "buddhist · buddhism · china",
+      "culture depended · monks",
+      "libraries · certain forms · russian"
+     ],
+     "timing": {
+      "references_ms": 7,
+      "graph_ms": 24,
+      "grouping_ms": 595,
+      "names_ms": 703,
+      "lenses_ms": 78,
+      "total_ms": 1406
+     }
+    }
+   }
+  },
+  {
+   "question": "lithium-ion battery degradation",
+   "biomedical": false,
+   "papers": 1000,
+   "seed_s": 0.5,
+   "with_mesh": 1,
+   "variants": {
+    "hybrid": {
+     "groups": 8,
+     "in_groups": 0.999,
+     "resolution": 1.0,
+     "mesh_lift": null,
+     "venue_lift": 1.02,
+     "seed_ari": 0.844,
+     "seconds": 2.77,
+     "names": [
+      "factors · energy storage · electric vehicles",
+      "cathode · material · electrolyte",
+      "learning · prediction · features",
+      "silicon · NCA · degradation modes",
+      "overcharge · safety · thermal runaway",
+      "growth · physics-based · solid electrolyte",
+      "impedance spectroscopy · equivalent circuit · SOH",
+      "gradient · distribution · cooling"
+     ],
+     "timing": {
+      "references_ms": 58,
+      "graph_ms": 28,
+      "grouping_ms": 1859,
+      "names_ms": 746,
+      "lenses_ms": 67,
+      "total_ms": 2758
+     }
+    },
+    "hybrid-noidf": {
+     "groups": 9,
+     "in_groups": 1.0,
+     "resolution": 1.0,
+     "mesh_lift": null,
+     "venue_lift": 1.207,
+     "seed_ari": 0.401,
+     "seconds": 2.71,
+     "names": [
+      "grid · factors · electric vehicles",
+      "learning · prediction · features",
+      "cathode · electrolyte · material",
+      "SEI · physics-based · solid electrolyte",
+      "overcharge · temperature · safety",
+      "degradation modes · lithium inventory · loss",
+      "silicon · anode · graphite",
+      "impedance spectroscopy · equivalent circuit · spectra",
+      "gradient · directionality · distribution"
+     ],
+     "timing": {
+      "references_ms": 8,
+      "graph_ms": 34,
+      "grouping_ms": 2018,
+      "names_ms": 563,
+      "lenses_ms": 73,
+      "total_ms": 2696
+     }
+    },
+    "hybrid-top30": {
+     "groups": 8,
+     "in_groups": 0.998,
+     "resolution": 1.0,
+     "mesh_lift": null,
+     "venue_lift": 1.118,
+     "seed_ari": 0.96,
+     "seconds": 1.77,
+     "names": [
+      "cathode · electrolyte · material",
+      "learning · prediction · features",
+      "factors · electric vehicles · grid",
+      "silicon · NCA · commercial",
+      "physics-based · growth · P2D",
+      "overcharge · thermal runaway · overcharged",
+      "impedance spectroscopy · equivalent circuit · spectra",
+      "gradient · thermal · distribution"
+     ],
+     "timing": {
+      "references_ms": 7,
+      "graph_ms": 33,
+      "grouping_ms": 954,
+      "names_ms": 706,
+      "lenses_ms": 63,
+      "total_ms": 1764
+     }
+    },
+    "refs": {
+     "groups": 6,
+     "in_groups": 0.696,
+     "resolution": 1.0,
+     "mesh_lift": null,
+     "venue_lift": 0.835,
+     "seed_ari": 0.955,
+     "seconds": 2.01,
+     "names": [
+      "cathode · anode · electrolyte",
+      "prediction · proposed · learning",
+      "discharge · stress · order",
+      "degradation modes · lithium inventory · incremental capacity",
+      "growth · physics-based · simulation",
+      "calendar · performance parameters · mission profile"
+     ],
+     "timing": {
+      "references_ms": 11,
+      "graph_ms": 11,
+      "grouping_ms": 1406,
+      "names_ms": 521,
+      "lenses_ms": 49,
+      "total_ms": 1997
+     }
+    },
+    "text": {
+     "groups": 8,
+     "in_groups": 1.0,
+     "resolution": 0.75,
+     "mesh_lift": null,
+     "venue_lift": 1.094,
+     "seed_ari": 0.92,
+     "seconds": 1.32,
+     "names": [
+      "grid · applications · empirical",
+      "temperature · pouch cells · graphite",
+      "learning · prediction · neural network",
+      "cathode · material · electrolyte",
+      "silicon · electron microscopy · x-ray",
+      "SEI · solid electrolyte · interphase",
+      "impedance spectroscopy · equivalent circuit · SOH",
+      "gradient · directionality · distribution"
+     ],
+     "timing": {
+      "references_ms": 7,
+      "graph_ms": 17,
+      "grouping_ms": 682,
+      "names_ms": 534,
+      "lenses_ms": 65,
+      "total_ms": 1305
+     }
+    }
+   }
+  },
+  {
+   "question": "air pollution and cardiovascular mortality",
+   "biomedical": true,
+   "papers": 1000,
+   "seed_s": 0.5,
+   "with_mesh": 465,
+   "variants": {
+    "hybrid": {
+     "groups": 6,
+     "in_groups": 1.0,
+     "resolution": 0.75,
+     "mesh_lift": 1.117,
+     "venue_lift": 1.923,
+     "seed_ari": 0.834,
+     "seconds": 2.98,
+     "names": [
+      "cohort · cox proportional · long-term exposure",
+      "mechanisms · dysfunction · oxidative stress",
+      "china · chinese · short-term exposure",
+      "poisson regression · daily · hospital admissions",
+      "poland · survivors · myocardial infarction",
+      "iran · inquired · mashhad"
+     ],
+     "timing": {
+      "references_ms": 82,
+      "graph_ms": 31,
+      "grouping_ms": 2014,
+      "names_ms": 793,
+      "lenses_ms": 50,
+      "total_ms": 2970
+     }
+    },
+    "hybrid-noidf": {
+     "groups": 8,
+     "in_groups": 1.0,
+     "resolution": 0.75,
+     "mesh_lift": 1.146,
+     "venue_lift": 2.118,
+     "seed_ari": 0.681,
+     "seconds": 2.9,
+     "names": [
+      "cox proportional · cohort · residential",
+      "cardiac · microm · hospital admissions",
+      "china · chinese · daily",
+      "mechanisms · oxidative stress · dysfunction",
+      "systematic · meta-analysis · inclusion criteria",
+      "iran · inquired · mashhad",
+      "poland · STEMI · central statistical",
+      "brazil · o paulo · ecological"
+     ],
+     "timing": {
+      "references_ms": 8,
+      "graph_ms": 32,
+      "grouping_ms": 2114,
+      "names_ms": 669,
+      "lenses_ms": 65,
+      "total_ms": 2887
+     }
+    },
+    "hybrid-top30": {
+     "groups": 9,
+     "in_groups": 1.0,
+     "resolution": 1.0,
+     "mesh_lift": 1.131,
+     "venue_lift": 2.047,
+     "seed_ari": 0.72,
+     "seconds": 1.68,
+     "names": [
+      "hazard ratio · cohort · cox proportional",
+      "mechanisms · atherosclerosis · oxidative stress",
+      "daily · microg m3 · day",
+      "china · daily · meteorological",
+      "iran · inquired · systematic",
+      "participants · china · cox proportional",
+      "poland · STEMI · central statistical",
+      "brazil · ecological · o paulo",
+      "nonsmoking white · prevalent CHD · code centroids"
+     ],
+     "timing": {
+      "references_ms": 7,
+      "graph_ms": 33,
+      "grouping_ms": 886,
+      "names_ms": 666,
+      "lenses_ms": 74,
+      "total_ms": 1666
+     }
+    },
+    "refs": {
+     "groups": 6,
+     "in_groups": 0.633,
+     "resolution": 1.25,
+     "mesh_lift": 1.102,
+     "venue_lift": 1.292,
+     "seed_ari": 0.992,
+     "seconds": 2.38,
+     "names": [
+      "china · short-term exposure · highlight",
+      "microg · microm · cardiac",
+      "mechanisms · atherosclerosis · global",
+      "long-term exposure · hazard ratio · cox proportional",
+      "hospitalization · hospital · daily",
+      "hazard ratio · cohort · cox proportional"
+     ],
+     "timing": {
+      "references_ms": 8,
+      "graph_ms": 13,
+      "grouping_ms": 1453,
+      "names_ms": 839,
+      "lenses_ms": 54,
+      "total_ms": 2366
+     }
+    },
+    "text": {
+     "groups": 9,
+     "in_groups": 1.0,
+     "resolution": 0.5,
+     "mesh_lift": 1.133,
+     "venue_lift": 2.213,
+     "seed_ari": 0.908,
+     "seconds": 1.32,
+     "names": [
+      "zip code · cox proportional · fatal CHD",
+      "mechanisms · dysfunction · oxidative stress",
+      "cohort · dispersion · traffic",
+      "china · chinese · generalized additive",
+      "systematic · meta-analysis · searched",
+      "iran · inquired · mashhad",
+      "brazil · o paulo · ecological",
+      "emergency · hospital admissions · department",
+      "poland · central statistical · EP-PARTICLES"
+     ],
+     "timing": {
+      "references_ms": 7,
+      "graph_ms": 18,
+      "grouping_ms": 525,
+      "names_ms": 685,
+      "lenses_ms": 74,
+      "total_ms": 1310
+     }
+    }
+   }
+  },
+  {
+   "question": "teacher feedback and student achievement",
+   "biomedical": false,
+   "papers": 1000,
+   "seed_s": 0.7,
+   "with_mesh": 12,
+   "variants": {
+    "hybrid": {
+     "groups": 8,
+     "in_groups": 0.986,
+     "resolution": 1.0,
+     "mesh_lift": null,
+     "venue_lift": 1.763,
+     "seed_ari": 0.946,
+     "seconds": 2.37,
+     "names": [
+      "english · EFL · writing",
+      "mathematics · formative · secondary school",
+      "faculty · university · teaching",
+      "principals · teacher performance · relationship",
+      "motivation · academic · pakistan",
+      "feedback literacy · engagement · analytics",
+      "performance feedback · multiple baseline · behavior",
+      "negative · children · grade"
+     ],
+     "timing": {
+      "references_ms": 104,
+      "graph_ms": 29,
+      "grouping_ms": 1636,
+      "names_ms": 521,
+      "lenses_ms": 68,
+      "total_ms": 2358
+     }
+    },
+    "hybrid-noidf": {
+     "groups": 5,
+     "in_groups": 0.985,
+     "resolution": 0.75,
+     "mesh_lift": null,
+     "venue_lift": 1.757,
+     "seed_ari": 0.643,
+     "seconds": 2.06,
+     "names": [
+      "learning · feedback practices · teacher education",
+      "faculty · sampling · selected",
+      "principals · relationship · teacher performance",
+      "english · EFL · writing",
+      "performance feedback · multiple baseline · behavior"
+     ],
+     "timing": {
+      "references_ms": 7,
+      "graph_ms": 24,
+      "grouping_ms": 1460,
+      "names_ms": 516,
+      "lenses_ms": 45,
+      "total_ms": 2052
+     }
+    },
+    "hybrid-top30": {
+     "groups": 8,
+     "in_groups": 0.983,
+     "resolution": 1.0,
+     "mesh_lift": null,
+     "venue_lift": 5.777,
+     "seed_ari": 0.936,
+     "seconds": 1.39,
+     "names": [
+      "faculty · teaching · medical",
+      "english · writing · EFL",
+      "mathematics · zealand · learning",
+      "principals · teacher performance · relationship",
+      "feedback literacy · engagement · analytics",
+      "motivation · pakistan · academic",
+      "grade · motivational · negative",
+      "performance feedback · multiple baseline · behavior"
+     ],
+     "timing": {
+      "references_ms": 7,
+      "graph_ms": 31,
+      "grouping_ms": 796,
+      "names_ms": 490,
+      "lenses_ms": 61,
+      "total_ms": 1385
+     }
+    },
+    "refs": {
+     "groups": 8,
+     "in_groups": 0.592,
+     "resolution": 1.25,
+     "mesh_lift": null,
+     "venue_lift": 6.828,
+     "seed_ari": 0.927,
+     "seconds": 1.73,
+     "names": [
+      "teaching · student evaluations · professional",
+      "zealand · england · formative",
+      "predicted · expectations · effort",
+      "feedback literacy · education · learning",
+      "english · writing · language",
+      "students self-regulated · structural equation · china",
+      "learning · assessments · undergraduate",
+      "performance feedback · multiple baseline · behavior"
+     ],
+     "timing": {
+      "references_ms": 7,
+      "graph_ms": 8,
+      "grouping_ms": 1138,
+      "names_ms": 499,
+      "lenses_ms": 64,
+      "total_ms": 1716
+     }
+    },
+    "text": {
+     "groups": 8,
+     "in_groups": 0.987,
+     "resolution": 0.75,
+     "mesh_lift": null,
+     "venue_lift": 3.528,
+     "seed_ari": 0.939,
+     "seconds": 1.41,
+     "names": [
+      "mathematics · motivation · school",
+      "university · faculty · education",
+      "relationship · teacher-student interaction · school",
+      "english · EFL · language teaching",
+      "students writing · english · written",
+      "performance feedback · multiple baseline · behavior",
+      "zealand · conceptions · primary school",
+      "principals · accountability · professional"
+     ],
+     "timing": {
+      "references_ms": 7,
+      "graph_ms": 18,
+      "grouping_ms": 631,
+      "names_ms": 677,
+      "lenses_ms": 66,
+      "total_ms": 1398
+     }
+    }
+   }
+  }
+ ]
+}
