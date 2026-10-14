@@ -48,7 +48,8 @@ import numpy as np
 from fastapi import HTTPException
 
 ROOT = Path(os.environ.get("SRL_FIELDS", "/mnt/fast/scholarsreadinglist/search/fields"))
-SELECTION_VERSION = "2"                  # 2: Kimi K3 teacher + 0.8B decider + students (no Jev); 1: Jev
+SELECTION_VERSION = "3"                  # 3: + title-only teacher labels, balanced decider set, cut-offs
+                                         #    from held-back labels; 2: first no-Jev recipe; 1: Jev
 TEACHER_USD = float(os.environ.get("SRL_FIELD_TEACHER_USD", "0.50"))   # Kimi K3 labels per field
 TEACHER_N = 340                          # ~$0.48 at $1.42 per 1,000 papers (measured in the job: longer prompt)
 DECIDER_N = 10_000                       # papers the decider labels for the students
@@ -293,9 +294,22 @@ def _vectors(ctx: Ctx, ws) -> tuple[np.ndarray, np.ndarray]:
     return V, has
 
 
+def _best_cut(p: np.ndarray, y: np.ndarray, lo: float = 0.15, hi: float = 0.6) -> tuple[float, float]:
+    """The yes/no cut-off with the best F1 against held-out teacher labels (a grid of 0.05; ties: closest to 0.5)."""
+    best = (-1.0, 0.5)
+    for t in np.arange(lo, hi + 1e-9, 0.05):
+        k = p >= t
+        tp = float((k & y).sum())
+        f1 = 2 * tp / max(1.0, k.sum() + y.sum())
+        if f1 > best[0] + 1e-9 or (abs(f1 - best[0]) < 1e-9 and abs(t - 0.5) < abs(best[1] - 0.5)):
+            best = (f1, round(float(t), 2))
+    return best[1], round(best[0], 3)
+
+
 def select_field(ctx: Ctx, job: Job, q: str, definition: str | None, keywords: str | None) -> dict:
     import faiss
     from sklearn.linear_model import LogisticRegression
+    from sklearn.metrics import roc_auc_score
     from srl_search import judges as J
     from srl_search.engine import passes
     from srl_search.scope import NON_PUBLICATION_TYPES
@@ -306,6 +320,8 @@ def select_field(ctx: Ctx, job: Job, q: str, definition: str | None, keywords: s
     work = job.dir / "work"
     work.mkdir(parents=True, exist_ok=True)
     say = lambda detail: job.stage(job.st.get("stage_index", 0), detail)
+    rng = np.random.default_rng(0)
+    bad_types = [i for i, tn in enumerate(cit.types) if tn in NON_PUBLICATION_TYPES]
 
     def texts_of(ws) -> list[str]:
         det = _details(ctx, ws)
@@ -319,13 +335,37 @@ def select_field(ctx: Ctx, job: Job, q: str, definition: str | None, keywords: s
                 out.append(J.paper_text(cit.title(nd) if nd >= 0 else "", None))
         return out
 
+    def publications(ws) -> np.ndarray:
+        det = _details(ctx, ws)
+        ok = []
+        for w in ws:
+            d = det.get(int(w))
+            if d is not None:
+                ok.append(passes(d, {}))
+            else:
+                nd = int(cit.nodes([int(w)])[0])
+                ok.append(nd >= 0 and int(cit.kind[nd]) not in bad_types and len(cit.title(nd)) >= 10)
+        return np.array(ok, bool)
+
+    def cited_by(ws, k=CITED_K):
+        nodes = cit.nodes(np.unique(np.asarray(ws, np.int64)))
+        nodes = nodes[nodes >= 0]
+        allrefs = np.concatenate([cit.refs(int(x)) for x in nodes]) if len(nodes) else np.zeros(0, np.uint32)
+        u, cnt = np.unique(allrefs, return_counts=True)
+        while (cnt >= k).sum() > EXPANSION_MAX:
+            k += 1
+        cn = u[cnt >= k]
+        cn = cn[~np.isin(np.asarray(cit.kind[cn]), bad_types)]
+        return np.array([cit.work(int(x)) for x in cn], np.int64), k
+
     def lr(ws_y: dict[int, float]):
         ws = np.array(list(ws_y), np.int64)
         X, h = _vectors(ctx, ws)
         y = np.array([ws_y[int(w)] >= 0.5 for w in ws])
         return LogisticRegression(C=2.0, max_iter=4000, class_weight="balanced").fit(X[h], y[h])
 
-    # 1 the teacher labels papers spread from the nearest to the farthest of the 300k closest to the topic
+    # 1 the teacher labels papers spread from the nearest to the farthest of the 300k closest to the topic, and a
+    #   quarter from the works the nearest papers cite (many have only a title: the decider must learn those too)
     t = time.time()
     job.stage(0, f"gathering the {POOL:,} papers closest to the topic")
     qv = eng.encoder.encode(q)[0]
@@ -338,10 +378,10 @@ def select_field(ctx: Ctx, job: Job, q: str, definition: str | None, keywords: s
     okA = ctx.quality.junk(wa, VA) < 0.5
     idxA = np.flatnonzero(okA)
     n = len(idxA)
+    n_cited = TEACHER_N // 4
     edges = sorted({0, *[int(n * f) for f in (.002, .004, .007, .01, .017, .025, .035, .05, .07, .1, .14, .2, .27, .4,
                                                 .55, .75)], n})
-    rng = np.random.default_rng(0)
-    per = math.ceil(TEACHER_N * 1.25 / (len(edges) - 1))          # 25% spare: some are not publications
+    per = math.ceil((TEACHER_N - n_cited) * 1.25 / (len(edges) - 1))
     sample, bucket = [], []
     for bi, (lo, hi) in enumerate(zip(edges, edges[1:])):
         if hi > lo:
@@ -349,34 +389,52 @@ def select_field(ctx: Ctx, job: Job, q: str, definition: str | None, keywords: s
             sample += idxA[pick].tolist()
             bucket += [bi] * len(pick)
     sw = wa[sample]
-    det = _details(ctx, sw)
-    keep = [k for k, w in enumerate(sw) if int(w) in det and passes(det[int(w)], {})]
-    keep = sorted(rng.choice(keep, size=min(TEACHER_N, len(keep)), replace=False).tolist())
-    sw, bucket = sw[keep], np.array(bucket)[keep]
+    ok = publications(sw)
+    keep = rng.choice(np.flatnonzero(ok), size=min(TEACHER_N - n_cited, int(ok.sum())), replace=False)
+    sw_pool, bucket = sw[np.sort(keep)], np.array(bucket)[np.sort(keep)]
+    pre, _ = cited_by(wa[idxA[:5000]])
+    pre = np.setdiff1d(pre, wa)
+    _, hv = _vectors(ctx, pre)
+    title_only, with_vec = pre[~hv], pre[hv]
+    pick = list(rng.choice(title_only, size=min(len(title_only), n_cited * 2), replace=False)) + \
+        list(rng.choice(with_vec, size=min(len(with_vec), n_cited), replace=False))
+    pick = np.array(pick, np.int64)
+    pick = pick[publications(pick)]
+    n_t = min(len(pick), n_cited)
+    title_set = set(title_only.tolist())
+    t_only = [w for w in pick if w in title_set][:round(n_t * 0.7)]
+    sw_cit = np.array(t_only + [w for w in pick if w not in set(t_only)][:n_t - len(t_only)], np.int64)
+    sw = np.concatenate([sw_pool, sw_cit])
     job.stage(0, f"the teacher (Kimi K3) judges {len(sw)} papers")
     teacher = J.Teacher(TEACHER_USD)
-    lab = teacher.label([J.paper_text(det[int(w)].get("title"), det[int(w)].get("abstract")) for w in sw], q, definition)
+    lab = teacher.label(texts_of(sw), q, definition)
     _spend(job.dir.parent, teacher.usd)
     labels = {int(w): float(x) for w, x in zip(sw, lab) if not math.isnan(x)}
-    on = np.nan_to_num(lab) >= 0.5
+    on_pool = np.nan_to_num(lab[:len(sw_pool)]) >= 0.5
     last = bucket == bucket.max()
-    tail = float(on[last].mean()) if last.any() else 0.0
-    report["teacher_labels"] = {"papers": len(labels), "on_topic": int(on.sum()), "failed": teacher.failed,
+    tail = float(on_pool[last].mean()) if last.any() else 0.0
+    # held back from every judge's training: chooses the cut-offs and says how good the judges are
+    lw_all = list(labels)
+    hold = set(rng.choice(lw_all, size=len(lw_all) // 5, replace=False).tolist())
+    train_labels = {w: v for w, v in labels.items() if w not in hold}
+    report["teacher_labels"] = {"papers": len(labels), "on_topic": int(sum(v >= 0.5 for v in labels.values())),
+                                "title_only": int(sum(1 for w in sw_cit if w in title_set)),
+                                "cited": int(len(sw_cit)), "held_out": len(hold), "failed": teacher.failed,
                                 "usd": round(teacher.usd, 3), "farthest_on_topic": round(tail, 3)}
-    if on.sum() < MIN_ON_TOPIC:
-        raise FinalError(f"Only {int(on.sum())} of {len(sw)} papers judged near “{q}” are about it: too few to find the "
-                         "field. Phrase the topic as papers about it would, or give a definition.")
+    if int(on_pool.sum()) < MIN_ON_TOPIC:
+        raise FinalError(f"Only {int(on_pool.sum())} of {len(sw_pool)} papers judged near “{q}” are about it: too few to "
+                         "find the field. Phrase the topic as papers about it would, or give a definition.")
     if tail > TOO_BROAD_TAIL:
         raise FinalError(f"“{q}” is broader than a whole-field map can hold today: {round(100 * tail)}% of the papers at "
                          f"the edge of the {POOL:,} closest are still about it. Map a narrower topic, or use the "
                          "1,000-paper map.")
     job.done_stage(0, t)
 
-    # 2 candidates: a classifier on meaning (teacher labels) searches a second pool along its direction; the exact
-    #   phrase; what the likely field cites. Nothing is judged for good yet.
+    # 2 candidates: a classifier on meaning searches a second pool along its direction; the exact phrase; what the
+    #   likely field cites
     t = time.time()
     job.stage(1, "searching along a first classifier; following citations")
-    lr0 = lr(labels)
+    lr0 = lr(train_labels)
     wdir = unit(lr0.coef_.astype(np.float32))[0]
     _, cb = eng.index.search(wdir.reshape(1, -1), POOL, params=faiss.SearchParametersIVF(nprobe=2048))
     rows_b = np.setdiff1d(cb[0][cb[0] >= 0], rows_a)
@@ -393,118 +451,115 @@ def select_field(ctx: Ctx, job: Job, q: str, definition: str | None, keywords: s
         hits, matches, _ = ctx.keywords.search(phrase, 200_000, {}, "all")
         H = np.setdiff1d(np.array([h[0] for h in hits], np.int64), U_w)
         report["phrases"] = {"query": phrase, "matches": int(matches), "outside_pool": int(len(H))}
-    likely = np.concatenate([U_w[p0 >= 0.5], H])
-    nodes = cit.nodes(np.unique(likely))
-    nodes = nodes[nodes >= 0]
-    allrefs = np.concatenate([cit.refs(int(x)) for x in nodes]) if len(nodes) else np.zeros(0, np.uint32)
-    u, cnt = np.unique(allrefs, return_counts=True)
-    k = CITED_K
-    while (cnt >= k).sum() > EXPANSION_MAX:
-        k += 1
-    bad_types = [i for i, tn in enumerate(cit.types) if tn in NON_PUBLICATION_TYPES]
-    cn = u[cnt >= k]
-    cn = cn[~np.isin(np.asarray(cit.kind[cn]), bad_types)]
-    C = np.setdiff1d(np.array([cit.work(int(x)) for x in cn], np.int64), np.concatenate([U_w, H]))
+    C, k = cited_by(np.concatenate([U_w[p0 >= 0.5], H]))
+    C = np.setdiff1d(C, np.concatenate([U_w, H]))
+    _, hC = _vectors(ctx, C)
     report["candidates"] = {"pool": int(len(U_w)), "likely_by_first_classifier": int((p0 >= 0.5).sum()),
-                            "phrase_outside_pool": int(len(H)), "cited_at_least": k, "cited_candidates": int(len(C))}
+                            "phrase_outside_pool": int(len(H)), "cited_at_least": k, "cited_candidates": int(len(C)),
+                            "cited_title_only": int((~hC).sum())}
     job.done_stage(1, t)
 
-    # 3 the decider learns from the teacher
+    # 3 the decider learns from the teacher (not from the held-back labels)
     t = time.time()
     job.stage(2, "teaching the 0.8B decider")
-    lw = list(labels)
-    J.train_decider(list(zip(texts_of(lw), [labels[w] for w in lw])), q, definition, work / "decider", say)
+    tw = list(train_labels)
+    J.train_decider(list(zip(texts_of(tw), [train_labels[w] for w in tw])), q, definition, work / "decider", say)
     job.done_stage(2, t)
 
-    # 4 the decider labels papers where judgments matter: half where the first classifier is unsure, the rest spread
-    #   over its scores, and works the field cites (many have only a title)
+    # 4 the decider judges a balanced set: likely papers, unsure ones, a spread, and cited works (mostly title only);
+    #   and the held-back papers, to choose its cut-off
     t = time.time()
     job.stage(3, f"the decider judges {DECIDER_N:,} papers")
-    band = np.flatnonzero((p0 > 0.1) & (p0 < 0.9))
-    spread = np.argsort(p0)[np.linspace(0, len(p0) - 1, len(p0)).astype(int)]
-    n_band, n_cited = DECIDER_N // 2, min(len(C), DECIDER_N // 5)
-    pick_u = set(rng.choice(band, size=min(n_band, len(band)), replace=False).tolist()) if len(band) else set()
-    rest = [i for i in rng.choice(spread, size=min(len(spread), DECIDER_N), replace=False) if i not in pick_u]
-    pick_u |= set(rest[:DECIDER_N - n_cited - len(pick_u)])
-    dws = [int(U_w[i]) for i in sorted(pick_u)] + [int(w) for w in rng.choice(C, size=n_cited, replace=False)]
-    dws = [w for w in dws if w not in labels]
-    dtexts = texts_of(dws)
-    dp = J.decider_scores(work / "decider", dtexts, say)
-    decided = dict(zip(dws, dp.tolist()))
-    report["decider_labels"] = {"papers": len(decided), "on_topic": int((dp >= 0.5).sum())}
+    taken: set[int] = set(labels)
+
+    def take(cands, m):
+        cands = [int(w) for w in cands if int(w) not in taken]
+        out = [cands[i] for i in rng.choice(len(cands), size=min(m, len(cands)), replace=False)] if cands else []
+        taken.update(out)
+        return out
+    dws = take(U_w[p0 >= 0.5], int(DECIDER_N * .30)) + take(U_w[(p0 > 0.1) & (p0 < 0.9)], int(DECIDER_N * .25)) \
+        + take(U_w, int(DECIDER_N * .15)) + take(C[~hC], int(DECIDER_N * .20)) + take(C[hC], int(DECIDER_N * .10))
+    dws += [w for w in hold]
+    dp = J.decider_scores(work / "decider", texts_of(dws), say)
+    hp = np.array([dp[dws.index(w)] for w in hold])
+    hy = np.array([labels[w] >= 0.5 for w in hold])
+    cut_d, f1_d = _best_cut(hp, hy)
+    decided = {w: v for w, v in zip(dws, dp.tolist()) if w not in hold}
+    report["decider_labels"] = {"papers": len(decided), "on_topic_at_cut": int(sum(v >= cut_d for v in decided.values())),
+                                "cut": cut_d, "held_out_f1": f1_d,
+                                "held_out_auc": round(float(roc_auc_score(hy, hp)), 3) if 0 < hy.sum() < len(hy) else None}
     job.done_stage(3, t)
 
-    # 5 students: the vector classifier and Ettin-17M learn from the teacher's and the decider's labels; Ettin judges
-    #   what has no vector (title only) and what the vector classifier is unsure about
+    # 5 students learn from the teacher and the decider (its answers as yes/no at its cut-off); Ettin judges what has no
+    #   vector, what the vector classifier is unsure about, and the held-back papers
     t = time.time()
     job.stage(4, "training the students")
-    taught = {**decided, **labels}                               # the teacher's answer wins where both exist
+    taught = {**{w: float(v >= cut_d) for w, v in decided.items()}, **train_labels}
     lr1 = lr(taught)
     p1 = lr1.predict_proba(U_V)[:, 1]
     _, hH = _vectors(ctx, H)
-    _, hC = _vectors(ctx, C)
-    XH, _ = _vectors(ctx, H[hH]) if hH.any() else (np.zeros((0, 768), np.float32), None)
-    XC, _ = _vectors(ctx, C[hC]) if hC.any() else (np.zeros((0, 768), np.float32), None)
-    pH = np.full(len(H), np.nan)
-    pC = np.full(len(C), np.nan)
-    if len(XH):
-        pH[hH] = lr1.predict_proba(XH)[:, 1]
-    if len(XC):
-        pC[hC] = lr1.predict_proba(XC)[:, 1]
+
+    def vec_p(ws, has):
+        out = np.full(len(ws), np.nan)
+        if has.any():
+            X, _ = _vectors(ctx, ws[has])
+            out[has] = lr1.predict_proba(X)[:, 1]
+        return out
+    pH, pC = vec_p(H, hH), vec_p(C, hC)
+    hold_w = np.array(sorted(hold), np.int64)
+    _, hHold = _vectors(ctx, hold_w)
+    pHold = vec_p(hold_w, hHold)
     unsure = lambda p: np.isnan(p) | ((p > BAND[0]) & (p < BAND[1]))
-    E = np.concatenate([U_w[unsure(p1)], H[unsure(pH)], C[unsure(pC)]])
-    E = np.array([w for w in E if int(w) not in taught], np.int64)
+    E = np.concatenate([U_w[unsure(p1)], H[unsure(pH)], C[unsure(pC)], hold_w])
+    E = np.array([w for w in dict.fromkeys(E.tolist()) if w not in taught], np.int64)
     say(f"the text student judges {len(E):,} papers (title only, or unsure)")
     tw = list(taught)
     pe = J.student_scores(list(zip(texts_of(tw), [taught[w] for w in tw])), texts_of(E), work / "student", say) \
         if len(E) else np.zeros(0)
     by_e = dict(zip(E.tolist(), pe.tolist()))
+
+    def student_p(w, pv):
+        if w in by_e:
+            return by_e[w] if pv != pv else (pv + by_e[w]) / 2
+        return pv
+    hs = np.array([student_p(int(w), float(pv)) for w, pv in zip(hold_w, pHold)])
+    hys = np.array([labels[int(w)] >= 0.5 for w in hold_w])
+    cut_s, f1_s = _best_cut(hs, hys)
+    report["students"] = {"cut": cut_s, "held_out_f1": f1_s,
+                          "held_out_auc": round(float(roc_auc_score(hys, hs)), 3) if 0 < hys.sum() < len(hys) else None,
+                          "judged_by_text_student": int(len(E))}
     job.done_stage(4, t)
 
-    # 6 judging: the teacher's and the decider's own answers where they exist; else the vector classifier, averaged
-    #   with the text student where it was unsure; the text student alone without a vector
+    # 6 judging: the teacher's own answer, else the decider's (at its cut-off), else the students' (at theirs)
     t = time.time()
     job.stage(5, "judging every candidate")
-
-    def final(ws, p_vec):
-        out = {}
-        for w, pv in zip(ws.tolist(), p_vec.tolist()):
-            if w in taught:
-                p = taught[w]
-            elif w in by_e:
-                p = by_e[w] if math.isnan(pv) else (pv + by_e[w]) / 2
-            else:
-                p = pv
-            if p == p and p >= 0.5:
-                out[w] = round(float(p), 3)
-        return out
     route = {}
     for name, ws, pv in (("meaning", U_w, p1), ("phrase", H, pH), ("cited", C, pC)):
-        for w, p in final(ws, pv).items():
-            route.setdefault(w, (name, p))
-    ids = np.array(list(route), np.int64)
-    det = _details(ctx, ids)
-    field = {}
-    for w in ids.tolist():                                       # publications only, not retracted
-        d = det.get(w)
-        if d is not None and not passes(d, {}):
-            continue
-        if d is None:
-            nd = int(cit.nodes([w])[0])
-            if nd < 0 or cit.type(nd) in NON_PUBLICATION_TYPES:
+        for w, v in zip(ws.tolist(), pv.tolist()):
+            if w in route:
                 continue
-        field[w] = {"via": route[w][0], "p": route[w][1]}
+            if w in labels:
+                yes = labels[w] >= 0.5
+            elif w in decided:
+                yes = decided[w] >= cut_d
+            else:
+                p = student_p(w, v)
+                yes = p == p and p >= cut_s
+            if yes:
+                route[w] = name
+    ids = np.array(list(route), np.int64)
+    ok = publications(ids)
+    field = {int(w): {"via": route[int(w)]} for w, o in zip(ids, ok) if o}
     if len(field) > TOO_BROAD_PAPERS:
         raise FinalError(f"“{q}” has about {len(field):,} papers: too broad for a whole-field map today. Map a narrower topic.")
     report["papers"] = len(field)
     report["by_route"] = {v: sum(1 for f in field.values() if f["via"] == v) for v in ("meaning", "phrase", "cited")}
-    report["judged_by_text_student"] = int(len(E))
     report["teacher_usd"] = round(teacher.usd, 3)
     job.done_stage(5, t)
     return {"version": SELECTION_VERSION, "made": _now(), "release": ctx.release["id"], "topic": q,
             "definition": definition, "keywords": keywords, "report": report,
             "papers": {str(w): f for w, f in field.items()},
-            "labels": {"teacher": {str(w): v for w, v in labels.items()},
+            "labels": {"teacher": {str(w): v for w, v in labels.items()}, "held_out": sorted(int(w) for w in hold),
                        "decider": {str(w): round(v, 3) for w, v in decided.items()}}}
 
 

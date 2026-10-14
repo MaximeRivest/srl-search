@@ -198,3 +198,16 @@ Measured with Kimi as the yardstick (validate_kimi.py; recall = the meta-analyse
 Where the recall went: of the on-topic studies v2 misses, 106 were found by v1 among the works the field cites, which
 Jev judged one by one; v2 had them as candidates, and its students (taught by the decider) rejected them. The decider
 said yes to 9 of the 15 on-topic references it judged; its 10,000 training examples for the students were 7% on topic.
+
+### Second run (selection v3: title-only teacher labels, balanced decider set, cut-offs from held-back labels)
+
+| Selection | Teacher $ | Time | Papers | Recall (abstract / title only) | Precision |
+|---|---:|---:|---:|---:|---:|
+| v1 Jev | 1.56 | 13.5 min | 35,123 | 0.86 (0.87 / 0.86) | 0.86 |
+| v2 | 0.47 | 19.6 min | 41,362 | 0.67 (0.70 / 0.61) | 0.73 |
+| v3 | 0.41 | 25 min | 57,818 | 0.76 (0.78 / 0.71) | 0.56 |
+
+Title-only teacher labels helped (title-only recall 0.61 -> 0.71). The cut-offs did not: chosen for the best F1 on 68
+held-back teacher papers (decider 0.2, students 0.6), but those papers are ~45% on topic (sampled evenly from near to
+far), while the ~700k candidates are mostly off topic: a cut-off balanced on the sample lets far too many in at scale
+(base rate). Held-back AUC: decider 0.954, students 0.928. Decider training took 504 s (cause not found yet).

@@ -242,7 +242,9 @@ def _decider_train(d: Path, steps: int = 75) -> None:
     yes, no = tok.encode("yes", add_special_tokens=False)[0], tok.encode("no", add_special_tokens=False)[0]
     head = torch.nn.Parameter(model.get_output_embeddings().weight[[yes, no]].detach().clone().float())
     free = torch.cuda.mem_get_info()[0]
-    if free < 17 * 2**30:                        # ~15 GB without it: recompute activations instead (~30% slower)
+    # 16 papers a step in any case: 4 x 4 needs ~15 GB, 2 x 8 ~10 GB; below that, recompute activations (~30% slower)
+    bs = 4 if free >= 17 * 2**30 else 2
+    if free < 11 * 2**30:
         model.gradient_checkpointing_enable(gradient_checkpointing_kwargs={"use_reentrant": False})
         model.enable_input_require_grads()
     model = get_peft_model(model, LoraConfig(r=16, lora_alpha=32, lora_dropout=0.05, target_modules="all-linear",
@@ -264,14 +266,14 @@ def _decider_train(d: Path, steps: int = 75) -> None:
     model.train()
     order: list[int] = []
     for step in range(steps):
-        for _ in range(4):                       # 4 x 4 papers a step
-            if len(order) < 4:
+        for _ in range(16 // bs):
+            if len(order) < bs:
                 order += rng.sample(range(len(rows)), len(rows))
-            b, order = order[:4], order[4:]
+            b, order = order[:bs], order[bs:]
             y = torch.tensor([float(rows[i]["y"] >= 0.5) for i in b], device="cuda")
             with torch.autocast("cuda", dtype=torch.bfloat16):
                 m = margin([rows[i]["text"] for i in b])
-            (F.binary_cross_entropy_with_logits(m.float(), y) / 4).backward()
+            (F.binary_cross_entropy_with_logits(m.float(), y) / (16 // bs)).backward()
         torch.nn.utils.clip_grad_norm_(params, 1.0)
         opt.step()
         sched.step()
@@ -304,6 +306,8 @@ def _student(d: Path, epochs: int = 2) -> None:
     enc = lambda ts: [tok(t, truncation=True, max_length=maxlen)["input_ids"] for t in ts]
     X = enc([r["text"] for r in train])
     y = torch.tensor([0 if r["y"] >= 0.5 else 1 for r in train])
+    npos = int((y == 0).sum()) or 1
+    cw = torch.tensor([len(y) / (2 * npos), len(y) / (2 * max(1, len(y) - npos))], device="cuda")   # both classes count
     model = AutoModelForSequenceClassification.from_pretrained(STUDENT_BASE, num_labels=2, attn_implementation="sdpa",
                                                                dtype=torch.float32).to("cuda")
 
@@ -322,7 +326,7 @@ def _student(d: Path, epochs: int = 2) -> None:
     for _ in range(epochs):
         for b, e in batches(X, True, 32):
             with torch.autocast("cuda", dtype=torch.bfloat16):
-                loss = F.cross_entropy(model(**e).logits.float(), y[b].to("cuda"))
+                loss = F.cross_entropy(model(**e).logits.float(), y[b].to("cuda"), weight=cw)
             opt.zero_grad(set_to_none=True)
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
