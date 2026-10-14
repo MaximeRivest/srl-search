@@ -278,3 +278,23 @@ End-to-end run (habitat fragmentation, 13.6 min, Kimi $0.48 + Jev $0.46 for 17,2
 
 Caveat: the band was chosen on the same classics yardstick (a fresh run, but the rule is tuned on it); one topic.
 Also: vLLM now leaves 4 GB of the card free and retries once with less (dictation grew by 1.4 GB under it: OOM).
+
+### Selection v5 on a second topic: LLM post-training (a young machine-learning field)
+
+"LLM post-training" alone failed the teacher check (13 of 204 on topic): "LLM" is also the Master of Laws, and half
+the nearest papers were about legal education. With a definition it runs (the pool search now uses the definition
+too; before, only the teacher read it). 9.9 min, $0.56, 27,514 papers. Measured with Kimi on 970 papers sampled in
+strata of the candidates ($1.43, `teacher/eval_population_llm_posttraining.json`) and a checklist of 44 landmark
+papers (InstructGPT, DPO, FLAN, DeepSeek-R1...; `teacher/round2/landmarks.tsv`):
+
+- Precision 0.56, recall 0.79, landmarks 37/44 (3 are not among the candidates; Christiano 2017 and Self-Instruct
+  score < 0.1; Jev refused DPO). Wrong papers: fine-tuning of smaller models in general (adapters, intermediate-task
+  training, BERT-style domain tuning).
+- OpenAlex lacks reference lists for most arXiv papers (8 of 10 surveys of the field have none) and undercounts their
+  citations (DPO: 294): the cited route (3,937 works) and the "cited 20+ times" Jev check (1,273 papers, $0.04) do little.
+- The students expect 30,900 on-topic papers; Kimi's and Jev's labels of the stratified sample both say ~19,000.
+  Students taught by Jev (9,119 labels, $0.27) instead of the decider: no better (P 0.54 / R 0.88). Rescaling the
+  students' probabilities on a stratified Jev sample fixes the count but only moves along the curve (P 0.67 / R 0.64).
+  The decider checking every paper scoring >= 0.1 itself: P 0.59 / R 0.76. The small models' ranking is the limit here.
+- Jev checking every paper scoring >= 0.2 (34,260 papers, ~$0.93): P 0.86 / R 0.72; >= 0.1 (44,044, ~$1.19): P 0.83 / R 0.74.
+  Jev agrees with Kimi on 90% of the sample here (and on the count: 18,800 vs 19,700).

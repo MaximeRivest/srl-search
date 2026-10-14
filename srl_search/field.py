@@ -415,7 +415,7 @@ def select_field(ctx: Ctx, job: Job, q: str, definition: str | None, keywords: s
     #   quarter from the works the nearest papers cite (many have only a title: the decider must learn those too)
     t = time.time()
     job.stage(0, f"gathering the {POOL:,} papers closest to the topic")
-    qv = eng.encoder.encode(q)[0]
+    qv = eng.encoder.encode(f"{q}: {definition}" if definition else q)[0]     # "LLM" alone is also a law degree
     _, ca = eng.index.search(qv.reshape(1, -1), POOL, params=faiss.SearchParametersIVF(nprobe=2048))
     rows_a = ca[0][ca[0] >= 0]
     VA = unit(eng.vectors.get(rows_a))
@@ -607,6 +607,7 @@ def select_field(ctx: Ctx, job: Job, q: str, definition: str | None, keywords: s
         if w in pos:
             final[pos[w]] = v
     cut, ef1 = _plugin_cut(final)
+    before_check = final.copy()
     # Jev checks what readers will see: well-cited papers near the cut-off (measured on habitat fragmentation:
     # precision 0.75 -> 0.82, recall 0.73 -> 0.77; among papers cited 50+ times 0.70 / 0.78 -> 0.86 / 0.86). Its
     # answers decide those papers; nothing learns from them
@@ -629,7 +630,7 @@ def select_field(ctx: Ctx, job: Job, q: str, definition: str | None, keywords: s
                        "papers": len(chk), "answered": len(checked), "failed": jev.failed,
                        "in": int(sum(v >= 0.5 for v in checked.values())), "usd": round(jev.usd, 3),
                        "seconds": round(time.time() - t_jev, 1)}
-    np.savez_compressed(work / "scores.npz", ids=univ, final=final, student=stud, route=np.array(
+    np.savez_compressed(work / "scores.npz", ids=univ, final=final, before_check=before_check, cut=cut, student=stud, route=np.array(
         [0] * len(U_w) + [1] * len(H) + [2] * len(C), np.int8), features=feats.astype(np.float32))
     names = ("student", "cited by the field", "share of its citations", "share of its references", "no references")
     report["judging"] = {"cut": cut, "expected_f1": ef1, "expected_on_topic": round(float(final.sum())),
@@ -792,12 +793,12 @@ def worker(store: Path = ROOT) -> None:
 def main(argv: list[str]) -> None:
     if argv[:1] == ["worker"]:
         return worker()
-    if argv[:1] == ["run"] and len(argv) >= 2:      # one topic, now, in this process (for tests and experiments)
-        from srl_search.topic_service import VERSION
+    if argv[:1] == ["run"] and len(argv) >= 2:      # run TOPIC [DEFINITION]: one topic, now, in this process
         store = Path(os.environ.get("SRL_FIELDS", str(ROOT)))
-        key = field_key(argv[1])
+        definition = argv[2] if len(argv) >= 3 else None
+        key = field_key(argv[1], definition)
         _write(store / key / "job.json", {"status": "queued", "kind": "full", "key": key, "created": _now(),
-                                         "request": {"q": argv[1], "definition": None, "keywords": None}})
+                                         "request": {"q": argv[1], "definition": definition, "keywords": None}})
         run_job(Ctx(), store, key)
         print(json.dumps(_read(store / key / "job.json"), indent=1))
         return

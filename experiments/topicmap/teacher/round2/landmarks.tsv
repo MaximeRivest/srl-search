@@ -1,0 +1,47 @@
+W2626804490	507	OK	Deep reinforcement learning from human preferences	Deep reinforcement learning from human preferences
+W2973379954	397	OK	Fine-Tuning Language Models from Human Preferences	Fine-Tuning Language Models from Human Preferences
+W3082115681	37	OK	Learning to summarize from human feedback	Learning to summarize from human feedback
+W4226278401	4351	OK	Training language models to follow instructions with human f	Training language models to follow instructions with human f
+W7166526593	0	CHECK	Constitutional AI: Harmlessness from AI Feedback	Constitutional AI on Trial: Stress Testing Claude Sonnet and
+W4223908421	393	OK	Training a Helpful and Harmless Assistant with Reinforcement	Training a Helpful and Harmless Assistant with Reinforcement
+W4378771755	294	OK	Direct Preference Optimization: Your Language Model is Secre	Direct Preference Optimization: Your Language Model is Secre
+W3198002980	69	OK	Finetuned Language Models Are Zero-Shot Learners	Finetuned Language Models Are Zero-Shot Learners
+W3205068155	563	OK	Multitask Prompted Training Enables Zero-Shot Task Generaliz	Multitask Prompted Training Enables Zero-Shot Task Generaliz
+W4307079201	1201	OK	Scaling Instruction-Finetuned Language Models	Scaling Instruction-Finetuned Language Models
+W6920344956	0	OK	Super-NaturalInstructions: Generalization via Declarative In	Super-NaturalInstructions: Generalization via Declarative In
+W4385572634	667	OK	Self-Instruct: Aligning Language Models with Self-Generated 	Self-Instruct: Aligning Language Models with Self-Generated 
+W4377297670	130	OK	LIMA: Less Is More for Alignment	LIMA: Less Is More for Alignment
+W4367000491	109	CHECK	WizardLM: Empowering Large Language Models to Follow Complex	WizardLM: Empowering large pre-trained language models to fo
+W4379539933	71	OK	Orca: Progressive Learning from Complex Explanation Traces o	Orca: Progressive Learning from Complex Explanation Traces o
+W4387994989	56	OK	Zephyr: Direct Distillation of LM Alignment	Zephyr: Direct Distillation of LM Alignment
+W4387322976	22	CHECK	UltraFeedback: Boosting Language Models with High-quality Fe	UltraFeedback: Boosting Language Models with Scaled AI Feedb
+W4386437475	70	CHECK	RLAIF: Scaling Reinforcement Learning from Human Feedback wi	RLAIF vs. RLHF: Scaling Reinforcement Learning from Human Fe
+W4307001524	37	OK	Scaling Laws for Reward Model Overoptimization	Scaling Laws for Reward Model Overoptimization
+W7115036306	0	OK	A General Theoretical Paradigm to Understand Learning from H	A general theoretical paradigm to understand learning from h
+W4391555989	23	OK	KTO: Model Alignment as Prospect Theoretic Optimization	KTO: Model Alignment as Prospect Theoretic Optimization
+W4392781203	8	OK	ORPO: Monolithic Preference Optimization without Reference M	ORPO: Monolithic Preference Optimization without Reference M
+W4398859186	8	OK	SimPO: Simple Preference Optimization with a Reference-Free 	SimPO: Simple Preference Optimization with a Reference-Free 
+W4365211596	37	OK	RRHF: Rank Responses to Align Language Models with Human Fee	RRHF: Rank Responses to Align Language Models with Human Fee
+W4366196653	32	OK	RAFT: Reward rAnked FineTuning for Generative Foundation Mod	RAFT: Reward rAnked FineTuning for Generative Foundation Mod
+W4391047180	10	OK	Self-Rewarding Language Models	Self-Rewarding Language Models
+W4390573302	11	OK	Self-Play Fine-Tuning Converts Weak Language Models to Stron	Self-Play Fine-Tuning Converts Weak Language Models to Stron
+W4386080611	18	OK	Reinforced Self-Training (ReST) for Language Modeling	Reinforced Self-Training (ReST) for Language Modeling
+W4226369848	118	OK	STaR: Bootstrapping Reasoning With Reasoning	STaR: Bootstrapping Reasoning With Reasoning
+W4379089709	31	OK	Let's Verify Step by Step	Let's Verify Step by Step
+W3210904070	23	OK	Training Verifiers to Solve Math Word Problems	Training Verifiers to Solve Math Word Problems
+W4417299031	0	CHECK	DeepSeekMath: Pushing the Limits of Mathematical Reasoning i	Evaluating Mathematical Reasoning Across Large Language Mode
+W4414281281	1011	CHECK	DeepSeek-R1: Incentivizing Reasoning Capability in LLMs via 	DeepSeek-R1 incentivizes reasoning in LLMs through reinforce
+W4406774573	12	OK	Kimi k1.5: Scaling Reinforcement Learning with LLMs	Kimi k1.5: Scaling Reinforcement Learning with LLMs
+W6979307423	0	OK	DAPO: An Open-Source LLM Reinforcement Learning System at Sc	DAPO: An Open-Source LLM Reinforcement Learning System at Sc
+W4409049124	6	OK	Understanding R1-Zero-Like Training: A Critical Perspective	Understanding R1-Zero-Like Training: A Critical Perspective
+W4392121102	1	OK	Back to Basics: Revisiting REINFORCE Style Optimization for 	Back to Basics: Revisiting REINFORCE Style Optimization for 
+W4404987838	8	OK	Tulu 3: Pushing Frontiers in Open Language Model Post-Traini	Tulu 3: Pushing Frontiers in Open Language Model Post-Traini
+W6928748004	2	OK	Open Problems and Fundamental Limitations of Reinforcement L	Open Problems and Fundamental Limitations of Reinforcement L
+W4384111857	19	OK	Secrets of RLHF in Large Language Models Part I: PPO	Secrets of RLHF in Large Language Models Part I: PPO
+W4387838992	21	OK	Safe RLHF: Safe Reinforcement Learning from Human Feedback	Safe RLHF: Safe Reinforcement Learning from Human Feedback
+W4386793209	7	OK	Statistical Rejection Sampling Improves Preference Optimizat	Statistical Rejection Sampling Improves Preference Optimizat
+W7019882953	7	OK	Iterative Preference Learning from Human Feedback: Bridging 	Iterative Preference Learning from Human Feedback: Bridging 
+W4362707064	189	OK	Instruction Tuning with GPT-4	Instruction Tuning with GPT-4
+W4318908031	113	OK	The Flan Collection: Designing Data and Methods for Effectiv	The Flan Collection: Designing Data and Methods for Effectiv
+W4380136143	39	OK	How Far Can Camels Go? Exploring the State of Instruction Tu	How Far Can Camels Go? Exploring the State of Instruction Tu
+W4391697658	25	CHECK	Llama 2: Open Foundation and Fine-Tuned Chat Models	Performance Analysis of LoRA Finetuning Llama-2
