@@ -106,3 +106,17 @@ def test_blockwise_text_neighbours_equal_the_full_computation(monkeypatch):
     monkeypatch.setattr(T, "BLOCK", 13)
     b = T.text_graph(V, has, 7).toarray()
     assert np.allclose(a, b)
+
+
+def test_paused_blocks_new_fields_but_not_map_rebuilds(tmp_path):
+    (tmp_path / "PAUSED").write_text("Paused while the judge changes.")
+    st = F.FieldStore(tmp_path)
+    with pytest.raises(HTTPException) as e:
+        st.get("new topic", None, None, "v1", None)
+    assert e.value.status_code == 503 and "Paused while the judge changes." in e.value.detail
+    key = F.field_key("old topic")
+    (tmp_path / key).mkdir()
+    (tmp_path / key / "field.json").write_text("{}")
+    with pytest.raises(F.Pending) as p:
+        st.get("old topic", None, None, "v2", None)
+    assert p.value.status["kind"] == "map"

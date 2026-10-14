@@ -92,6 +92,15 @@ def _read(path: Path):
         return None
 
 
+def paused(root: Path) -> str | None:
+    """New fields are paused when ROOT/PAUSED exists (its text says why). Maps of fields already selected can
+    still be rebuilt: that uses no AI judgments."""
+    try:
+        return (root / "PAUSED").read_text().strip() or "New whole-field maps are paused."
+    except OSError:
+        return None
+
+
 class Pending(Exception):
     """The whole-field map is being made (or waits its turn): the job's status, for the caller to show."""
 
@@ -150,6 +159,9 @@ class FieldStore:
             raise HTTPException(409, "No whole-field map of this topic yet: ask for it without read= to start one "
                                      "(it takes about half an hour).")
         kind = "map" if (d / "field.json").exists() else "full"
+        if kind == "full" and paused(self.root):
+            raise HTTPException(503, paused(self.root) + " Whole-field maps already made still open; the 1,000-paper "
+                                     "map works for any topic.", headers={"Retry-After": "86400"})
         if kind == "full":
             queued_full = sum(1 for k in self.queued() if (_read(self.root / k / "job.json") or {}).get("kind") == "full")
             if len(self.queued()) >= MAX_QUEUED:
@@ -619,6 +631,8 @@ def run_job(ctx: Ctx, store: Path, key: str) -> None:
     sel = _read(sel_path)
     try:
         if sel is None or job.st.get("kind") == "full":
+            if paused(store):                          # queued before the pause: not run
+                raise FinalError(paused(store))
             jev = Jev(store)
             sel = select_field(ctx, job, req["q"], req.get("definition"), req.get("keywords"), jev)
             _write(sel_path, sel)
