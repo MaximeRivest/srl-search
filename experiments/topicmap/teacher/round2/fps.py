@@ -1,0 +1,8 @@
+fp = np.flatnonzero(ok_e & (d_ev >= .95) & (ev_y < .5))
+print("confident false yes:", len(fp), "weighted share of confident yes:", round(w_e[fp].sum() / w_e[ok_e & (d_ev >= .95)].sum(), 2))
+print(collections.Counter(ev_st[fp].tolist()).most_common())
+rs = np.random.default_rng(1)
+for i in rs.choice(fp, 14, replace=False): print(" -", ev_st[i], "|", ev_texts[i].split("\n")[0][7:130])
+fn = np.flatnonzero(ok_e & (d_ev < .3) & (ev_y >= .5))
+print("missed (decider < 0.3, Kimi yes):", len(fn), collections.Counter(ev_st[fn].tolist()).most_common(6))
+for i in fn[:6]: print(" -", ev_st[i], "|", ev_texts[i].split("\n")[0][7:130])

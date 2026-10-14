@@ -16,6 +16,7 @@ dependencies = [
   "mcp==2.3.0",
   "igraph>=1.0,<2",
   "peft>=0.17",
+  "flash-linear-attention==0.5.2",
 ]
 
 [dependency-groups]

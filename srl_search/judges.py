@@ -87,6 +87,7 @@ class Teacher:
         self.dead: set[str] = set()
         self.limited: dict[str, int] = {}
         self.slots = {n: threading.BoundedSemaphore(CAPS.get(n, 32)) for n, *_ in self.providers}
+        self.slowest: dict[str, float] = {}           # seconds, per provider: one stuck call holds up a whole label()
 
     def _one(self, i: int, system: str, text: str) -> float:
         """One answer: providers in turn from this paper's own offset; a full provider is skipped, a failed call is
@@ -114,14 +115,17 @@ class Teacher:
         return float("nan")
 
     def _call(self, name, url, body, price, key) -> float:
+        t0 = time.time()
         try:
             req = urllib.request.Request(url, data=body, headers={
                 "Authorization": f"Bearer {os.environ[key]}", "Content-Type": "application/json",
                 "User-Agent": "scholarsreadinglist-fields/1"})              # Together's Cloudflare refuses urllib's
-            with urllib.request.urlopen(req, timeout=60) as r:
+            # answers take 1-6 s (8 output tokens): a call still waiting at 20 s is stuck; another provider is asked
+            with urllib.request.urlopen(req, timeout=20) as r:
                 out = json.load(r)
             u = out.get("usage") or {}
             with self.lock:
+                self.slowest[name] = round(max(self.slowest.get(name, 0.0), time.time() - t0), 1)
                 self.usd += (u.get("prompt_tokens", 0) * price[0] + u.get("completion_tokens", 0) * price[1]) / 1e6
             ans = (out["choices"][0]["message"].get("content") or "").strip().lower().strip(".\"'")
             if ans.startswith("not on topic"):
@@ -242,9 +246,10 @@ def _decider_train(d: Path, steps: int = 75) -> None:
     yes, no = tok.encode("yes", add_special_tokens=False)[0], tok.encode("no", add_special_tokens=False)[0]
     head = torch.nn.Parameter(model.get_output_embeddings().weight[[yes, no]].detach().clone().float())
     free = torch.cuda.mem_get_info()[0]
-    # 16 papers a step in any case: 4 x 4 needs ~15 GB, 2 x 8 ~10 GB; below that, recompute activations (~30% slower)
-    bs = 4 if free >= 17 * 2**30 else 2
-    if free < 11 * 2**30:
+    # 16 papers a step in any case. With flash-linear-attention's kernels (5x faster than transformers' torch fallback
+    # for Qwen3.5's linear-attention layers) 4 papers of 600 tokens need ~7 GB; below 6 GB, recompute activations
+    bs = 8 if free >= 14 * 2**30 else 4 if free >= 9 * 2**30 else 2
+    if free < 6 * 2**30:
         model.gradient_checkpointing_enable(gradient_checkpointing_kwargs={"use_reentrant": False})
         model.enable_input_require_grads()
     model = get_peft_model(model, LoraConfig(r=16, lora_alpha=32, lora_dropout=0.05, target_modules="all-linear",
@@ -255,8 +260,9 @@ def _decider_train(d: Path, steps: int = 75) -> None:
                                        tokenize=False, add_generation_prompt=True, enable_thinking=False)
 
     def margin(texts):
+        # lengths rounded up to 128: the kernels are tuned once per shape (~1-2 s each), not once per batch
         enc = tok([prompt(t) for t in texts], return_tensors="pt", padding=True, truncation=True, max_length=640,
-                  add_special_tokens=False).to("cuda")
+                  pad_to_multiple_of=128, add_special_tokens=False).to("cuda")
         h = model.get_base_model().model(**enc).last_hidden_state[:, -1, :].float()
         lg = h @ head.T
         return lg[:, 0] - lg[:, 1]
@@ -292,7 +298,7 @@ def _decider_train(d: Path, steps: int = 75) -> None:
 
 
 def _student(d: Path, epochs: int = 2) -> None:
-    """Ettin-17M, all weights (tiny-classifiers' recipe), trained on the rows, then scores score.jsonl."""
+    """Ettin-17M, all weights (tiny-classifiers' recipe), trained on the rows (y: P(on topic)), then scores score.jsonl."""
     import torch
     import torch.nn.functional as F
     from transformers import AutoModelForSequenceClassification, AutoTokenizer
@@ -305,9 +311,9 @@ def _student(d: Path, epochs: int = 2) -> None:
     maxlen = min(512, 64 * math.ceil(lens[int(.95 * len(lens))] / 64))
     enc = lambda ts: [tok(t, truncation=True, max_length=maxlen)["input_ids"] for t in ts]
     X = enc([r["text"] for r in train])
-    y = torch.tensor([0 if r["y"] >= 0.5 else 1 for r in train])
-    npos = int((y == 0).sum()) or 1
-    cw = torch.tensor([len(y) / (2 * npos), len(y) / (2 * max(1, len(y) - npos))], device="cuda")   # both classes count
+    # soft targets: the decider's probabilities as they are (distillation), the teacher's answers as 0/1. No class
+    # weights: they shift every probability towards "yes", and most candidates are not on topic
+    y = torch.tensor([[float(r["y"]), 1.0 - float(r["y"])] for r in train])
     model = AutoModelForSequenceClassification.from_pretrained(STUDENT_BASE, num_labels=2, attn_implementation="sdpa",
                                                                dtype=torch.float32).to("cuda")
 
@@ -326,7 +332,7 @@ def _student(d: Path, epochs: int = 2) -> None:
     for _ in range(epochs):
         for b, e in batches(X, True, 32):
             with torch.autocast("cuda", dtype=torch.bfloat16):
-                loss = F.cross_entropy(model(**e).logits.float(), y[b].to("cuda"), weight=cw)
+                loss = F.cross_entropy(model(**e).logits.float(), y[b].to("cuda"))
             opt.zero_grad(set_to_none=True)
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)

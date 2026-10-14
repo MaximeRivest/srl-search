@@ -211,3 +211,46 @@ Title-only teacher labels helped (title-only recall 0.61 -> 0.71). The cut-offs 
 held-back teacher papers (decider 0.2, students 0.6), but those papers are ~45% on topic (sampled evenly from near to
 far), while the ~700k candidates are mostly off topic: a cut-off balanced on the sample lets far too many in at scale
 (base rate). Held-back AUC: decider 0.954, students 0.928. Decider training took 504 s (cause not found yet).
+
+### Round 2 (selection v4): measured on the whole candidate population, not 68 held-back papers
+
+A population yardstick: Kimi K3 labelled 1,585 papers sampled in strata from v3's 690,564 candidates ($2.00;
+`teacher/eval_population.json`, analysis in `teacher/round2/`). Estimated on-topic papers among the candidates: ~52,400.
+
+Findings, in order:
+1. v3's cut-offs were set on 68 held-back answers (half on topic) while candidates are ~8% on topic; and the students
+   were trained with class weights and on yes/no labels at the decider's 0.2 cut. Each shifted answers towards yes.
+2. The real limit was the decider. With 272 answers it ranks well (AUC 0.967 on the population) but is overconfident
+   (when it says 0.99, Kimi agrees 78%); judging every candidate itself it would reach at best P 0.68 / R 0.70.
+   Its confident mistakes are neighbouring subjects (population genetics, metapopulations, deforestation mapping).
+3. 400 answers instead of 272 (dropping the held-back set, same $0.49): decider AUC 0.967 -> 0.98, best F1 0.69 -> 0.76.
+   Choosing the extra 128 where the first classifier is unsure (active learning) vs spreading them: F1 0.758 vs 0.741
+   (one training each: within noise, but active learning is better at recall >= 0.7).
+4. Students learning the decider's probabilities (no class weights): AUC 0.977, about as good as the decider.
+5. A second decider pass on the papers the students are least sure about: no gain (F1 0.740 -> 0.741-0.748 for
+   10-40k papers, 2-5 min of GPU). Dropped.
+6. The meta-analyses' missed studies are the field's classics in older words ("woodlots as biogeographic islands",
+   "forest remnants"): the decider itself scores them ~0 (105 of 159 below 0.1). Citation signals separate them (median
+   22% of their citations come from the likely field vs 0.4% for off-topic candidates). A combiner (student score +
+   citation signals) fitted on the teacher's answers, baseline shifted to the students' expected count: +5 points of
+   meta-analysis recall at the same precision (simulated).
+7. Expected-F1 cut-off from the probabilities of all candidates (no labels): the students' probabilities add up to
+   54,900 expected on-topic papers vs ~52,400 estimated from Kimi: calibrated enough to pick the cut-off.
+8. Speed: teaching the decider took 504 s because the search environment lacked flash-linear-attention: transformers
+   5.3 then runs Qwen3.5's linear-attention layers in plain PyTorch (0.83 s vs 0.16 s per batch). With it, and text
+   lengths rounded up to 128 (its kernels are tuned once per shape): 95 s. The teacher's 64 s inside the job was one
+   stuck request waiting out a 60 s timeout (alone: 7 s for 150 papers; under load single answers take up to 20 s):
+   timeout now 20 s, then another provider. NOTE: the live environment (search/.venv) needs flash-linear-attention too.
+
+End-to-end run (habitat fragmentation, selection v4, 400 Kimi answers, $0.48, 14.6 min: teacher 35 s, candidates
+43 s, decider 95 s, decider labels 149 s, students 154 s, judging 7 s, map 192 s, subgroups 200 s):
+
+| Selection | $ | Time | Papers | Precision (90% range) | Population recall | Meta-analyses' studies (title only) |
+|---|---:|---:|---:|---:|---:|---:|
+| v1 Jev | 1.56 | 13.5 min | 35,123 | 0.91 (0.87-0.94) | 0.64 | 0.86 (0.86) |
+| v3 | 0.41 | 25 min | 57,818 | 0.59 (0.55-0.63) | 0.65 | 0.76 (0.71) |
+| v4 | 0.48 | 14.6 min | 44,749 | 0.73 (0.67-0.79) | 0.67 | 0.77 (0.79) |
+
+v4 is better than v3 everywhere but still short of v1 in precision and in the meta-analyses' studies. Every variant
+tried lands on the same curve (population F1 ~0.70-0.74, the cut-off only moves along it); v1 lies above it. What v1
+had is knowledge of the field's vocabulary, old and new, that a 0.8B model does not get from 400 examples.
