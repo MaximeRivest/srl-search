@@ -1,0 +1,712 @@
+{
+ "reviews": {
+  "2149427681": {
+   "label": "plant reproduction (Aguilar 2006)",
+   "references_indexed": 72,
+   "on_topic": 27,
+   "phrases": 0.593,
+   "near-300k": 0.63,
+   "classifier>=0.5": 0.63,
+   "union: classifier>=0.5 or phrases": 0.63
+  },
+  "4414026499": {
+   "label": "insect pollinators (2025)",
+   "references_indexed": 63,
+   "on_topic": 26,
+   "phrases": 0.577,
+   "near-300k": 0.654,
+   "classifier>=0.5": 0.615,
+   "union: classifier>=0.5 or phrases": 0.615
+  },
+  "2582456127": {
+   "label": "insect herbivores and herbivory (2017)",
+   "references_indexed": 72,
+   "on_topic": 30,
+   "phrases": 0.633,
+   "near-300k": 0.733,
+   "classifier>=0.5": 0.667,
+   "union: classifier>=0.5 or phrases": 0.7
+  },
+  "2119776782": {
+   "label": "herbivorous insects (2014)",
+   "references_indexed": 87,
+   "on_topic": 47,
+   "phrases": 0.362,
+   "near-300k": 0.617,
+   "classifier>=0.5": 0.489,
+   "union: classifier>=0.5 or phrases": 0.511
+  },
+  "4200024369": {
+   "label": "seagrass edges and fragmentation (2021)",
+   "references_indexed": 60,
+   "on_topic": 24,
+   "phrases": 0.333,
+   "near-300k": 0.667,
+   "classifier>=0.5": 0.583,
+   "union: classifier>=0.5 or phrases": 0.583
+  },
+  "2898210967": {
+   "label": "genetic effects (2018)",
+   "references_indexed": 69,
+   "on_topic": 30,
+   "phrases": 0.5,
+   "near-300k": 0.6,
+   "classifier>=0.5": 0.567,
+   "union: classifier>=0.5 or phrases": 0.567
+  },
+  "1905487223": {
+   "label": "woody plants, genetic diversity (2011)",
+   "references_indexed": 71,
+   "on_topic": 22,
+   "phrases": 0.455,
+   "near-300k": 0.545,
+   "classifier>=0.5": 0.5,
+   "union: classifier>=0.5 or phrases": 0.5
+  },
+  "2114975481": {
+   "label": "nest predators (2002)",
+   "references_indexed": 137,
+   "on_topic": 90,
+   "phrases": 0.5,
+   "near-300k": 0.756,
+   "classifier>=0.5": 0.589,
+   "union: classifier>=0.5 or phrases": 0.622
+  },
+  "1811969986": {
+   "label": "interspecific interactions (2014)",
+   "references_indexed": 51,
+   "on_topic": 18,
+   "phrases": 0.333,
+   "near-300k": 0.5,
+   "classifier>=0.5": 0.5,
+   "union: classifier>=0.5 or phrases": 0.5
+  },
+  "4387764691": {
+   "label": "mutualisms and antagonisms (2023)",
+   "references_indexed": 53,
+   "on_topic": 25,
+   "phrases": 0.76,
+   "near-300k": 0.8,
+   "classifier>=0.5": 0.68,
+   "union: classifier>=0.5 or phrases": 0.76
+  },
+  "3154832160": {
+   "label": "herpetofauna of Brazil (2021)",
+   "references_indexed": 76,
+   "on_topic": 26,
+   "phrases": 0.385,
+   "near-300k": 0.538,
+   "classifier>=0.5": 0.538,
+   "union: classifier>=0.5 or phrases": 0.538
+  },
+  "2315712689": {
+   "label": "mammal life histories (2014)",
+   "references_indexed": 100,
+   "on_topic": 70,
+   "phrases": 0.329,
+   "near-300k": 0.629,
+   "classifier>=0.5": 0.5,
+   "union: classifier>=0.5 or phrases": 0.514
+  },
+  "2112037272": {
+   "label": "bird reproductive traits (2011)",
+   "references_indexed": 25,
+   "on_topic": 5,
+   "phrases": 0.8,
+   "near-300k": 1.0,
+   "classifier>=0.5": 1.0,
+   "union: classifier>=0.5 or phrases": 1.0
+  },
+  "2141365420": {
+   "label": "patch size effect (Bender 1998)",
+   "references_indexed": 65,
+   "on_topic": 40,
+   "phrases": 0.225,
+   "near-300k": 0.625,
+   "classifier>=0.5": 0.35,
+   "union: classifier>=0.5 or phrases": 0.35
+  },
+  "1482764309": {
+   "label": "matrix composition (Prevedello 2010)",
+   "references_indexed": 49,
+   "on_topic": 27,
+   "phrases": 0.444,
+   "near-300k": 0.741,
+   "classifier>=0.5": 0.704,
+   "union: classifier>=0.5 or phrases": 0.704
+  },
+  "2104734141": {
+   "label": "climate x habitat loss (Mantyka-Pringle 2011)",
+   "references_indexed": 104,
+   "on_topic": 11,
+   "phrases": 0.364,
+   "near-300k": 0.545,
+   "classifier>=0.5": 0.364,
+   "union: classifier>=0.5 or phrases": 0.455
+  },
+  "2026695720": {
+   "label": "wetland vertebrates, habitat loss (2014)",
+   "references_indexed": 89,
+   "on_topic": 43,
+   "phrases": 0.442,
+   "near-300k": 0.628,
+   "classifier>=0.5": 0.628,
+   "union: classifier>=0.5 or phrases": 0.628
+  },
+  "1977549989": {
+   "label": "trophic disruption (2014)",
+   "references_indexed": 92,
+   "on_topic": 39,
+   "phrases": 0.487,
+   "near-300k": 0.846,
+   "classifier>=0.5": 0.564,
+   "union: classifier>=0.5 or phrases": 0.641
+  },
+  "4410144033": {
+   "label": "dam-induced river fragmentation (2025)",
+   "references_indexed": 145,
+   "on_topic": 63,
+   "phrases": 0.159,
+   "near-300k": 0.603,
+   "classifier>=0.5": 0.063,
+   "union: classifier>=0.5 or phrases": 0.175
+  }
+ },
+ "references": 1244,
+ "on_topic": 589,
+ "on_topic_with_vector": 414,
+ "publication_references": 839,
+ "phrase_matches": 36513,
+ "pool": 538161,
+ "classifier_output_size": {
+  "0.3": 96326,
+  "0.5": 31876,
+  "0.7": 14314
+ },
+ "field_set": 54731,
+ "expansion_added_size": {
+  "2": 192152,
+  "3": 111365,
+  "5": 57966,
+  "10": 23491
+ },
+ "near_k_similarity": {
+  "10000": 0.5467,
+  "30000": 0.4971,
+  "100000": 0.439,
+  "300000": 0.2671
+ },
+ "recall": {
+  "phrases": {
+   "recall_on_topic": 0.424,
+   "ci95_by_review": [
+    0.35,
+    0.496
+   ],
+   "recall_on_topic_with_abstract_vector": 0.604,
+   "recall_all_publication_references": 0.319,
+   "by_year": {
+    "before 2000": 0.379,
+    "2000-2009": 0.477,
+    "2010 on": 0.404
+   }
+  },
+  "near-10k": {
+   "recall_on_topic": 0.302,
+   "ci95_by_review": [
+    0.244,
+    0.399
+   ],
+   "recall_on_topic_with_abstract_vector": 0.43,
+   "recall_all_publication_references": 0.253,
+   "by_year": {
+    "before 2000": 0.247,
+    "2000-2009": 0.357,
+    "2010 on": 0.288
+   }
+  },
+  "near-30k": {
+   "recall_on_topic": 0.424,
+   "ci95_by_review": [
+    0.34,
+    0.516
+   ],
+   "recall_on_topic_with_abstract_vector": 0.604,
+   "recall_all_publication_references": 0.383,
+   "by_year": {
+    "before 2000": 0.394,
+    "2000-2009": 0.489,
+    "2010 on": 0.365
+   }
+  },
+  "near-100k": {
+   "recall_on_topic": 0.548,
+   "ci95_by_review": [
+    0.444,
+    0.627
+   ],
+   "recall_on_topic_with_abstract_vector": 0.78,
+   "recall_all_publication_references": 0.553,
+   "by_year": {
+    "before 2000": 0.566,
+    "2000-2009": 0.604,
+    "2010 on": 0.442
+   }
+  },
+  "near-300k": {
+   "recall_on_topic": 0.676,
+   "ci95_by_review": [
+    0.62,
+    0.705
+   ],
+   "recall_on_topic_with_abstract_vector": 0.961,
+   "recall_all_publication_references": 0.882,
+   "by_year": {
+    "before 2000": 0.682,
+    "2000-2009": 0.685,
+    "2010 on": 0.654
+   }
+  },
+  "classifier>=0.3": {
+   "recall_on_topic": 0.596,
+   "ci95_by_review": [
+    0.494,
+    0.656
+   ],
+   "recall_on_topic_with_abstract_vector": 0.848,
+   "recall_all_publication_references": 0.476,
+   "by_year": {
+    "before 2000": 0.626,
+    "2000-2009": 0.643,
+    "2010 on": 0.487
+   }
+  },
+  "classifier>=0.5": {
+   "recall_on_topic": 0.516,
+   "ci95_by_review": [
+    0.416,
+    0.592
+   ],
+   "recall_on_topic_with_abstract_vector": 0.734,
+   "recall_all_publication_references": 0.38,
+   "by_year": {
+    "before 2000": 0.5,
+    "2000-2009": 0.596,
+    "2010 on": 0.417
+   }
+  },
+  "classifier>=0.7": {
+   "recall_on_topic": 0.423,
+   "ci95_by_review": [
+    0.328,
+    0.507
+   ],
+   "recall_on_topic_with_abstract_vector": 0.601,
+   "recall_all_publication_references": 0.3,
+   "by_year": {
+    "before 2000": 0.379,
+    "2000-2009": 0.515,
+    "2010 on": 0.34
+   }
+  },
+  "classifier>=0.5 anywhere": {
+   "recall_on_topic": 0.52,
+   "ci95_by_review": [
+    0.419,
+    0.597
+   ],
+   "recall_on_topic_with_abstract_vector": 0.739,
+   "recall_all_publication_references": 0.383,
+   "by_year": {
+    "before 2000": 0.505,
+    "2000-2009": 0.596,
+    "2010 on": 0.423
+   }
+  },
+  "union: classifier>=0.5 or phrases": {
+   "recall_on_topic": 0.545,
+   "ci95_by_review": [
+    0.458,
+    0.615
+   ],
+   "recall_on_topic_with_abstract_vector": 0.775,
+   "recall_all_publication_references": 0.417,
+   "by_year": {
+    "before 2000": 0.52,
+    "2000-2009": 0.609,
+    "2010 on": 0.481
+   }
+  },
+  "union + cited by >=2 field papers": {
+   "recall_on_topic": 0.954,
+   "ci95_by_review": [
+    0.893,
+    0.996
+   ],
+   "recall_on_topic_with_abstract_vector": 0.957,
+   "recall_all_publication_references": 0.856,
+   "by_year": {
+    "before 2000": 0.99,
+    "2000-2009": 0.974,
+    "2010 on": 0.878
+   }
+  },
+  "union + cited by >=3 field papers": {
+   "recall_on_topic": 0.942,
+   "ci95_by_review": [
+    0.879,
+    0.991
+   ],
+   "recall_on_topic_with_abstract_vector": 0.942,
+   "recall_all_publication_references": 0.812,
+   "by_year": {
+    "before 2000": 0.975,
+    "2000-2009": 0.966,
+    "2010 on": 0.865
+   }
+  },
+  "union + cited by >=5 field papers": {
+   "recall_on_topic": 0.908,
+   "ci95_by_review": [
+    0.818,
+    0.981
+   ],
+   "recall_on_topic_with_abstract_vector": 0.911,
+   "recall_all_publication_references": 0.753,
+   "by_year": {
+    "before 2000": 0.949,
+    "2000-2009": 0.945,
+    "2010 on": 0.801
+   }
+  },
+  "union + cited by >=10 field papers": {
+   "recall_on_topic": 0.854,
+   "ci95_by_review": [
+    0.741,
+    0.952
+   ],
+   "recall_on_topic_with_abstract_vector": 0.879,
+   "recall_all_publication_references": 0.665,
+   "by_year": {
+    "before 2000": 0.914,
+    "2000-2009": 0.906,
+    "2010 on": 0.699
+   }
+  }
+ },
+ "missed_by_union": [
+  {
+   "id": "W748478685",
+   "year": 1990,
+   "jev": 0.95,
+   "p": 0.0,
+   "has_vector": false,
+   "in_phrases": false,
+   "title": "Is forest fragmentation a management issue in the northeast? Papers from the technical session sponsored by the Wildlife and Fish Ecology Working Group, Society"
+  },
+  {
+   "id": "W1967001119",
+   "year": 2013,
+   "jev": 0.79,
+   "p": 0.098,
+   "has_vector": true,
+   "in_phrases": false,
+   "title": "Anadromous Sea Lampreys Recolonize a Maine Coastal River Tributary after Dam Removal"
+  },
+  {
+   "id": "W1980360582",
+   "year": 2012,
+   "jev": 0.97,
+   "p": 0.0,
+   "has_vector": false,
+   "in_phrases": false,
+   "title": "Influences of habitat fragmentation by damming on the genetic structure of masu salmon populations in Hokkaido, Japan"
+  },
+  {
+   "id": "W1980396783",
+   "year": 1976,
+   "jev": 0.59,
+   "p": 0.378,
+   "has_vector": true,
+   "in_phrases": false,
+   "title": "Distribution, abundance, size, and genetic variation of Peromyscus maniculatus on the Gulf Islands of British Columbia"
+  },
+  {
+   "id": "W1988681995",
+   "year": 2004,
+   "jev": 0.7,
+   "p": 0.151,
+   "has_vector": true,
+   "in_phrases": false,
+   "title": "Stream crossings and the conservation of diadromous invertebrates in South Pacific island streams"
+  },
+  {
+   "id": "W2037946510",
+   "year": 2005,
+   "jev": 0.69,
+   "p": 0.0,
+   "has_vector": false,
+   "in_phrases": false,
+   "title": "EFFECT OF RE-OPENING OF A MIGRATORY PATHWAY FOR EEL (ANGUILLA ANGUILLA, L.) AT A WATERSHED SCALE"
+  },
+  {
+   "id": "W2044114918",
+   "year": 2008,
+   "jev": 0.77,
+   "p": 0.0,
+   "has_vector": false,
+   "in_phrases": false,
+   "title": "Composición, riqueza de especies y abundancia de insectos defoliadores de actividad nocturna asociados a Aristotelia chilensis (maqui) en el bosque maulino frag"
+  },
+  {
+   "id": "W2055957708",
+   "year": 2004,
+   "jev": 0.83,
+   "p": 0.0,
+   "has_vector": false,
+   "in_phrases": false,
+   "title": "Edge effects and the responses of aerial insect assemblages to structural-retention harvesting in Canadian boreal peatland forests"
+  },
+  {
+   "id": "W2072893711",
+   "year": 2001,
+   "jev": 0.68,
+   "p": 0.29,
+   "has_vector": true,
+   "in_phrases": false,
+   "title": "Short-term use of different residual forest structures by three sciurid species in a clear-cut boreal landscape"
+  },
+  {
+   "id": "W2083015984",
+   "year": 2011,
+   "jev": 0.95,
+   "p": 0.304,
+   "has_vector": true,
+   "in_phrases": false,
+   "title": "Genetic Population Structure of Olympic Peninsula Bull Trout Populations and Implications for Elwha Dam Removal"
+  },
+  {
+   "id": "W2095356081",
+   "year": 1988,
+   "jev": 0.75,
+   "p": 0.065,
+   "has_vector": true,
+   "in_phrases": false,
+   "title": "The influence of a dam having no fishway on the distribution of decapod crustaceans in the Yukinoura river, Nagasaki, Japan."
+  },
+  {
+   "id": "W2101388709",
+   "year": 1994,
+   "jev": 0.94,
+   "p": 0.326,
+   "has_vector": true,
+   "in_phrases": false,
+   "title": "Patterns of abundance and demography: Collembola in a habitat patch gradient"
+  },
+  {
+   "id": "W2116351086",
+   "year": 2013,
+   "jev": 0.75,
+   "p": 0.365,
+   "has_vector": true,
+   "in_phrases": false,
+   "title": "Colonization of Steelhead in a Natal Stream after Barrier Removal"
+  },
+  {
+   "id": "W2126600884",
+   "year": 2007,
+   "jev": 0.65,
+   "p": 0.054,
+   "has_vector": true,
+   "in_phrases": false,
+   "title": "Anthropogenic Impacts on American Eel Demographics in Hudson River Tributaries, New York"
+  },
+  {
+   "id": "W2142543083",
+   "year": 1986,
+   "jev": 0.65,
+   "p": 0.35,
+   "has_vector": true,
+   "in_phrases": false,
+   "title": "Shrews on small islands: epigenetic variation elucidates population stability"
+  },
+  {
+   "id": "W2153674343",
+   "year": 2012,
+   "jev": 0.51,
+   "p": 0.0,
+   "has_vector": false,
+   "in_phrases": false,
+   "title": "Distribution of freshwater macroinvertebrates in streams with dams and associated reservoirs on a subtropical oceanic island off southern Japan"
+  },
+  {
+   "id": "W2315698385",
+   "year": 2013,
+   "jev": 0.93,
+   "p": 0.103,
+   "has_vector": true,
+   "in_phrases": false,
+   "title": "Genetic divergence and landlocking of a common freshwater goby Rhinogobius fluviatilis in the Yoshino River system"
+  },
+  {
+   "id": "W2328992719",
+   "year": 2012,
+   "jev": 0.94,
+   "p": 0.114,
+   "has_vector": true,
+   "in_phrases": false,
+   "title": "Genetic influence of the dam isolations in the Kamo and Nakayama River systems on the common fresh water goby populations Rhinogobius spp."
+  },
+  {
+   "id": "W2330048450",
+   "year": 2016,
+   "jev": 0.52,
+   "p": 0.0,
+   "has_vector": false,
+   "in_phrases": false,
+   "title": "Landscape context affects site occupancy of pond-breeding anurans across a disturbance gradient in the Brazilian Cerrado"
+  },
+  {
+   "id": "W2330757639",
+   "year": 2012,
+   "jev": 0.75,
+   "p": 0.081,
+   "has_vector": true,
+   "in_phrases": false,
+   "title": "Effects of weirs on fish fauna of the lowest reaches of two tidal rivers draining into the Tone River estuary"
+  },
+  {
+   "id": "W2565090875",
+   "year": 2016,
+   "jev": 0.76,
+   "p": 0.13,
+   "has_vector": true,
+   "in_phrases": false,
+   "title": "Genetic Characterization of Oncorhynchus mykiss Prior to Dam Removal with Implications for Recolonization of the Elwha River Watershed, Washington"
+  },
+  {
+   "id": "W2809034835",
+   "year": 2018,
+   "jev": 0.68,
+   "p": 0.036,
+   "has_vector": true,
+   "in_phrases": false,
+   "title": "Ancestry and Adaptation of Rainbow Trout in Yosemite National Park"
+  },
+  {
+   "id": "W2810709955",
+   "year": 2018,
+   "jev": 0.51,
+   "p": 0.041,
+   "has_vector": true,
+   "in_phrases": false,
+   "title": "Ecology and conservation of the American eel in the Caribbean region"
+  },
+  {
+   "id": "W2895104509",
+   "year": 2018,
+   "jev": 0.81,
+   "p": 0.0,
+   "has_vector": false,
+   "in_phrases": false,
+   "title": "Simultaneous assessment of two passage facilities for maintaining hydrological connectivity for subtropical coastal riverine fish"
+  },
+  {
+   "id": "W3047748003",
+   "year": 2020,
+   "jev": 0.56,
+   "p": 0.11,
+   "has_vector": true,
+   "in_phrases": false,
+   "title": "Population Genetic Assessment of Anadromous and Resident Striped Bass (Morone saxatilis) in the Roanoke River System, Eastern United States"
+  },
+  {
+   "id": "W4221052663",
+   "year": 2022,
+   "jev": 0.83,
+   "p": 0.164,
+   "has_vector": true,
+   "in_phrases": false,
+   "title": "Fish assemblage response to removal of a low‐head dam in the lower reach of a tropical island river"
+  },
+  {
+   "id": "W4232159824",
+   "year": 2002,
+   "jev": 0.96,
+   "p": 0.0,
+   "has_vector": false,
+   "in_phrases": false,
+   "title": "Delayed Responses of Small-Mammal Assemblages Subject to Afforestation-Induced Grassland Fragmentation"
+  },
+  {
+   "id": "W4253849019",
+   "year": 2004,
+   "jev": 0.97,
+   "p": 0.0,
+   "has_vector": false,
+   "in_phrases": false,
+   "title": "Efectos de la Fragmentación Sobre la Aborción y Depredación de Semillas en el Chaco Serrano1"
+  },
+  {
+   "id": "W4285711535",
+   "year": 2020,
+   "jev": 0.69,
+   "p": 0.118,
+   "has_vector": true,
+   "in_phrases": false,
+   "title": "Effects of dams on demographic structures of amphidromous fish and crustacean species in Caribbean rivers"
+  },
+  {
+   "id": "W4296613398",
+   "year": 2022,
+   "jev": 0.77,
+   "p": 0.215,
+   "has_vector": true,
+   "in_phrases": false,
+   "title": "Environmental DNA reveals anadromous river herring habitat use and recolonization after restoration of aquatic connectivity"
+  },
+  {
+   "id": "W4321503396",
+   "year": 2023,
+   "jev": 0.85,
+   "p": 0.274,
+   "has_vector": true,
+   "in_phrases": false,
+   "title": "Colonization of a temperate river by mobile fish following habitat reconnection"
+  },
+  {
+   "id": "W4322505112",
+   "year": 2023,
+   "jev": 0.78,
+   "p": 0.12,
+   "has_vector": true,
+   "in_phrases": false,
+   "title": "Integrating environmental DNA monitoring to inform eel ( Anguilla anguilla ) status in freshwaters at their easternmost range—A case study in Cyprus"
+  },
+  {
+   "id": "W4367834919",
+   "year": 2023,
+   "jev": 0.53,
+   "p": 0.086,
+   "has_vector": true,
+   "in_phrases": false,
+   "title": "Early detection and recovery of river herring spawning habitat use in response to a mainstem dam removal"
+  },
+  {
+   "id": "W4407338469",
+   "year": 2025,
+   "jev": 0.97,
+   "p": 0.206,
+   "has_vector": true,
+   "in_phrases": false,
+   "title": "Small dams fragment assemblages of diadromous and freshwater decapods in Hong Kong lowland streams"
+  }
+ ],
+ "timing": {
+  "load_s": 34.6,
+  "pool_s": 46.5,
+  "pool_details_s": 54.1,
+  "jev_s": 7.6,
+  "expansion_s": 5.7
+ }
+}

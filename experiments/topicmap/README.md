@@ -121,3 +121,28 @@ between seeds); choosing by group count fixed it.
 - [3] https://doi.org/10.1038/s41598-019-41695-z · Traag, Waltman & van Eck 2019, Sci. Rep.: Leiden guarantees connected communities.
 - [4] https://doi.org/10.48550/arxiv.1802.03426 · McInnes, Healy & Melville 2018: UMAP (the fuzzy k-nearest-neighbour graph).
 - [5] https://doi.org/10.1038/srep00336 · Lancichinetti & Fortunato 2012, Sci. Rep.: consensus clustering in complex networks.
+
+## The whole field, not the closest 1,000 (experiments, 2026-10-13/14, habitat fragmentation)
+
+- `calibrate_scope.py`: 8 archetypes → 300k closest by meaning → Jev (jev-1.13.0, one Noul) labels 850 papers
+  stratified by distance (5 s, ~2¢). No single distance cut-off works: 98% on topic in the top 500, still 8-20%
+  at ranks 20k-120k. ~24k on-topic papers in the 282k; about half never use a fragmentation phrase.
+- `probe_scope.py`: logistic regression on meaning vectors trained on those labels ranks the far papers far better
+  than distance (cross-validated AUC beyond rank 10k: 0.97 vs 0.67).
+- `recall_reviews.py`: recall on the 589 on-topic studies cited by 19 meta-analyses and systematic reviews (not
+  archetypes; on topic = Jev on title + abstract; 95% intervals by resampling reviews):
+
+| Method | Papers kept | Recall | Recall, studies with an abstract vector |
+|---|---:|---:|---:|
+| exact phrases | 36.5k | 0.42 | 0.60 |
+| 300k closest by meaning | 282k | 0.68 | 0.96 |
+| classifier ≥ 0.5 | 31.9k | 0.52 | 0.73 |
+| classifier ≥ 0.5 or phrases | 54.7k | 0.55 | 0.78 |
+| … + works cited by ≥ 3 of those papers | +111k | **0.94** (0.88-0.99) | 0.94 |
+| … + works cited by ≥ 5 | +58k | 0.91 (0.82-0.98) | 0.91 |
+
+  30% of the reviews' on-topic studies have no English abstract in the corpus (older papers, books, chapters,
+  theses): no text search can find them; the field's own citations do. Weak spots: dam-fragmented rivers
+  (classifier 0.06: its training sample had almost no river papers), old island and patch-size studies.
+  Limits: on-topic is Jev's judgment, so Jev's own errors are not measured (a person checking ~50 references
+  would); reviews favour well-cited studies, so recall of recent work is overstated (2010+: 0.87 at ≥ 3).
