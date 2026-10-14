@@ -56,7 +56,7 @@ def test_serves_finished_maps_and_says_why_a_group_has_no_split(tmp_path):
 
 def test_budget_and_queue_limits(tmp_path, monkeypatch):
     st = F.FieldStore(tmp_path)
-    (tmp_path / "spend.json").write_text(json.dumps({date.today().isoformat(): F.BUDGET_USD - 1}))
+    (tmp_path / "spend.json").write_text(json.dumps({date.today().isoformat(): F.BUDGET_USD - F.EST_USD / 2}))
     with pytest.raises(HTTPException) as e:
         st.get("a b", None, None, "v1", None)
     assert e.value.status_code == 503 and "budget" in e.value.detail
@@ -80,8 +80,9 @@ def test_a_topic_that_cannot_be_mapped_says_why_once(tmp_path):
 
 def test_definition_is_part_of_the_identity():
     assert F.field_key("bats") != F.field_key("bats", "the flying mammals")
-    q = F.jev_question("bats", "the flying mammals")
-    assert q["instructions"]["definition"] == "the flying mammals" and q["type"] == "noul"
+    from srl_search.judges import instruction, paper_text
+    assert "the flying mammals" in instruction("bats", "the flying mammals")
+    assert paper_text("<i>T</i>", None) == "Title: T\n(no abstract)" and "Abstract: a b" in paper_text("T", "a\n b")
 
 
 def test_blockwise_coupling_keeps_the_same_strongest_links(monkeypatch):

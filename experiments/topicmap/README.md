@@ -181,3 +181,20 @@ training), $1.31 per 1,000 papers, ~450 a second through tiny-classifiers' label
   vLLM 0.29 it gives the same scores (0.9605). Start-up: 112 s compiled, 21 s eager (95 vs 109 papers/s): eager wins.
 - Vector prefilter keeping 99% of on-topic papers: still keeps 58% of candidates; small gain.
 - Grouping the 33k-paper fragmentation map: 398 s on one core, 85 s with Leiden runs on 24 cores (same 11 groups).
+
+### First end-to-end run of the cheap recipe (field.py selection v2, 2026-10-14) — not good enough yet
+
+Habitat fragmentation, from the topic's words only: 340 Kimi labels ($0.47), decider, students, map. 19.6 min
+(teacher 73 s, candidates 23 s, decider training 408 s with gradient checkpointing on the shared GPU 1, decider
+labels 159 s, students 143 s, map 170 s, subgroups 196 s). 41,362 papers.
+
+Measured with Kimi as the yardstick (validate_kimi.py; recall = the meta-analyses' references Kimi calls on topic):
+
+| Selection | Papers | Recall (abstract / title only) | Precision (400 random papers) |
+|---|---:|---:|---:|
+| v1, Jev judging, $1.56 | 35,123 | 0.86 (0.87 / 0.86) | 0.86 |
+| v2, Kimi $0.47 + decider + students | 41,362 | 0.67 (0.70 / 0.61) | 0.73 |
+
+Where the recall went: of the on-topic studies v2 misses, 106 were found by v1 among the works the field cites, which
+Jev judged one by one; v2 had them as candidates, and its students (taught by the decider) rejected them. The decider
+said yes to 9 of the 15 on-topic references it judged; its 10,000 training examples for the students were 7% on topic.

@@ -1,31 +1,30 @@
 """Whole-field topic maps: every paper of a research field, not the 1,000 closest to a question.
 
-Measured on habitat fragmentation (experiments/topicmap/README.md): the 1,000 closest papers are a corner of a
-field of ~25-60k; no distance cut-off separates the field from its neighbours; exact phrases miss half of it; and
-30% of the studies that meta-analyses cite have no English abstract, so no text search can see them. What worked:
+Why (experiments/topicmap/README.md): the 1,000 closest papers are a corner of a field of ~10-60k; no distance
+cut-off separates a field from its neighbours; exact phrases miss half of it; and ~30% of the studies meta-analyses
+cite have no English abstract, so only the field's own citations reach them. How, for <= $0.50 of AI labels and
+without Jev (TypeSafe's terms forbid training on its answers; srl_search/judges.py):
 
-  1 archetypes   the 300 papers closest in meaning to the topic, labelled by Jev (TypeSafe's yes/no judgment
-                 model); the field's centre = the mean of the on-topic ones
-  2 pool         the 300,000 papers closest to that centre (publications, not junk)
-  3 labels       Jev labels a sample spread evenly from nearest to farthest
-  4 classifier   logistic regression on the papers' meaning vectors, trained on Jev's labels (on far papers it
-                 ranks far better than distance: cross-validated AUC 0.97 vs 0.67); a second pool of 300,000
-                 along the classifier's own direction; two rounds of labelling where it is unsure
-  5 phrases      papers with the topic's exact phrase: kept if the classifier agrees (P >= 0.3), or if Jev does
-                 when they have no meaning vector
-  6 citations    works cited by >= 3 papers of the field so far (reaches studies without abstracts), each judged
-                 by Jev (on its title and abstract, or its title alone)
-  7 map          the topic map of all of it (srl_search/topics.py, strongest 30 reference links per paper)
+  1 teacher      the 300k papers closest in meaning to the topic; Kimi K3 judges 375 of them, spread from nearest
+                 to farthest (~$0.49)
+  2 candidates   a classifier on meaning vectors trained on those answers searches a second 300k along its own
+                 direction; the topic's exact phrase; works cited >= 3 times by the likely field
+  3 decider      Qwen3.5-0.8B learns the teacher's judgments (yes/no head, LoRA, ~2.5 min on GPU 1)
+  4 decider labels  it judges ~10,000 candidates where it matters (vLLM, ~2 min)
+  5 students     the vector classifier again, and Ettin-17M on text, both taught by the teacher and the decider;
+                 Ettin judges papers with a title only, and those the vector classifier is unsure about
+  6 judging      every candidate: the teacher's or decider's own answer, else the students'
+  7 map          the topic map of all of it (srl_search/topics.py; Leiden runs on 24 cores)
   8 subgroups    every group of 300+ papers split into its own groups
 
-On 19 meta-analyses of habitat fragmentation, steps 1-6 found 94% of the studies they cite (text alone: 42-68%).
-A field takes ~20-40 minutes and ~$1-3 of Jev. It runs as a job (`python -m srl_search.field worker`, started by
-the srl-fields path unit when a job file appears), never in the search API, which only reads results and queues
-jobs (FieldStore). Results are kept across nightly releases: the selected field (field.json) is the expensive
-part; maps are rebuilt from it when the map code changes (~10 min).
+The search API only reads results and queues jobs (FieldStore); the worker (`python -m srl_search.field worker`,
+started by the srl-fields path unit) runs them one at a time. GPU steps wait for free memory on GPU 1 and never stop
+the household services there. Results are kept across nightly releases: the selected field (field.json) is the
+expensive part; maps are rebuilt from it when the map code changes (~5 min).
 
-Store: ROOT/<key>/job.json (status), field.json (the papers and how each was found), maps/<code version>/
-main.json and group-<n>.json; ROOT/queue/<key>.job (jobs to run); ROOT/spend.json (Jev dollars per day).
+Store: ROOT/<key>/job.json (status), field.json (the papers, how each was found, the labels), work/ (the job's
+models and files), maps/<code version>/main.json and group-<n>.json; ROOT/queue/<key>.job (jobs to run);
+ROOT/spend.json (teacher dollars per day); ROOT/PAUSED (new fields refused, with the reason).
 """
 from __future__ import annotations
 
@@ -49,24 +48,24 @@ import numpy as np
 from fastapi import HTTPException
 
 ROOT = Path(os.environ.get("SRL_FIELDS", "/mnt/fast/scholarsreadinglist/search/fields"))
-SELECTION_VERSION = "1"
-JEV_MODEL = "jev-1.13.0"                 # pinned: the labels' meaning must not move under a running job
-JEV_USD_PER_TOKEN = 0.042 / 1e6          # input tokens; output is free (docs.typesafe.ai/models, 2026-10)
-BUDGET_USD = float(os.environ.get("SRL_FIELD_BUDGET_USD", "10"))    # Jev spend a day, all jobs together
-EST_USD = 3.0                            # what a new field is assumed to cost when deciding to accept it
+SELECTION_VERSION = "2"                  # 2: Kimi K3 teacher + 0.8B decider + students (no Jev); 1: Jev
+TEACHER_USD = float(os.environ.get("SRL_FIELD_TEACHER_USD", "0.50"))   # Kimi K3 labels per field
+TEACHER_N = 340                          # ~$0.48 at $1.42 per 1,000 papers (measured in the job: longer prompt)
+DECIDER_N = 10_000                       # papers the decider labels for the students
+BUDGET_USD = float(os.environ.get("SRL_FIELD_BUDGET_USD", "10"))    # teacher spend a day, all jobs together
+EST_USD = TEACHER_USD                    # what a new field is assumed to cost when deciding to accept it
 MAX_QUEUED = 3
 POOL = 300_000
-SEED_K = 300                             # archetype candidates
-MIN_ARCHETYPES = 15
-SAMPLE_PER_BUCKET = 40
-ACTIVE_ROUNDS, ACTIVE_N = 2, 300
+MIN_ON_TOPIC = 15                        # teacher's on-topic answers needed to go on
 CITED_K = 3
 EXPANSION_MAX = 300_000
+BAND = (0.2, 0.8)                        # the vector classifier is unsure here: the text student judges too
 TOO_BROAD_TAIL = 0.30                    # share on topic among the farthest of the 300k: the field goes on beyond
 TOO_BROAD_PAPERS = 150_000
 SPLIT_MIN = 300                          # groups at least this big get their own subgroups
-STAGES = [("archetypes", 60), ("pool", 150), ("labels", 45), ("classifier", 180), ("phrases", 90),
-          ("citations", 420), ("map", 600), ("subgroups", 420)]
+LEIDEN_WORKERS = int(os.environ.get("SRL_FIELDS_WORKERS", "24"))
+STAGES = [("teacher", 40), ("candidates", 150), ("decider", 200), ("decider labels", 150), ("students", 90),
+          ("judging", 120), ("map", 200), ("subgroups", 120)]
 
 
 def field_key(q: str, definition: str | None = None, keywords: str | None = None) -> str:
@@ -202,69 +201,15 @@ def pending_text(st: dict, q: str, base: str) -> str:
             f"{base}/topics/{urllib.parse.quote(q)}\n")
 
 
-# ------------------------------------------------------------------------------------------------ Jev
-def jev_question(topic: str, definition: str | None) -> dict:
-    ins = {"topic": topic}
-    if definition:
-        ins["definition"] = definition
-    ins["question"] = ("Is `topic` a central subject of the paper described in `paper`?"
-                       + (" `definition` says what the topic covers." if definition else ""))
-    return {"type": "noul", "instructions": ins, "criteria": {
-        "true": "The paper studies the topic itself as a main subject: the phenomenon, its causes, consequences, "
-                "mechanisms, measurement, methods, or how it is managed, in any system or organism.",
-        "false": "The topic is absent or only mentioned in passing; or the words mean something else in this paper; "
-                 "or the paper studies a neighbouring subject without studying the topic itself."}}
-
-
-class Jev:
-    def __init__(self, store_root: Path, threads: int = 64):
-        self.key = os.environ.get("TYPESAFE_API_KEY")
-        if not self.key:
-            raise RuntimeError("TYPESAFE_API_KEY is not set")
-        self.root, self.threads = store_root, threads
-        self.tokens = self.calls = self.failed = 0
-
-    def _one(self, state: dict, question: dict) -> float:
-        body = json.dumps({"state": state, "model": JEV_MODEL, "questions": {"q": question}}).encode()
-        for attempt in range(7):
-            try:
-                req = urllib.request.Request("https://api.typesafe.ai/v1/systemone", data=body, headers={
-                    "Authorization": f"Bearer {self.key}", "Content-Type": "application/json"})
-                with urllib.request.urlopen(req, timeout=60) as r:
-                    out = json.load(r)
-                self.tokens += int(out.get("usage", {}).get("input_tokens", 0))
-                return float(out["answers"]["q"]["noul"])
-            except urllib.error.HTTPError as e:
-                wait = float(e.headers.get("retry-after") or 0) or 2 ** attempt
-                if e.code not in (429, 500, 502, 503, 504):
-                    break
-                time.sleep(min(wait, 60))
-            except (OSError, ValueError, KeyError):
-                time.sleep(2 ** attempt)
-        self.failed += 1
-        return float("nan")
-
-    def label(self, papers: list[dict], question: dict) -> np.ndarray:
-        """P(yes) for each {"title", "abstract"}; NaN when the service did not answer."""
-        t0 = self.tokens
-        with ThreadPoolExecutor(self.threads) as ex:
-            out = np.array(list(ex.map(lambda p: self._one({"paper": p}, question), papers)), dtype=np.float64)
-        self.calls += len(papers)
-        self._spend((self.tokens - t0) * JEV_USD_PER_TOKEN)
-        return out
-
-    def _spend(self, usd: float) -> None:
-        path = self.root / "spend.json"
-        with open(self.root / "spend.lock", "w") as lk:
-            fcntl.flock(lk, fcntl.LOCK_EX)
-            led = _read(path) or {}
-            today = date.today().isoformat()
-            led[today] = round(led.get(today, 0.0) + usd, 4)
-            _write(path, led)
-
-    @property
-    def usd(self) -> float:
-        return self.tokens * JEV_USD_PER_TOKEN
+def _spend(root: Path, usd: float) -> None:
+    """Add to today's teacher spend (all jobs, for the daily budget)."""
+    path = root / "spend.json"
+    with open(root / "spend.lock", "w") as lk:
+        fcntl.flock(lk, fcntl.LOCK_EX)
+        led = _read(path) or {}
+        today = date.today().isoformat()
+        led[today] = round(led.get(today, 0.0) + usd, 4)
+        _write(path, led)
 
 
 # ------------------------------------------------------------------------------------------------ the worker
@@ -348,221 +293,219 @@ def _vectors(ctx: Ctx, ws) -> tuple[np.ndarray, np.ndarray]:
     return V, has
 
 
-def _paper(d: dict | None, cit=None, w: int | None = None) -> dict:
-    """What Jev reads about a paper: title and abstract, or the citation index's title alone."""
-    if d:
-        return {"title": re.sub(r"<[^>]+>", "", d.get("title") or ""), "abstract": re.sub(r"<[^>]+>", " ", d.get("abstract") or "")[:3000]}
-    nd = int(cit.nodes([w])[0]) if cit is not None and w is not None else -1
-    return {"title": cit.title(nd) if nd >= 0 else "", "abstract": ""}
-
-
-def select_field(ctx: Ctx, job: Job, q: str, definition: str | None, keywords: str | None, jev: Jev) -> dict:
+def select_field(ctx: Ctx, job: Job, q: str, definition: str | None, keywords: str | None) -> dict:
     import faiss
-    from sklearn.isotonic import IsotonicRegression
     from sklearn.linear_model import LogisticRegression
-    from sklearn.model_selection import StratifiedKFold, cross_val_predict
-    from sklearn.metrics import roc_auc_score
+    from srl_search import judges as J
     from srl_search.engine import passes
     from srl_search.scope import NON_PUBLICATION_TYPES
     eng, cit = ctx.engine, ctx.cit
-    question = jev_question(q, definition)
     faiss.omp_set_num_threads(16)
-    report: dict = {"topic": q, "definition": definition}
-    labels: dict[int, float] = {}               # work number -> Jev P(on topic)
+    report: dict = {"topic": q, "definition": definition, "teacher": "Kimi K3", "decider": J.DECIDER_BASE,
+                    "student": J.STUDENT_BASE}
+    work = job.dir / "work"
+    work.mkdir(parents=True, exist_ok=True)
+    say = lambda detail: job.stage(job.st.get("stage_index", 0), detail)
 
-    def ok_publications(ws: np.ndarray, V: np.ndarray) -> tuple[np.ndarray, dict]:
+    def texts_of(ws) -> list[str]:
         det = _details(ctx, ws)
-        junk = ctx.quality.junk(ws.astype(np.int64), V) if len(ws) else np.zeros(0)
-        ok = np.array([int(w) in det and passes(det[int(w)], {}) for w in ws]) & (junk < 0.5)
-        return ok, det
+        out = []
+        for w in ws:
+            d = det.get(int(w))
+            if d:
+                out.append(J.paper_text(d.get("title"), d.get("abstract")))
+            else:
+                nd = int(cit.nodes([int(w)])[0])
+                out.append(J.paper_text(cit.title(nd) if nd >= 0 else "", None))
+        return out
 
-    # 1 archetypes: the closest papers, judged; the field's centre is the mean of the on-topic ones
+    def lr(ws_y: dict[int, float]):
+        ws = np.array(list(ws_y), np.int64)
+        X, h = _vectors(ctx, ws)
+        y = np.array([ws_y[int(w)] >= 0.5 for w in ws])
+        return LogisticRegression(C=2.0, max_iter=4000, class_weight="balanced").fit(X[h], y[h])
+
+    # 1 the teacher labels papers spread from the nearest to the farthest of the 300k closest to the topic
     t = time.time()
-    job.stage(0, "judging the papers closest to the topic")
+    job.stage(0, f"gathering the {POOL:,} papers closest to the topic")
     qv = eng.encoder.encode(q)[0]
-    _, cand = eng.index.search(qv.reshape(1, -1), 2000, params=faiss.SearchParametersIVF(nprobe=512))
-    cand = cand[0][cand[0] >= 0]
-    V = unit(eng.vectors.get(cand))
-    ws = np.asarray(eng.work_ids[cand], dtype=np.int64)
-    order = np.argsort(-(V @ qv))
-    ws, V = ws[order], V[order]
-    ok, det = ok_publications(ws, V)
-    ws, V = ws[ok][:SEED_K], V[ok][:SEED_K]
-    lab = jev.label([_paper(det.get(int(w))) for w in ws], question)
-    labels.update({int(w): float(p) for w, p in zip(ws, lab) if not math.isnan(p)})
-    on = np.nan_to_num(lab) >= 0.5
-    report["archetypes"] = {"judged": int(len(ws)), "on_topic": int(on.sum())}
-    if on.sum() < MIN_ARCHETYPES:
-        raise FinalError(f"Only {int(on.sum())} of the {len(ws)} papers closest to “{q}” are about it: too few to find "
-                         "the field. Phrase the topic as papers about it would (e.g. “effects of habitat fragmentation "
-                         "on biodiversity”), or give a definition.")
-    centre = unit((V[on] * lab[on, None]).sum(0, keepdims=True))[0]
-    job.done_stage(0, t)
-
-    # 2 pool: the closest to the centre
-    t = time.time()
-    job.stage(1, f"{int(on.sum())} archetypes; gathering the {POOL:,} papers closest to them")
-    _, ca = eng.index.search(centre.reshape(1, -1).astype(np.float32), POOL, params=faiss.SearchParametersIVF(nprobe=2048))
+    _, ca = eng.index.search(qv.reshape(1, -1), POOL, params=faiss.SearchParametersIVF(nprobe=2048))
     rows_a = ca[0][ca[0] >= 0]
     VA = unit(eng.vectors.get(rows_a))
     wa = np.asarray(eng.work_ids[rows_a], dtype=np.int64)
-    sa = VA @ centre
-    o = np.argsort(-sa, kind="stable")
-    rows_a, VA, wa, sa = rows_a[o], VA[o], wa[o], sa[o]
-    okA, detA = ok_publications(wa, VA)
-    report["pool"] = {"nearest": int(len(wa)), "publications": int(okA.sum()),
-                      "similarity_range": [round(float(sa[0]), 4), round(float(sa[-1]), 4)]}
-    job.done_stage(1, t)
-
-    # 3 labels spread from nearest to farthest
-    t = time.time()
-    job.stage(2, "judging a sample from the nearest to the farthest")
+    o = np.argsort(-(VA @ qv), kind="stable")
+    rows_a, VA, wa = rows_a[o], VA[o], wa[o]
+    okA = ctx.quality.junk(wa, VA) < 0.5
     idxA = np.flatnonzero(okA)
     n = len(idxA)
     edges = sorted({0, *[int(n * f) for f in (.002, .004, .007, .01, .017, .025, .035, .05, .07, .1, .14, .2, .27, .4,
                                                 .55, .75)], n})
     rng = np.random.default_rng(0)
-    sample, bucket_of = [], []
-    for bi, (a, b) in enumerate(zip(edges, edges[1:])):
-        if b > a:
-            pick = rng.choice(np.arange(a, b), size=min(SAMPLE_PER_BUCKET, b - a), replace=False)
+    per = math.ceil(TEACHER_N * 1.25 / (len(edges) - 1))          # 25% spare: some are not publications
+    sample, bucket = [], []
+    for bi, (lo, hi) in enumerate(zip(edges, edges[1:])):
+        if hi > lo:
+            pick = rng.choice(np.arange(lo, hi), size=min(per, hi - lo), replace=False)
             sample += idxA[pick].tolist()
-            bucket_of += [bi] * len(pick)
-    lab = jev.label([_paper(detA.get(int(wa[i]))) for i in sample], question)
-    labels.update({int(wa[i]): float(p) for i, p in zip(sample, lab) if not math.isnan(p)})
-    bucket_of = np.array(bucket_of)
-    last = bucket_of == bucket_of.max()
-    tail = float(np.nanmean(lab[last] >= 0.5))
-    report["distance_curve"] = [{"ranks": [int(a), int(b)], "on_topic": round(float(np.nanmean(lab[bucket_of == bi] >= 0.5)), 3)}
-                                for bi, (a, b) in enumerate(zip(edges, edges[1:])) if (bucket_of == bi).any()]
-    report["farthest_on_topic"] = round(tail, 3)
+            bucket += [bi] * len(pick)
+    sw = wa[sample]
+    det = _details(ctx, sw)
+    keep = [k for k, w in enumerate(sw) if int(w) in det and passes(det[int(w)], {})]
+    keep = sorted(rng.choice(keep, size=min(TEACHER_N, len(keep)), replace=False).tolist())
+    sw, bucket = sw[keep], np.array(bucket)[keep]
+    job.stage(0, f"the teacher (Kimi K3) judges {len(sw)} papers")
+    teacher = J.Teacher(TEACHER_USD)
+    lab = teacher.label([J.paper_text(det[int(w)].get("title"), det[int(w)].get("abstract")) for w in sw], q, definition)
+    _spend(job.dir.parent, teacher.usd)
+    labels = {int(w): float(x) for w, x in zip(sw, lab) if not math.isnan(x)}
+    on = np.nan_to_num(lab) >= 0.5
+    last = bucket == bucket.max()
+    tail = float(on[last].mean()) if last.any() else 0.0
+    report["teacher_labels"] = {"papers": len(labels), "on_topic": int(on.sum()), "failed": teacher.failed,
+                                "usd": round(teacher.usd, 3), "farthest_on_topic": round(tail, 3)}
+    if on.sum() < MIN_ON_TOPIC:
+        raise FinalError(f"Only {int(on.sum())} of {len(sw)} papers judged near “{q}” are about it: too few to find the "
+                         "field. Phrase the topic as papers about it would, or give a definition.")
     if tail > TOO_BROAD_TAIL:
-        raise FinalError(f"“{q}” is broader than a whole-field map can hold: {round(100 * tail)}% of the papers at the "
-                         f"edge of the {POOL:,} closest are still about it. Map a narrower topic, or use the "
+        raise FinalError(f"“{q}” is broader than a whole-field map can hold today: {round(100 * tail)}% of the papers at "
+                         f"the edge of the {POOL:,} closest are still about it. Map a narrower topic, or use the "
                          "1,000-paper map.")
-    job.done_stage(2, t)
+    job.done_stage(0, t)
 
-    # 4 classifier on meaning, a second pool along its direction, two rounds where it is unsure
+    # 2 candidates: a classifier on meaning (teacher labels) searches a second pool along its direction; the exact
+    #   phrase; what the likely field cites. Nothing is judged for good yet.
     t = time.time()
-    job.stage(3, "training a classifier on the judgments; searching along it")
-
-    def train():
-        ws_l = np.array(list(labels), np.int64)
-        Xl, hl = _vectors(ctx, ws_l)
-        yl = np.array([labels[int(w)] >= 0.5 for w in ws_l])
-        Xl, yl = Xl[hl], yl[hl]
-        clf = LogisticRegression(C=2.0, max_iter=3000, class_weight="balanced").fit(Xl, yl)
-        return clf, Xl, yl
-
-    clf, Xl, yl = train()
-    wdir = unit(clf.coef_.astype(np.float32))[0]
+    job.stage(1, "searching along a first classifier; following citations")
+    lr0 = lr(labels)
+    wdir = unit(lr0.coef_.astype(np.float32))[0]
     _, cb = eng.index.search(wdir.reshape(1, -1), POOL, params=faiss.SearchParametersIVF(nprobe=2048))
     rows_b = np.setdiff1d(cb[0][cb[0] >= 0], rows_a)
     VB = unit(eng.vectors.get(rows_b)) if len(rows_b) else np.zeros((0, 768), np.float32)
     wb = np.asarray(eng.work_ids[rows_b], dtype=np.int64)
-    okB, detB = ok_publications(wb, VB)
+    okB = ctx.quality.junk(wb, VB) < 0.5 if len(wb) else np.zeros(0, bool)
     U_w = np.concatenate([wa[okA], wb[okB]])
     U_V = np.concatenate([VA[okA], VB[okB]])
     del VA, VB
-    det_U = {**detA, **detB}
-    for r in range(ACTIVE_ROUNDS):
-        p = clf.predict_proba(U_V)[:, 1]
-        unsure = np.flatnonzero((p > 0.1) & (p < 0.9) & ~np.isin(U_w, list(labels)))
-        if not len(unsure):
-            break
-        pick = unsure[np.argsort(p[unsure])][np.linspace(0, len(unsure) - 1, min(ACTIVE_N, len(unsure))).astype(int)]
-        lab = jev.label([_paper(det_U.get(int(U_w[i]))) for i in pick], question)
-        labels.update({int(U_w[i]): float(x) for i, x in zip(pick, lab) if not math.isnan(x)})
-        job.stage(3, f"round {r + 1}: judged {len(pick)} papers where the classifier was unsure")
-        clf, Xl, yl = train()
-    p_U = clf.predict_proba(U_V)[:, 1]
-    cv = cross_val_predict(LogisticRegression(C=2.0, max_iter=3000, class_weight="balanced"), Xl, yl,
-                           cv=StratifiedKFold(5, shuffle=True, random_state=0), method="predict_proba")[:, 1]
-    iso = IsotonicRegression(out_of_bounds="clip").fit(cv, yl)
-    report["classifier"] = {"labels": int(len(yl)), "on_topic_labels": int(yl.sum()),
-                            "cross_validated_auc": round(float(roc_auc_score(yl, cv)), 3),
-                            "pool": int(len(U_w)), "kept": int((p_U >= 0.5).sum()),
-                            "expected_on_topic_in_pool": round(float(iso.predict(p_U).sum()))}
-    field: dict[int, dict] = {int(w): {"via": "meaning", "p": round(float(x), 3)} for w, x in zip(U_w, p_U) if x >= 0.5}
-    if len(field) > TOO_BROAD_PAPERS:
-        raise FinalError(f"“{q}” has about {len(field):,} papers: too broad for a whole-field map. Map a narrower topic.")
-    for w in list(labels):            # what Jev said overrules the classifier for the papers it judged
-        if w in field and labels[w] < 0.5:
-            del field[w]
-        elif labels[w] >= 0.5 and w not in field:
-            field[w] = {"via": "judged", "p": None}
-    job.done_stage(3, t)
-
-    # 5 the topic's exact phrase
-    t = time.time()
+    p0 = lr0.predict_proba(U_V)[:, 1]
     phrase = keywords or (f'"{q}"' if len(q.split()) <= 6 and not re.search(r'["()*:]|\b(AND|OR|NOT)\b', q) else None)
-    report["phrases"] = {"query": phrase}
+    H = np.zeros(0, np.int64)
     if phrase:
-        job.stage(4, f"papers with the exact words {phrase}")
         hits, matches, _ = ctx.keywords.search(phrase, 200_000, {}, "all")
-        hw = np.array([h[0] for h in hits if h[0] not in field], np.int64)
-        Vh, hh = _vectors(ctx, hw)
-        ph = clf.predict_proba(Vh[hh])[:, 1] if hh.any() else np.zeros(0)
-        keep_v = [int(w) for w, x in zip(hw[hh], ph) if x >= 0.3]
-        rest = hw[~hh]
-        det_r = _details(ctx, rest)
-        rest = np.array([w for w in rest if int(w) in det_r and passes(det_r[int(w)], {})], np.int64)
-        lab = jev.label([_paper(det_r.get(int(w))) for w in rest], question) if len(rest) else np.zeros(0)
-        keep_j = [int(w) for w, x in zip(rest, lab) if x >= 0.5]
-        for w in keep_v:
-            field[w] = {"via": "phrase", "p": None}
-        for w in keep_j:
-            field[w] = {"via": "phrase+judged", "p": None}
-        report["phrases"].update({"matches": int(matches), "new": int(len(hw)), "kept_by_classifier": len(keep_v),
-                                  "judged_without_vector": int(len(rest)), "kept_by_judgment": len(keep_j)})
-    else:
-        job.stage(4, "no exact phrase for this topic")
-    job.done_stage(4, t)
-
-    # 6 what the field cites
-    t = time.time()
-    job.stage(5, f"{len(field):,} papers so far; following their references")
-    nodes = cit.nodes(np.array(sorted(field), np.int64))
+        H = np.setdiff1d(np.array([h[0] for h in hits], np.int64), U_w)
+        report["phrases"] = {"query": phrase, "matches": int(matches), "outside_pool": int(len(H))}
+    likely = np.concatenate([U_w[p0 >= 0.5], H])
+    nodes = cit.nodes(np.unique(likely))
     nodes = nodes[nodes >= 0]
     allrefs = np.concatenate([cit.refs(int(x)) for x in nodes]) if len(nodes) else np.zeros(0, np.uint32)
     u, cnt = np.unique(allrefs, return_counts=True)
     k = CITED_K
     while (cnt >= k).sum() > EXPANSION_MAX:
         k += 1
-    in_field = set(field)
-    bad_types = {i for i, tn in enumerate(cit.types) if tn in NON_PUBLICATION_TYPES}
-    cand_nodes = u[cnt >= k]
-    cand_nodes = cand_nodes[~np.isin(np.asarray(cit.kind[cand_nodes]), list(bad_types))]
-    cand = np.array([cit.work(int(x)) for x in cand_nodes], np.int64)
-    cand = cand[~np.isin(cand, list(in_field))]
-    det_c = _details(ctx, cand)
-    cand = np.array([w for w in cand if int(w) not in det_c or passes(det_c[int(w)], {})], np.int64)
-    Vc, hc = _vectors(ctx, cand)
-    pc = np.full(len(cand), np.nan)
-    if hc.any():
-        pc[hc] = clf.predict_proba(Vc[hc])[:, 1]
-    sure = hc & (pc >= 0.9)
-    ask = np.flatnonzero(~sure)
-    job.stage(5, f"judging {len(ask):,} works cited by ≥ {k} papers of the field")
-    lab = jev.label([_paper(det_c.get(int(cand[i])), cit, int(cand[i])) for i in ask], question) if len(ask) else np.zeros(0)
-    added = 0
-    for i in np.flatnonzero(sure):
-        field[int(cand[i])] = {"via": "cited", "p": round(float(pc[i]), 3)}
-        added += 1
-    for i, x in zip(ask, lab):
-        if x >= 0.5:
-            field[int(cand[i])] = {"via": "cited+judged", "p": None if math.isnan(pc[i]) else round(float(pc[i]), 3)}
-            added += 1
-    report["citations"] = {"cited_at_least": k, "candidates": int(len(cand)), "kept_by_classifier": int(sure.sum()),
-                           "judged": int(len(ask)), "added": added,
-                           "added_without_abstract_vector": int(sum(1 for i, x in zip(ask, lab) if x >= 0.5 and not hc[i]))}
-    job.done_stage(5, t)
+    bad_types = [i for i, tn in enumerate(cit.types) if tn in NON_PUBLICATION_TYPES]
+    cn = u[cnt >= k]
+    cn = cn[~np.isin(np.asarray(cit.kind[cn]), bad_types)]
+    C = np.setdiff1d(np.array([cit.work(int(x)) for x in cn], np.int64), np.concatenate([U_w, H]))
+    report["candidates"] = {"pool": int(len(U_w)), "likely_by_first_classifier": int((p0 >= 0.5).sum()),
+                            "phrase_outside_pool": int(len(H)), "cited_at_least": k, "cited_candidates": int(len(C))}
+    job.done_stage(1, t)
+
+    # 3 the decider learns from the teacher
+    t = time.time()
+    job.stage(2, "teaching the 0.8B decider")
+    lw = list(labels)
+    J.train_decider(list(zip(texts_of(lw), [labels[w] for w in lw])), q, definition, work / "decider", say)
+    job.done_stage(2, t)
+
+    # 4 the decider labels papers where judgments matter: half where the first classifier is unsure, the rest spread
+    #   over its scores, and works the field cites (many have only a title)
+    t = time.time()
+    job.stage(3, f"the decider judges {DECIDER_N:,} papers")
+    band = np.flatnonzero((p0 > 0.1) & (p0 < 0.9))
+    spread = np.argsort(p0)[np.linspace(0, len(p0) - 1, len(p0)).astype(int)]
+    n_band, n_cited = DECIDER_N // 2, min(len(C), DECIDER_N // 5)
+    pick_u = set(rng.choice(band, size=min(n_band, len(band)), replace=False).tolist()) if len(band) else set()
+    rest = [i for i in rng.choice(spread, size=min(len(spread), DECIDER_N), replace=False) if i not in pick_u]
+    pick_u |= set(rest[:DECIDER_N - n_cited - len(pick_u)])
+    dws = [int(U_w[i]) for i in sorted(pick_u)] + [int(w) for w in rng.choice(C, size=n_cited, replace=False)]
+    dws = [w for w in dws if w not in labels]
+    dtexts = texts_of(dws)
+    dp = J.decider_scores(work / "decider", dtexts, say)
+    decided = dict(zip(dws, dp.tolist()))
+    report["decider_labels"] = {"papers": len(decided), "on_topic": int((dp >= 0.5).sum())}
+    job.done_stage(3, t)
+
+    # 5 students: the vector classifier and Ettin-17M learn from the teacher's and the decider's labels; Ettin judges
+    #   what has no vector (title only) and what the vector classifier is unsure about
+    t = time.time()
+    job.stage(4, "training the students")
+    taught = {**decided, **labels}                               # the teacher's answer wins where both exist
+    lr1 = lr(taught)
+    p1 = lr1.predict_proba(U_V)[:, 1]
+    _, hH = _vectors(ctx, H)
+    _, hC = _vectors(ctx, C)
+    XH, _ = _vectors(ctx, H[hH]) if hH.any() else (np.zeros((0, 768), np.float32), None)
+    XC, _ = _vectors(ctx, C[hC]) if hC.any() else (np.zeros((0, 768), np.float32), None)
+    pH = np.full(len(H), np.nan)
+    pC = np.full(len(C), np.nan)
+    if len(XH):
+        pH[hH] = lr1.predict_proba(XH)[:, 1]
+    if len(XC):
+        pC[hC] = lr1.predict_proba(XC)[:, 1]
+    unsure = lambda p: np.isnan(p) | ((p > BAND[0]) & (p < BAND[1]))
+    E = np.concatenate([U_w[unsure(p1)], H[unsure(pH)], C[unsure(pC)]])
+    E = np.array([w for w in E if int(w) not in taught], np.int64)
+    say(f"the text student judges {len(E):,} papers (title only, or unsure)")
+    tw = list(taught)
+    pe = J.student_scores(list(zip(texts_of(tw), [taught[w] for w in tw])), texts_of(E), work / "student", say) \
+        if len(E) else np.zeros(0)
+    by_e = dict(zip(E.tolist(), pe.tolist()))
+    job.done_stage(4, t)
+
+    # 6 judging: the teacher's and the decider's own answers where they exist; else the vector classifier, averaged
+    #   with the text student where it was unsure; the text student alone without a vector
+    t = time.time()
+    job.stage(5, "judging every candidate")
+
+    def final(ws, p_vec):
+        out = {}
+        for w, pv in zip(ws.tolist(), p_vec.tolist()):
+            if w in taught:
+                p = taught[w]
+            elif w in by_e:
+                p = by_e[w] if math.isnan(pv) else (pv + by_e[w]) / 2
+            else:
+                p = pv
+            if p == p and p >= 0.5:
+                out[w] = round(float(p), 3)
+        return out
+    route = {}
+    for name, ws, pv in (("meaning", U_w, p1), ("phrase", H, pH), ("cited", C, pC)):
+        for w, p in final(ws, pv).items():
+            route.setdefault(w, (name, p))
+    ids = np.array(list(route), np.int64)
+    det = _details(ctx, ids)
+    field = {}
+    for w in ids.tolist():                                       # publications only, not retracted
+        d = det.get(w)
+        if d is not None and not passes(d, {}):
+            continue
+        if d is None:
+            nd = int(cit.nodes([w])[0])
+            if nd < 0 or cit.type(nd) in NON_PUBLICATION_TYPES:
+                continue
+        field[w] = {"via": route[w][0], "p": route[w][1]}
+    if len(field) > TOO_BROAD_PAPERS:
+        raise FinalError(f"“{q}” has about {len(field):,} papers: too broad for a whole-field map today. Map a narrower topic.")
     report["papers"] = len(field)
-    report["by_route"] = {v: sum(1 for f in field.values() if f["via"] == v) for v in sorted({f["via"] for f in field.values()})}
-    report["jev"] = {"calls": jev.calls, "failed": jev.failed, "tokens": jev.tokens, "usd": round(jev.usd, 3)}
+    report["by_route"] = {v: sum(1 for f in field.values() if f["via"] == v) for v in ("meaning", "phrase", "cited")}
+    report["judged_by_text_student"] = int(len(E))
+    report["teacher_usd"] = round(teacher.usd, 3)
+    job.done_stage(5, t)
     return {"version": SELECTION_VERSION, "made": _now(), "release": ctx.release["id"], "topic": q,
             "definition": definition, "keywords": keywords, "report": report,
-            "papers": {str(w): f for w, f in field.items()}, "labels": {str(w): round(p, 3) for w, p in labels.items()}}
+            "papers": {str(w): f for w, f in field.items()},
+            "labels": {"teacher": {str(w): v for w, v in labels.items()},
+                       "decider": {str(w): round(v, 3) for w, v in decided.items()}}}
 
 
 class FinalError(Exception):
@@ -596,7 +539,8 @@ def build_maps(ctx: Ctx, job: Job, sel: dict, version: str) -> dict:
     seed = T.Seed(ws, V, has, details, score)
     seed = seed.subset(T.collapse_versions(seed, cit))
     q = sel["topic"]
-    raw = T.build(seed, cit, q, T.Options(refs_top=30))
+    T.PARALLEL_MIN = 1500                              # the worker owns its cores: Leiden runs side by side
+    raw = T.build(seed, cit, q, T.Options(refs_top=30, workers=LEIDEN_WORKERS))
     out = finish(ctx, cit, raw, seed, ctx.release["id"])
     via = sel["papers"]
     out["papers"]["via"] = [via.get(pid[1:], {}).get("via", "") for pid in out["papers"]["id"]]
@@ -613,7 +557,8 @@ def build_maps(ctx: Ctx, job: Job, sel: dict, version: str) -> dict:
         job.stage(7, f"splitting group {g['id']} ({g['size']:,} papers), {j + 1} of {len(big)}")
         members = [by_w[int(pid[1:])] for pid, gg in zip(out["papers"]["id"], out["papers"]["group"]) if gg == g["id"]]
         sub_seed = seed.subset(np.array(members))
-        sub = T.build(sub_seed, cit, q, T.Options(refs_top=30, min_size=max(8, len(members) // 25), min_groups=2, max_groups=8))
+        sub = T.build(sub_seed, cit, q, T.Options(refs_top=30, min_size=max(8, len(members) // 25), min_groups=2,
+                                                  max_groups=8, workers=LEIDEN_WORKERS))
         sub = finish(ctx, cit, sub, sub_seed, ctx.release["id"])
         sub["papers"]["via"] = [via.get(pid[1:], {}).get("via", "") for pid in sub["papers"]["id"]]
         sub.update({"question": q, "mode": "field", "filters": {}, "asked_papers": len(members),
@@ -633,13 +578,12 @@ def run_job(ctx: Ctx, store: Path, key: str) -> None:
         if sel is None or job.st.get("kind") == "full":
             if paused(store):                          # queued before the pause: not run
                 raise FinalError(paused(store))
-            jev = Jev(store)
-            sel = select_field(ctx, job, req["q"], req.get("definition"), req.get("keywords"), jev)
+            sel = select_field(ctx, job, req["q"], req.get("definition"), req.get("keywords"))
             _write(sel_path, sel)
         out = build_maps(ctx, job, sel, VERSION)
         job.st.update({"status": "done", "finished": _now(), "eta_s": 0, "detail": "",
                        "summary": {"papers": sel["report"]["papers"], "groups": len(out["groups"]),
-                                   "usd": sel["report"]["jev"]["usd"]}})
+                                   "usd": sel["report"].get("teacher_usd", sel["report"].get("jev", {}).get("usd"))}})
     except FinalError as e:
         job.st.update({"status": "failed", "final": True, "error": str(e), "finished": _now()})
     except Exception as e:  # noqa: BLE001

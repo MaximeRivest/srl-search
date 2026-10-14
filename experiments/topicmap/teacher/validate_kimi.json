@@ -1,0 +1,20 @@
+{
+ "new_kimi_0.47": {
+  "papers": 41362,
+  "recall": 0.669,
+  "recall_with_abstract": 0.695,
+  "recall_title_only": 0.606,
+  "precision": 0.73,
+  "precision_n": 400,
+  "kimi_usd": 0.528
+ },
+ "old_jev_1.56": {
+  "papers": 35123,
+  "recall": 0.863,
+  "recall_with_abstract": 0.865,
+  "recall_title_only": 0.856,
+  "precision": 0.858,
+  "precision_n": 400,
+  "kimi_usd": 0.53
+ }
+}

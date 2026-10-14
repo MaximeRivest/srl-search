@@ -15,6 +15,7 @@ dependencies = [
   "tantivy==0.25.0",
   "mcp==2.3.0",
   "igraph>=1.0,<2",
+  "peft>=0.17",
 ]
 
 [dependency-groups]
