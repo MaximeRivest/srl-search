@@ -399,3 +399,17 @@ def test_one_person_split_in_two_author_records_is_one_expert():
     out = T.build(seed, cit, "coral reefs")
     names = [e["name"] for g in out["groups"] for e in g["lenses"]["experts"]]
     assert names.count("Ana") == 1
+
+
+def test_a_book_and_its_chapters_count_once():
+    oup = "10.1093/oso/9780198838388"
+    assert T.book_of({"type": "book-chapter", "doi": oup + ".003.0005"}) == T.book_of({"type": "book", "doi": oup + ".001.0001"})
+    assert T.book_of({"type": "book-chapter", "doi": "10.1007/978-3-030-1_5"}) == "10.1007/978-3-030-1"
+    assert T.book_of({"type": "article", "doi": "10.1/x"}) is None
+    seed, cit = literature()
+    for i in range(0, 60, 2):                       # half of group 0 becomes chapters of one book
+        seed.details[i] = {**seed.details[i], "type": "book-chapter", "doi": f"{oup}.003.{i:04d}"}
+    out = T.build(seed, cit, "x")
+    for g in out["groups"]:
+        chapters = [it for it in g["lenses"]["start_here"] if seed.details[it["w"] - 1]["type"] == "book-chapter"]
+        assert len(chapters) <= 1

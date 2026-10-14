@@ -452,6 +452,20 @@ def credit(pos: np.ndarray, nauth: int) -> np.ndarray:
     return 1 / rank
 
 
+CHAPTER_DOI = re.compile(r"(\.\d{3}\.\d{4}|_\d+|[./]ch\d+|\.c\d+)$", re.I)
+
+
+def book_of(d: dict) -> str | None:
+    """The book a chapter belongs to (a book counts as its own), else None: the DOI without its chapter suffix
+    (OUP .003.0005, Springer _5, Wiley .ch5), or the venue of a chapter."""
+    if d.get("type") not in ("book-chapter", "book"):
+        return None
+    doi = (d.get("doi") or "").lower()
+    if doi:
+        return CHAPTER_DOI.sub("", doi)
+    return (d.get("venue") or "").lower() or None
+
+
 def h_index(values) -> int:
     v = sorted(values, reverse=True)
     h = 0
@@ -497,7 +511,15 @@ def lenses_for(c: int, idx: np.ndarray, gr: Graph, seed: Seed, group: np.ndarray
         pool = np.flatnonzero((years >= YEAR_NOW - 8) & (cov >= 3))
         if len(pool) < 3:
             pool = np.flatnonzero(cov >= 3)
-        best = sorted(pool, key=lambda p: (-cov[p], -years[p]))[:k]
+        best, books = [], set()
+        for p in sorted(pool, key=lambda p: (-cov[p], -years[p])):
+            b = book_of(seed.details[idx[p]])           # one entry per book: its chapters all cite the same works
+            if b and b in books:
+                continue
+            books.add(b) if b else None
+            best.append(p)
+            if len(best) == k:
+                break
         out["start_here"] = [{"w": int(seed.wids[idx[p]]), "covers": int(cov[p]),
                               "why": f"cites {int(cov[p])} of the group's {len(top)} most-cited works"
                                      + (" · a review" if seed.details[idx[p]].get("type") == "review" else "")}

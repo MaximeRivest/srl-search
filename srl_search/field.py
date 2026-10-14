@@ -120,7 +120,8 @@ class FieldStore:
             q = self.queued()
             st["position"] = q.index(key) + 1 if key in q else None
             ahead = q[:q.index(key)] if key in q else []
-            st["eta_s"] = sum(STAGES_TOTAL for _ in ahead) + STAGES_TOTAL
+            st["eta_s"] = sum(job_seconds((_read(self.root / k / "job.json") or {}).get("kind")) for k in ahead) \
+                + job_seconds(st.get("kind")) + (60 if not ahead else 0)    # + the worker starting
         return st
 
     def get(self, q: str, definition: str | None, keywords: str | None, version: str, group: int | None,
@@ -168,9 +169,14 @@ class FieldStore:
 STAGES_TOTAL = sum(s for _, s in STAGES)
 
 
+def job_seconds(kind: str | None) -> int:
+    """Typical length: a new field runs every stage; a map job (the field kept, the map code changed) the last two."""
+    return sum(s for _, s in STAGES[6:]) if kind == "map" else STAGES_TOTAL
+
+
 def pending_text(st: dict, q: str, base: str) -> str:
     """What an AI or a person reads while a whole-field map is being made."""
-    eta = int(st.get("eta_s") or STAGES_TOTAL)
+    eta = int(st.get("eta_s") or job_seconds(st.get("kind")))
     where = (f"{st['position']} in line" if st.get("status") == "queued" and st.get("position")
              else f"step {st.get('stage_index', 0) + 1} of {len(STAGES)} ({st.get('stage', 'starting')})")
     return (f"# Whole-field map of “{q}”: being made\n\n"
