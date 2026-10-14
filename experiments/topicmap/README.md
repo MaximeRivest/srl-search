@@ -146,3 +146,16 @@ between seeds); choosing by group count fixed it.
   (classifier 0.06: its training sample had almost no river papers), old island and patch-size studies.
   Limits: on-topic is Jev's judgment, so Jev's own errors are not measured (a person checking ~50 references
   would); reviews favour well-cited studies, so recall of recent work is overstated (2010+: 0.87 at ≥ 3).
+
+## Whole-field maps, as built (srl_search/field.py, 2026-10-14)
+
+Fully automatic (only the topic's words; archetypes chosen by Jev among the 300 closest papers):
+
+| Topic | Papers | Groups | Time | Jev | Checked |
+|---|---:|---:|---:|---:|---|
+| habitat fragmentation | 35,123 | 11 (each split) | 13.5 min (map rebuild alone 9.5) | $1.56 | recall 0.895 (0.83-0.96) on 19 meta-analyses' studies; precision ~0.81 on 400 random papers (`validate_field.py`) |
+| microplastics in freshwater ecosystems | 10,097 | 6 | 6.6 min | $0.37 | experts and groups read by eye only |
+
+Recall by period on fragmentation: before 2000 0.94, 2000s 0.92, 2010 on 0.81; dam-fragmented rivers 0.52 (was 0.06
+with the hand-made classifier). Weak point seen: the exact-phrase step uses the whole topic as one phrase, which finds
+almost nothing for long topics (45 matches for the microplastics wording); meaning and citations carry it.
