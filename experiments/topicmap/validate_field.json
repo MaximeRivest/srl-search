@@ -1,0 +1,256 @@
+{
+ "field_papers": 35123,
+ "references": 1266,
+ "on_topic": 608,
+ "recall": 0.895,
+ "ci95_by_review": [
+  0.829,
+  0.956
+ ],
+ "recall_with_abstract": 0.889,
+ "recall_without_abstract": 0.909,
+ "recall_by_year": {
+  "before 2000": 0.936,
+  "2000-2009": 0.918,
+  "2010 on": 0.806
+ },
+ "found_via": {
+  "cited+judged": 222,
+  "phrase": 5,
+  "meaning": 315,
+  "judged": 1,
+  "cited": 1
+ },
+ "per_review": {
+  "plant reproduction (Aguilar 2006)": 1.0,
+  "insect pollinators (2025)": 0.964,
+  "insect herbivores and herbivory (2017)": 0.967,
+  "herbivorous insects (2014)": 0.885,
+  "seagrass edges and fragmentation (2021)": 0.909,
+  "genetic effects (2018)": 0.969,
+  "woody plants, genetic diversity (2011)": 1.0,
+  "nest predators (2002)": 0.946,
+  "interspecific interactions (2014)": 0.955,
+  "mutualisms and antagonisms (2023)": 0.964,
+  "herpetofauna of Brazil (2021)": 1.0,
+  "mammal life histories (2014)": 0.907,
+  "bird reproductive traits (2011)": 1.0,
+  "patch size effect (Bender 1998)": 0.952,
+  "matrix composition (Prevedello 2010)": 0.933,
+  "climate x habitat loss (Mantyka-Pringle 2011)": 0.857,
+  "wetland vertebrates, habitat loss (2014)": 0.979,
+  "trophic disruption (2014)": 0.86,
+  "dam-induced river fragmentation (2025)": 0.524
+ },
+ "precision_sample": {
+  "n": 400,
+  "on_topic": 0.807,
+  "by_route": {
+   "cited+judged": 0.854,
+   "meaning": 0.815,
+   "phrase": 0.702
+  }
+ },
+ "missed_examples": [
+  {
+   "id": "W134563810",
+   "year": 2007,
+   "title": "Plant Herbivore Interactions at the Forest Edge"
+  },
+  {
+   "id": "W183830193",
+   "year": 2006,
+   "title": "Applying nature's design: corridors as a strategy for biodiversity conservation"
+  },
+  {
+   "id": "W388573471",
+   "year": 2005,
+   "title": "Metacommunities: Spatial Dynamics and Ecological Communities"
+  },
+  {
+   "id": "W748478685",
+   "year": 1990,
+   "title": "Is forest fragmentation a management issue in the northeast? Papers from the technical session sponsored by the Wildlife and Fish Ecology Wo"
+  },
+  {
+   "id": "W1497135611",
+   "year": 2011,
+   "title": "Clarifying climate change adaptation responses for scattered trees in modified landscapes"
+  },
+  {
+   "id": "W1572737349",
+   "year": 2011,
+   "title": "Past and present management influences the seed bank and seed rain in a rural landscape mosaic"
+  },
+  {
+   "id": "W1605413122",
+   "year": 2000,
+   "title": "Tree seedling establishment under insect herbivory: edge effects and inter- annual variation"
+  },
+  {
+   "id": "W1959878221",
+   "year": 2011,
+   "title": "EXISTING AND FUTURE CHALLENGES: THE CONCEPT OF SUCCESSFUL FISH PASSAGE IN SOUTH AMERICA"
+  },
+  {
+   "id": "W1977127723",
+   "year": 1988,
+   "title": "Nature Conservation: The Role of Remnants of Native Vegetation, edited by Denis A.Saunders, Graham W.Arnold, Andrew A.Burbige and Angas J. M"
+  },
+  {
+   "id": "W1980360582",
+   "year": 2012,
+   "title": "Influences of habitat fragmentation by damming on the genetic structure of masu salmon populations in Hokkaido, Japan"
+  },
+  {
+   "id": "W1980396783",
+   "year": 1976,
+   "title": "Distribution, abundance, size, and genetic variation of Peromyscus maniculatus on the Gulf Islands of British Columbia"
+  },
+  {
+   "id": "W1988681995",
+   "year": 2004,
+   "title": "Stream crossings and the conservation of diadromous invertebrates in South Pacific island streams"
+  },
+  {
+   "id": "W2000549938",
+   "year": 1996,
+   "title": "Conservation Biology and Carnivore Conservation in the Rocky Mountains"
+  },
+  {
+   "id": "W2016454090",
+   "year": 2004,
+   "title": "A comparison-shopper's guide to connectivity metrics"
+  },
+  {
+   "id": "W2018955647",
+   "year": 2007,
+   "title": "Contribution of insectivorous avifauna to top down control of Lindera benzoin herbivores at forest edge and interior habitats"
+  },
+  {
+   "id": "W2037946510",
+   "year": 2005,
+   "title": "EFFECT OF RE-OPENING OF A MIGRATORY PATHWAY FOR EEL (ANGUILLA ANGUILLA, L.) AT A WATERSHED SCALE"
+  },
+  {
+   "id": "W2044114918",
+   "year": 2008,
+   "title": "Composición, riqueza de especies y abundancia de insectos defoliadores de actividad nocturna asociados a Aristotelia chilensis (maqui) en el"
+  },
+  {
+   "id": "W2051895482",
+   "year": 1972,
+   "title": "Competition among Fugitive Species in a Harlequin Environment"
+  },
+  {
+   "id": "W2055957708",
+   "year": 2004,
+   "title": "Edge effects and the responses of aerial insect assemblages to structural-retention harvesting in Canadian boreal peatland forests"
+  },
+  {
+   "id": "W2072893711",
+   "year": 2001,
+   "title": "Short-term use of different residual forest structures by three sciurid species in a clear-cut boreal landscape"
+  },
+  {
+   "id": "W2073095026",
+   "year": 2005,
+   "title": "Host–parasitoid spatial ecology: a plea for a landscape-level synthesis"
+  },
+  {
+   "id": "W2073598740",
+   "year": 2012,
+   "title": "Specialization and Rarity Predict Nonrandom Loss of Interactions from Mutualist Networks"
+  },
+  {
+   "id": "W2075367762",
+   "year": 1985,
+   "title": "Depredation on Artificial Ground Nests: Effects of Edge and Plot Age"
+  },
+  {
+   "id": "W2083015984",
+   "year": 2011,
+   "title": "Genetic Population Structure of Olympic Peninsula Bull Trout Populations and Implications for Elwha Dam Removal"
+  },
+  {
+   "id": "W2091380830",
+   "year": 1992,
+   "title": "Particular problems for the conservation of diadromous fish"
+  },
+  {
+   "id": "W2095356081",
+   "year": 1988,
+   "title": "The influence of a dam having no fishway on the distribution of decapod crustaceans in the Yukinoura river, Nagasaki, Japan."
+  },
+  {
+   "id": "W2096682001",
+   "year": 2003,
+   "title": "Local population structure of a naturally occurring metapopulation of the quokka (Setonix brachyurus Macropodidae: Marsupialia)"
+  },
+  {
+   "id": "W2097031232",
+   "year": 2006,
+   "title": "SPACE USE BY ROUND-TAILED MUSKRATS IN ISOLATED WETLANDS"
+  },
+  {
+   "id": "W2101388709",
+   "year": 1994,
+   "title": "Patterns of abundance and demography: Collembola in a habitat patch gradient"
+  },
+  {
+   "id": "W2105739041",
+   "year": 2004,
+   "title": "Ecological Responses to Habitat Edges: Mechanisms, Models, and Variability Explained"
+  },
+  {
+   "id": "W2115074890",
+   "year": 1992,
+   "title": "Integrating Scientific Methods with Habitat Conservation Planning: Reserve Design for Northern Spotted Owls"
+  },
+  {
+   "id": "W2116351086",
+   "year": 2013,
+   "title": "Colonization of Steelhead in a Natal Stream after Barrier Removal"
+  },
+  {
+   "id": "W2126600884",
+   "year": 2007,
+   "title": "Anthropogenic Impacts on American Eel Demographics in Hudson River Tributaries, New York"
+  },
+  {
+   "id": "W2135208795",
+   "year": 2005,
+   "title": "Patch area, population density and the scaling of migration rates: the resource concentration hypothesis revisited"
+  },
+  {
+   "id": "W2142543083",
+   "year": 1986,
+   "title": "Shrews on small islands: epigenetic variation elucidates population stability"
+  },
+  {
+   "id": "W2153674343",
+   "year": 2012,
+   "title": "Distribution of freshwater macroinvertebrates in streams with dams and associated reservoirs on a subtropical oceanic island off southern Ja"
+  },
+  {
+   "id": "W2171039564",
+   "year": 2010,
+   "title": "Relative influence of habitat complexity and proximity to patch edges on seagrass epifaunal communities"
+  },
+  {
+   "id": "W2224829089",
+   "year": 1988,
+   "title": "Edge effect: a concept under scrutiny"
+  },
+  {
+   "id": "W2315698385",
+   "year": 2013,
+   "title": "Genetic divergence and landlocking of a common freshwater goby Rhinogobius fluviatilis in the Yoshino River system"
+  },
+  {
+   "id": "W2328992719",
+   "year": 2012,
+   "title": "Genetic influence of the dam isolations in the Kamo and Nakayama River systems on the common fresh water goby populations Rhinogobius spp."
+  }
+ ]
+}

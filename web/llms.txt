@@ -133,6 +133,16 @@ accept from one call), so nothing is shortened: the map itself (`/topics/{questi
 group at a glance), a group's lists and a group's papers each come in as many pages as they need. Every answer
 says which page it is, how many there are, and what to call next. A busy group of 350 papers is ~13 pages.
 
+**The whole field** (`scope=field`, optional `definition`): every paper of the research field, not the 1,000
+closest: papers close in meaning, judged one by one by an AI classifier (TypeSafe's Jev), the topic's exact phrase,
+and the works the field cites at least 3 times (which reaches classics without abstracts), then mapped into groups
+and subgroups (groups of 300+ papers are pre-split: `group=N&scope=field`). Made once by a background job, ~15-40
+minutes, then kept across data updates and instant for everyone; while it is being made the answer is **HTTP 202**
+with `progress` (stage, `eta_s`): ask again later with the same request. Checked on habitat fragmentation: 35k
+papers; it found ~90% (83-96%) of the studies 19 published meta-analyses cite, and ~80% of its papers are clearly on
+topic. A topic too broad for it (its edge still mostly on topic) answers 422 with the reason. A small daily budget
+caps how many new fields are mapped (503 when used up).
+
 **How to use it (agents)**: map first, then read. For a question about a field, call `/topics/{question}`: it
 lists every group and every reading list. Then, for every group that bears on the question, read `part=lists`
 and every page of `part=papers`: hundreds of abstracts, which a large context holds easily, and which is what
@@ -163,8 +173,8 @@ Other apps: add a remote MCP server with that address (setup for each: https://s
 | `get_papers` | /works for up to 20 `ids` at once (DOI, W-number, PMCID, URLs): full records |
 | `find_similar_papers` | /similar: `paper`, `limit`, the same filters |
 | `citation_walk` | /walk: `paper`, `breadth` (neighbours to learn from, default 30), `limit` per section |
-| `map_topic` | /topics: `topic`, `papers` (default 1000), `group` (split one group), `year_from`, `year_to`. Every group, every reading list, every expert. Counts as 5 calls |
-| `read_topic_group` | /topics with `read`: `topic`, `group`, `part` = lists / papers, `page`, `abstracts` (full by default), `within` (a group of a split). Counts as 1 call |
+| `map_topic` | /topics: `topic`, `papers` (default 1000), `group` (split one group), `year_from`, `year_to`, `page`, `scope` = closest / whole_field, `definition`. Every group, every reading list, every expert. Counts as 5 calls |
+| `read_topic_group` | /topics with `read`: `topic`, `group`, `part` = lists / papers, `page`, `abstracts` (full by default), `within` (a group of a split), `scope`. Counts as 1 call |
 
 Also three prompts, `field_overview(topic)`, `literature_review(question)` and `check_claim(claim)`, and this guide
 as a resource.

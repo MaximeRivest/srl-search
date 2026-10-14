@@ -388,3 +388,14 @@ def test_reading_a_group_never_makes_a_map(tmp_path, monkeypatch):
     with pytest.raises(HTTPException) as e:
         svc.get("never mapped", cached_only=True)
     assert e.value.status_code == 409 and "first" in e.value.detail
+
+
+def test_one_person_split_in_two_author_records_is_one_expert():
+    seed, cit = literature()
+    au = cit.authors
+    au.names[3] = "Ana"                        # group 0's pool: half of the works now by "another" Ana record
+    for j in range(1000, 1020):
+        au.table[j] = [(3, 1), (10 + j, 2)]
+    out = T.build(seed, cit, "coral reefs")
+    names = [e["name"] for g in out["groups"] for e in g["lenses"]["experts"]]
+    assert names.count("Ana") == 1

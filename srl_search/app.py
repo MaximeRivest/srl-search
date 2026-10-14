@@ -60,6 +60,7 @@ import numpy as np
 
 from srl_search.atlas import Atlas, question_spot
 from srl_search.citations import Citations
+from srl_search.field import Pending, pending_text
 from srl_search.engine import EMBEDDING_PLAN, JUNK_PENALTY, Engine, ExactEngine
 from srl_search.keyword import KeywordIndex, looks_boolean
 from srl_search.public import PUBLIC_BASE, PUBLIC_ROUTES
@@ -565,6 +566,11 @@ D_READ = ("Read this group of the map in depth, with abstracts: its reading list
           "most central first (part=papers), in pages of ~64k characters (page=N). The map must exist (409 if not: "
           "call /topics first). Counts as 1 request, not 5.")
 D_PART = "With read: lists (its reading lists) or papers (all its papers, page by page)."
+D_SCOPE = ("closest (default): the papers closest to the question, mapped in seconds. field: the whole research field "
+           "(every paper on topic: by meaning, an AI judge, the exact phrase and the studies the field cites), mapped "
+           "by a background job in ~15-40 minutes the first time, then kept for everyone; while it is being made the "
+           "answer is HTTP 202 with its progress. Groups of 300+ papers are split into subgroups (group=N).")
+D_DEFINITION = "With scope=field: what the topic covers, in a sentence (optional; part of the map's identity)."
 D_PAGE = ("Which page: of the map itself (as text), or with read of the group's lists or papers. Each answer says "
           "how many pages there are and what to call next.")
 
@@ -586,7 +592,9 @@ def topics(q: str = Query(..., min_length=2, max_length=2000, description=D_TOPI
            part: str = Query("lists", pattern="^(lists|papers)$", description=D_PART),
            page: int = Query(1, ge=1, le=100, description=D_PAGE),
            abstracts: str = Query("full", pattern="^(full|short|none)$",
-                                  description="With read: full abstracts, their first sentences, or none.")):
+                                  description="With read: full abstracts, their first sentences, or none."),
+           scope: str = Query("closest", pattern="^(closest|field)$", description=D_SCOPE),
+           definition: str | None = Query(None, max_length=1000, description=D_DEFINITION)):
     """The research groups inside a topic, and what to read in each. The papers (closest in meaning, or exact-word
     matches) are grouped by the works they cite and the words they use; each group gets a name (the phrases most
     over-represented in it) and reading lists computed from its own papers' citations: core (most cited by the
@@ -597,7 +605,13 @@ def topics(q: str = Query(..., min_length=2, max_length=2000, description=D_TOPI
     (cached for the data release). Counts as 5 requests at the public door. With read=N: one group in depth, with
     abstracts (part=lists: its reading lists; part=papers&page=N: all of its papers, most central first)."""
     svc = topics_service()
-    out = svc.get(q, papers, mode, year_from, year_to, group, cached_only=bool(read))
+    try:
+        out = svc.get(q, papers, mode, year_from, year_to, group, cached_only=bool(read), scope=scope,
+                      definition=definition)
+    except Pending as e:
+        return JSONResponse({"status": e.status.get("status"), "progress": e.status, "question": q, "scope": "field",
+                             "message": "The whole-field map is being made; ask again later (the same request)."},
+                            status_code=202, headers={"Retry-After": "60"})
     return svc.read(out, read, part, page, abstracts) if read else out
 
 
@@ -612,7 +626,9 @@ def topics_text(q: str,
                 part: str = Query("lists", pattern="^(lists|papers)$", description=D_PART),
                 page: int = Query(1, ge=1, le=100, description=D_PAGE),
                 abstracts: str = Query("full", pattern="^(full|short|none)$",
-                                       description="With read: full abstracts, their first sentences, or none.")):
+                                       description="With read: full abstracts, their first sentences, or none."),
+                scope: str = Query("closest", pattern="^(closest|field)$", description=D_SCOPE),
+                definition: str | None = Query(None, max_length=1000, description=D_DEFINITION)):
     """The same topic map with the question in the address and the answer as plain text (Markdown): every group,
     every reading list, every expert. /topics/intermittent fasting. With read=N: one group in depth, with abstracts
     (?read=2&part=lists, then ?read=2&part=papers&page=1, 2, ...)."""
@@ -622,7 +638,12 @@ def topics_text(q: str,
     if not 2 <= len(q) <= 2000:
         raise HTTPException(422, "the question must be 2-2000 characters: /topics/intermittent fasting")
     svc = topics_service()
-    out = svc.get(q, papers, mode, year_from, year_to, group, cached_only=bool(read))
+    try:
+        out = svc.get(q, papers, mode, year_from, year_to, group, cached_only=bool(read), scope=scope,
+                      definition=definition)
+    except Pending as e:
+        return PlainTextResponse(pending_text(e.status, q, PUBLIC_BASE), status_code=202,
+                                 headers={"Cache-Control": "no-store", "Retry-After": "60"})
     text = topic_read_text(svc.read(out, read, part, page, abstracts), PUBLIC_BASE) if read else topic_text(out, PUBLIC_BASE, page)
     return PlainTextResponse(text, headers={"Cache-Control": "no-store"})
 

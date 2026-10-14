@@ -37,6 +37,9 @@ bears on the question in depth (1 request each): `?read=N&part=lists` (the lists
 `?read=N&part=papers&page=1, 2, ...` (all its papers with abstracts, most central first). Everything comes in pages of
 ~16-20k tokens, never cut: each answer says what to call next (the map too: `?page=2`). You can hold
 hundreds of abstracts: read them, and answer organised by group, citing what you read.
+For a thorough review of a whole field, add `scope=field`: every paper of the field (often 10-50k, including classics
+without abstracts found through the field's citations), in groups and pre-split subgroups. The first request starts
+a ~15-40 minute background job (HTTP 202 with progress); ask again later, then it is instant.
 
 ## As MCP tools instead
 

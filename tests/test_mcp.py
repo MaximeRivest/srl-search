@@ -60,7 +60,10 @@ def fake_api():
 
     engine = SimpleNamespace(details=lambda ws: {w: {"doi": f"10.1/{w}"} for w in ws if w != 12})
 
-    def topics_get(q, papers, mode, year_from, year_to, group, cached_only=False):
+    def topics_get(q, papers, mode, year_from, year_to, group, cached_only=False, scope="closest", definition=None):
+        if scope == "field":
+            from srl_search.field import Pending
+            raise Pending({"status": "running", "stage": "citations", "stage_index": 5, "eta_s": 900})
         calls.append({"topics": q, "papers": papers, "group": group, "year_from": year_from})
         if q == "nothing":
             raise HTTPException(404, "Only 3 papers found for this; a map needs at least 30.")
@@ -134,6 +137,10 @@ def test_tools_answer_in_markdown_the_model_can_cite():
             r = await c.call_tool("map_topic", {"topic": "intermittent fasting", "group": 2, "year_from": 2015})
             assert not r.is_error and text(r).startswith("# Research groups in: intermittent fasting")
             assert calls[-1] == {"topics": "intermittent fasting", "papers": 1000, "group": 2, "year_from": 2015}
+            r = await c.call_tool("map_topic", {"topic": "habitat fragmentation", "scope": "whole_field"})
+            assert not r.is_error and "being made" in text(r) and "15 more minutes" in text(r)
+            r = await c.call_tool("read_topic_group", {"topic": "habitat fragmentation", "group": 1, "scope": "whole_field"})
+            assert not r.is_error and "being made" in text(r)
             r = await c.call_tool("map_topic", {"topic": "nothing"})
             assert r.is_error and "at least 30" in text(r)
             r = await c.call_tool("read_topic_group", {"topic": "intermittent fasting", "group": 3, "part": "papers", "page": 2})

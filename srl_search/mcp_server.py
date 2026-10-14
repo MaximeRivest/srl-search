@@ -163,6 +163,7 @@ How to search well:
 - Questions and descriptions: search by meaning (the default). Exact names, genes, drugs, acronyms, phrases: quotes or AND / OR / NOT, which search exact words. For a review, do both.
 - Screen with abstracts="short" or "none", then get_papers for the ones you keep. Snowball from the best 2-3 with find_similar_papers and citation_walk.
 - Start with the landscape, not a flat list. For any question about a field, a topic, "what does research say", a review or a reading list, call map_topic first: it groups the ~1,000 papers closest to the topic into research groups (by what they cite and what they say) and gives every group's reading lists (start here, core, rising, only here, bridges, newest) and experts. Then go deep: read_topic_group on every group that bears on the question, part="lists" (the lists with full abstracts) and part="papers" page by page (all of the group's papers with full abstracts, most central first) until you have read the group. Split a large or mixed group with map_topic group=N. Then search_papers with each group's own phrases, citation_walk from its key papers, get_papers for full records. You have the context to read hundreds of abstracts: do it, and answer from what you read, organised by group (how the field divides, what each group found, where they disagree, who the experts are), citing every claim.
+- For a thorough review of a whole field (all its papers, not the ~1,000 closest), map_topic with scope="whole_field": it is made once in the background (~15-40 minutes; the answer says so: tell the user, work from the quick map meanwhile, and ask again later), then opens instantly. Its groups are split into subgroups: read the subgroups (map_topic with group=N and the same scope) and read_topic_group with the same scope.
 - Judge papers from the record: reviews vs single studies, citations relative to age, venue. A record flagged as junk is probably not scholarship. Citation counts are not proof that a paper is right.
 - Cite the DOI link when there is one, else the OpenAlex link, copied from these results. Never invent details a record lacks.
 - Each tool call counts against 30 a minute per address (map_topic counts as 5, read_topic_group as 1). One search with a larger limit beats several small ones. If told to wait, wait that long and continue: the maps are cached, nothing is lost.""",
@@ -319,6 +320,14 @@ How to search well:
         page: Annotated[int, Field(ge=1, le=20, description=(
             "Page of the map (~16-20k tokens each). Page 1 opens with all groups at a glance; the answer says if "
             "there are more pages: read them all."))] = 1,
+        scope: Annotated[Literal["closest", "whole_field"], Field(description=(
+            "closest (default): the ~1,000 papers closest to the topic, mapped in seconds. whole_field: every paper "
+            "of the research field (often 10,000-50,000: by meaning, an AI judge, the exact phrase and the studies "
+            "the field cites, including classics without abstracts), in groups and subgroups. The first time it "
+            "takes ~15-40 minutes in the background (the answer says so; ask again later); then it is instant for "
+            "everyone. Use it for a thorough review of a whole field."))] = "closest",
+        definition: Annotated[str | None, Field(max_length=1000, description=(
+            "With whole_field, optional: what the topic covers, in a sentence, when its words are ambiguous."))] = None,
     ) -> str:
         """The landscape of a research topic: the papers closest to it, grouped into research groups by the works
         they cite and the words they use. For every group: its name (its most distinctive phrases), size, years,
@@ -328,7 +337,13 @@ How to search well:
         highest position-weighted h-index inside the group). Use it first for any question about a field, then
         read the relevant groups in depth with read_topic_group. Long maps come in pages (page 1 lists every group
         at a glance): read every page. 3-30 s the first time (then cached); counts as 5 calls."""
-        out = await call(api.topics_service().get, topic, papers, "auto", year_from, year_to, group)
+        from srl_search.field import Pending, pending_text
+        field = scope == "whole_field"
+        try:
+            out = await call(api.topics_service().get, topic, papers, "auto", year_from, year_to, group,
+                             scope="field" if field else "closest", definition=definition)
+        except Pending as e:
+            return pending_text(e.status, topic, PUBLIC_BASE)
         return await call(api.topic_text, out, PUBLIC_BASE, page)
 
     @server.tool(title="Read one research group in depth", annotations=READ_ONLY, structured_output=False)
@@ -344,6 +359,8 @@ How to search well:
         within: Annotated[int | None, Field(ge=1, le=50, description=(
             "If the map was a split of a group (map_topic with group=N), that N: then `group` is a group of the split."))] = None,
         papers: Annotated[int, Field(ge=200, le=2000, description="As given to map_topic (default 1000).")] = 1000,
+        scope: Annotated[Literal["closest", "whole_field"], Field(description="As given to map_topic.")] = "closest",
+        definition: Annotated[str | None, Field(max_length=1000, description="As given to map_topic.")] = None,
         year_from: Annotated[int | None, Field(description="As given to map_topic.")] = None,
         year_to: Annotated[int | None, Field(description="As given to map_topic.")] = None,
     ) -> str:
@@ -351,11 +368,17 @@ How to search well:
         of its papers, most central first (part="papers", page 1, 2, ... until an answer says it is the last page). This is how
         to build real knowledge of a field before answering: read every group that bears on the question. Uses
         the cached map (call map_topic first, with the same topic and options); counts as 1 call."""
+        from srl_search.field import Pending, pending_text
+
         def go():
             svc = api.topics_service()
-            out = svc.get(topic, papers, "auto", year_from, year_to, within, cached_only=True)
+            out = svc.get(topic, papers, "auto", year_from, year_to, within, cached_only=True,
+                          scope="field" if scope == "whole_field" else "closest", definition=definition)
             return api.topic_read_text(svc.read(out, group, part, page, abstracts), PUBLIC_BASE)
-        return await call(go)
+        try:
+            return await call(go)
+        except Pending as e:
+            return pending_text(e.status, topic, PUBLIC_BASE)
 
     @server.resource(f"{PUBLIC_BASE}/llms.txt", name="guide", title="Search API guide",
                      description="Every call, what is covered today, result fields, limits and how to search well.",

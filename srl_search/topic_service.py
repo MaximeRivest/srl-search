@@ -168,10 +168,15 @@ class TopicService:
 
     # ------------------------------------------------------------------------------------------ the answer
     def get(self, q: str, papers: int = 1000, mode: str = "auto", year_from=None, year_to=None,
-            group: int | None = None, cached_only: bool = False) -> dict:
+            group: int | None = None, cached_only: bool = False, scope: str = "closest",
+            definition: str | None = None) -> dict:
         """The map (cached or made now). cached_only: reading a group uses a map already made (it is priced as
-        one request, so it must never cost a map's work): 409 if there is none."""
+        one request, so it must never cost a map's work): 409 if there is none. scope="field": the whole-field map
+        (srl_search/field.py), made by a background job: raises field.Pending while it is being made."""
         q = " ".join(q.split())
+        if scope == "field":
+            return self.field_store().get(q, (definition or "").strip() or None, None, VERSION, group,
+                                          start=not cached_only)
         if mode == "auto":
             mode = "keyword" if self.api.KEYWORDS and self.api.looks_boolean(q) else "semantic"
         if mode == "keyword" and not self.api.KEYWORDS:
@@ -257,65 +262,13 @@ class TopicService:
         return out
 
     def finish(self, raw: dict, seed: T.Seed) -> dict:
-        """Work numbers -> papers a person can open: titles, years, venues, links, map positions."""
-        api, cit = self.api, self.cit
-        t = time.perf_counter()
-        inside = {int(w) for w in seed.wids}
-        wanted = set()
-        for g in raw["groups"]:
-            wanted.add(g["typical"])
-            for name, items in g["lenses"].items():
-                for it in items:
-                    for k in ("w", "top", "latest"):
-                        if it.get(k):
-                            wanted.add(int(it[k]))
-        det = api.engine.details(sorted(wanted))
-        by_seed = {int(w): d for w, d in zip(seed.wids, seed.details)}
+        return finish(self.api, self.cit, raw, seed, self.release)
 
-        def paper(w: int) -> dict:
-            d = det.get(w) or by_seed.get(w)
-            if d is None:                              # in the citation index only (no English abstract)
-                nd = int(cit.nodes([w])[0])
-                d = {"title": cit.title(nd) if nd >= 0 else None, "year": int(cit.year[nd]) if nd >= 0 else None,
-                     "type": cit.type(nd) if nd >= 0 else None, "citations": int(cit.cites[nd]) if nd >= 0 else None}
-            names = [a.strip() for a in (d.get("authors") or "").split("|") if a.strip()]
-            out = {"id": f"W{w}", "title": T.TAG.sub("", d.get("title") or "") or "(no title)", "year": d.get("year"),
-                   "type": d.get("type"), "venue": d.get("venue"), "authors": names[:3],
-                   "authors_count": d.get("authors_count") or len(names), "citations": d.get("citations"),
-                   "doi": d.get("doi"), "pmcid": d.get("pmcid"), "in_map": w in inside}
-            r = api.readable(w)
-            if r:
-                out["readable"] = True
-            return {k: v for k, v in out.items() if v not in (None, [], "")}
-
-        for g in raw["groups"]:
-            g["typical"] = paper(g["typical"])
-            for name, items in g["lenses"].items():
-                if name == "experts":
-                    for it in items:
-                        it["top"] = paper(it["top"])
-                        if it.get("latest"):
-                            it["latest"] = paper(it["latest"])
-                    continue
-                for it in items:
-                    it.update(paper(int(it.pop("w"))))
-
-        # map positions: the release's table (one row per embedded paper)
-        xs, ys = [], []
-        for w in seed.wids:
-            p = api.place_work(int(w))
-            xs.append(round(p[0], 5) if p else None)
-            ys.append(round(p[1], 5) if p else None)
-        papers = raw["papers"]
-        papers["id"] = [f"W{w}" for w in papers.pop("w")]
-        papers["x"], papers["y"] = xs, ys
-        for g in raw["groups"]:
-            pts = np.array([(x, y) for x, y, gg in zip(xs, ys, papers["group"]) if gg == g["id"] and x is not None])
-            g["centre"] = {"x": round(float(np.median(pts[:, 0])), 5), "y": round(float(np.median(pts[:, 1])), 5)} if len(pts) else None
-        raw["timing"]["finish_ms"] = round((time.perf_counter() - t) * 1000)
-        raw["release"] = self.release
-        raw["atlas"] = api.ATLAS.id if api.ATLAS is not None else None
-        return raw
+    def field_store(self):
+        if getattr(self, "_fields", None) is None:
+            from srl_search.field import FieldStore
+            self._fields = FieldStore(Path(os.environ.get("SRL_FIELDS", "/mnt/fast/scholarsreadinglist/search/fields")))
+        return self._fields
 
     def read(self, out: dict, group: int, part: str = "lists", page: int = 1, abstracts: str = "full") -> dict:
         """One group of a map in depth, with abstracts: its reading lists ("lists"), or all of its papers, most
@@ -400,6 +353,68 @@ class TopicService:
             p.unlink(missing_ok=True)
 
 
+def finish(api, cit, raw: dict, seed: T.Seed, release: str) -> dict:
+    """Work numbers -> papers a person can open: titles, years, venues, links, map positions. (Shared with the
+    whole-field worker, srl_search/field.py, which is not this service.)"""
+    t = time.perf_counter()
+    inside = {int(w) for w in seed.wids}
+    wanted = set()
+    for g in raw["groups"]:
+        wanted.add(g["typical"])
+        for name, items in g["lenses"].items():
+            for it in items:
+                for k in ("w", "top", "latest"):
+                    if it.get(k):
+                        wanted.add(int(it[k]))
+    det = api.engine.details(sorted(wanted))
+    by_seed = {int(w): d for w, d in zip(seed.wids, seed.details)}
+
+    def paper(w: int) -> dict:
+        d = det.get(w) or by_seed.get(w)
+        if d is None:                              # in the citation index only (no English abstract)
+            nd = int(cit.nodes([w])[0])
+            d = {"title": cit.title(nd) if nd >= 0 else None, "year": int(cit.year[nd]) if nd >= 0 else None,
+                 "type": cit.type(nd) if nd >= 0 else None, "citations": int(cit.cites[nd]) if nd >= 0 else None}
+        names = [a.strip() for a in (d.get("authors") or "").split("|") if a.strip()]
+        out = {"id": f"W{w}", "title": T.TAG.sub("", d.get("title") or "") or "(no title)", "year": d.get("year"),
+               "type": d.get("type"), "venue": d.get("venue"), "authors": names[:3],
+               "authors_count": d.get("authors_count") or len(names), "citations": d.get("citations"),
+               "doi": d.get("doi"), "pmcid": d.get("pmcid"), "in_map": w in inside}
+        r = api.readable(w)
+        if r:
+            out["readable"] = True
+        return {k: v for k, v in out.items() if v not in (None, [], "")}
+
+    for g in raw["groups"]:
+        g["typical"] = paper(g["typical"])
+        for name, items in g["lenses"].items():
+            if name == "experts":
+                for it in items:
+                    it["top"] = paper(it["top"])
+                    if it.get("latest"):
+                        it["latest"] = paper(it["latest"])
+                continue
+            for it in items:
+                it.update(paper(int(it.pop("w"))))
+
+    # map positions: the release's table (one row per embedded paper)
+    xs, ys = [], []
+    for w in seed.wids:
+        p = api.place_work(int(w))
+        xs.append(round(p[0], 5) if p else None)
+        ys.append(round(p[1], 5) if p else None)
+    papers = raw["papers"]
+    papers["id"] = [f"W{w}" for w in papers.pop("w")]
+    papers["x"], papers["y"] = xs, ys
+    for g in raw["groups"]:
+        pts = np.array([(x, y) for x, y, gg in zip(xs, ys, papers["group"]) if gg == g["id"] and x is not None])
+        g["centre"] = {"x": round(float(np.median(pts[:, 0])), 5), "y": round(float(np.median(pts[:, 1])), 5)} if len(pts) else None
+    raw["timing"]["finish_ms"] = round((time.perf_counter() - t) * 1000)
+    raw["release"] = release
+    raw["atlas"] = api.ATLAS.id if api.ATLAS is not None else None
+    return raw
+
+
 # ------------------------------------------------------------------------------------------------ as text
 # Written for a model to read and act on. Complete: every group, every reading list, every item; what is not
 # here (abstracts, every member paper) is one call away, and each answer says which call.
@@ -455,6 +470,9 @@ def as_text(out: dict, base: str, page: int = 1) -> str:
     head = (f"# Research groups in: {out['parent']['name']} (group {out['parent']['group']} of “{q}”, split further)"
             if out.get("parent") else f"# Research groups in: {q}")
     how = ("closest in meaning to the question" if out["mode"] == "semantic"
+           else "of the whole field (found by meaning, judged one by one by an AI classifier, by the topic's exact "
+                "phrase, and by following the studies the field cites, which reaches papers without abstracts)"
+           if out["mode"] == "field"
            else f"best matches for the exact words (`{out.get('query') or q}`)")
     lines = [head, ""]
     if page == 1:
@@ -466,6 +484,15 @@ def as_text(out: dict, base: str, page: int = 1) -> str:
         if cov.get("references_thin"):
             lines += [f"Note: only {cov['with_references']:,} of these papers have references in OpenAlex, so here the "
                       "groups lean more on wording than on citations.", ""]
+        fr = out.get("field")
+        if fr:
+            lines += [f"How the field was found: {fr['papers']:,} papers judged on topic, made {fr['made'][:10]}. Checked "
+                      "once on habitat fragmentation against 19 meta-analyses: it found ~90% of the studies they cite, "
+                      "and ~80% of its papers are clearly on topic. Groups of 300+ papers are split into subgroups: read "
+                      "those (map with group=N) rather than thousands of papers at once.", ""]
+            if cov.get("without_text_vector"):
+                lines += [f"{cov['without_text_vector']:,} papers have no English abstract (older papers, books, "
+                          "chapters): they are here because the field cites them; their titles are all there is.", ""]
         lines.append("## The groups at a glance")
         for g in out["groups"]:
             yrs = g.get("years")

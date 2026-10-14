@@ -159,6 +159,25 @@ cache, load limits, titles and map positions) `srl_search/topic_service.py`, cit
   group in full.
 - Tests: `tests/test_topics.py` (a made-up literature with three planted groups; no index loaded).
 
+### Whole-field maps (since 2026-10-14)
+
+`/topics?q=...&scope=field` (MCP: `map_topic` with `scope="whole_field"`): every paper of the field, not the 1,000
+closest. `srl_search/field.py`: archetypes judged by TypeSafe's Jev → 300k nearest their centre → Jev labels a
+sample from near to far → logistic regression on meaning vectors (plus a second 300k pool along its direction, two
+rounds of labels where it is unsure) → the topic's exact phrase → works cited ≥ 3 times by the field, each judged
+by Jev → map with the strongest 30 reference links per paper → every group of 300+ split. Habitat fragmentation:
+35,123 papers, 13.5 min, $1.56; 89.5% recall (83-96%) on the studies cited by 19 meta-analyses, ~81% precision
+(experiments/topicmap/validate_field.py).
+- A job, never in this process: the API (`FieldStore`) serves finished maps, reports progress (HTTP 202) and writes
+  a job file; the `srl-fields` path unit (`~/Projects/os/machines/hm/scholarsreadinglist-data.nix`) starts the
+  worker (`python -m srl_search.field worker`, peak ~45 GB), which empties the queue and stops.
+- Store `/mnt/fast/scholarsreadinglist/search/fields/<key>/`: `field.json` (the papers, how each was found, the
+  labels; kept across releases), `maps/<code version>/main.json`, `group-N.json`. A code change rebuilds maps from
+  `field.json` (~10 min, no Jev); `fields/spend.json` counts Jev dollars per day; at most 3 jobs wait, and new fields
+  stop when `SRL_FIELD_BUDGET_USD` (default 10) a day would be passed.
+- Key: `~/.config/scholarsreadinglist/typesafe.env` (`TYPESAFE_API_KEY=`), read by the worker only.
+- Tests: `tests/test_field.py` (store, queue, budget, block-wise graphs).
+
 ## Ranking: junk sinks (since 2026-10-09)
 
 Search by meaning ranks by similarity − `junk_penalty` × P(junk) (default 0.3 for `all`, 0 for the curated

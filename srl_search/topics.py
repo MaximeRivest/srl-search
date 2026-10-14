@@ -41,6 +41,7 @@ import numpy as np
 from scipy import sparse
 
 YEAR_NOW = date.today().year
+BLOCK = 2000          # rows per block for the big products (memory stays ~linear in n: whole fields are 50k+ papers)
 # References that are not reading material: left out of the lenses (they still link papers in the graph).
 NOT_READING = frozenset({"dataset", "paratext", "supplementary-materials", "software", "peer-review", "libguides",
                          "erratum", "retraction"})
@@ -105,14 +106,20 @@ def collapse_versions(seed: "Seed", cit, threshold: float = 0.95) -> np.ndarray:
     n = len(seed.wids)
     if n == 0 or not seed.has_vec.any():
         return np.arange(n)
-    S = seed.vecs @ seed.vecs.T
-    np.fill_diagonal(S, 0)
+    V = seed.vecs
+    pairs = []
+    for start in range(0, n, BLOCK):                  # block by block: never the full n x n matrix
+        B = V[start:start + BLOCK] @ V.T
+        r, c = np.nonzero(B >= threshold)
+        r = r + start
+        m = c > r
+        pairs += list(zip(r[m].tolist(), c[m].tolist()))
     nodes = cit.nodes(seed.wids)
     has_refs = np.array([nd >= 0 and int(cit.fwd_off[nd + 1]) > int(cit.fwd_off[nd]) for nd in nodes])
     fa = [first_author(d) for d in seed.details]
     rank = lambda i: (seed.details[i].get("type") == "preprint", not has_refs[i], i)
     gone = np.zeros(n, bool)
-    for i, j in zip(*np.nonzero(np.triu(S >= threshold, 1))):
+    for i, j in sorted(pairs):
         if gone[i] or gone[j] or not fa[i] or fa[i] != fa[j]:
             continue
         gone[max(i, j, key=rank)] = True
@@ -139,56 +146,68 @@ def reference_matrix(cit, wids: np.ndarray) -> tuple[sparse.csr_matrix, np.ndarr
     return A, refs, nodes
 
 
-def coupling(A: sparse.csr_matrix, idf: bool) -> sparse.csr_matrix:
-    """Cosine similarity of the papers' reference vectors (Salton's measure when idf is False)."""
+def _ref_vectors(A: sparse.csr_matrix, idf: bool) -> sparse.csr_matrix:
     n = A.shape[0]
-    if A.shape[1] == 0:
-        return sparse.csr_matrix((n, n), dtype=np.float64)
     df = np.asarray(A.sum(0)).ravel()
     X = A.astype(np.float64)
     if idf:
         X = X @ sparse.diags(np.log(n / df))          # a reference every paper cites carries nothing
     norm = np.sqrt(np.asarray(X.multiply(X).sum(1)).ravel())
     norm[norm == 0] = 1
-    X = sparse.diags(1 / norm) @ X
-    S = (X @ X.T).tocsr()
-    S.setdiag(0)
-    S.eliminate_zeros()
-    return S
+    return (sparse.diags(1 / norm) @ X).tocsr()
 
 
-def top_k(S: sparse.csr_matrix, k: int) -> sparse.csr_matrix:
-    """Each row's k largest entries, symmetrized by the larger of the two directions."""
-    S = S.tocsr()
-    rows, cols, vals = [], [], []
-    for i in range(S.shape[0]):
-        a, b = S.indptr[i], S.indptr[i + 1]
-        if b - a == 0:
-            continue
-        d, c = S.data[a:b], S.indices[a:b]
-        if b - a > k:
-            keep = np.argpartition(-d, k)[:k]
-            d, c = d[keep], c[keep]
-        rows.append(np.full(len(c), i)); cols.append(c); vals.append(d)
-    if not rows:
+def coupling(A: sparse.csr_matrix, idf: bool, top: int = 0) -> sparse.csr_matrix:
+    """Cosine similarity of the papers' reference vectors (Salton's measure when idf is False). top > 0: each paper's
+    `top` strongest links only, symmetrized by the larger direction, computed block by block (whole fields: the full
+    product of 50k papers that share references is hundreds of GB)."""
+    n = A.shape[0]
+    if A.shape[1] == 0:
+        return sparse.csr_matrix((n, n), dtype=np.float64)
+    X = _ref_vectors(A, idf)
+    if not top:
+        S = (X @ X.T).tocsr()
+        S.setdiag(0)
+        S.eliminate_zeros()
         return S
-    K = sparse.csr_matrix((np.concatenate(vals), (np.concatenate(rows), np.concatenate(cols))), shape=S.shape)
+    XT = X.T.tocsc()
+    rows, cols, vals = [], [], []
+    for start in range(0, n, BLOCK):
+        B = (X[start:start + BLOCK] @ XT).tocsr()
+        for r in range(B.shape[0]):
+            i = start + r
+            a, b = B.indptr[r], B.indptr[r + 1]
+            d, c = B.data[a:b], B.indices[a:b]
+            m = c != i
+            d, c = d[m], c[m]
+            if len(d) > top:
+                keep = np.argpartition(-d, top)[:top]
+                d, c = d[keep], c[keep]
+            rows.append(np.full(len(c), i)); cols.append(c); vals.append(d)
+    if not rows:
+        return sparse.csr_matrix((n, n), dtype=np.float64)
+    K = sparse.csr_matrix((np.concatenate(vals), (np.concatenate(rows), np.concatenate(cols))), shape=(n, n))
     return K.maximum(K.T).tocsr()
 
 
 def text_graph(vecs: np.ndarray, has_vec: np.ndarray, k: int) -> sparse.csr_matrix:
-    """UMAP's fuzzy k-nearest-neighbour graph over cosine distance, symmetrized (a + b - ab)."""
+    """UMAP's fuzzy k-nearest-neighbour graph over cosine distance, symmetrized (a + b - ab). Exact neighbours,
+    computed in blocks of rows (never the full n x n matrix)."""
     n = len(vecs)
     idx = np.flatnonzero(has_vec)
     m = len(idx)
     if m <= 2:
         return sparse.csr_matrix((n, n), dtype=np.float64)
     k = min(k, m - 1)
-    V = vecs[idx]
-    D = 1 - V @ V.T
-    np.fill_diagonal(D, np.inf)
-    nn = np.argpartition(D, k, axis=1)[:, :k]
-    d = np.take_along_axis(D, nn, 1)
+    V = np.ascontiguousarray(vecs[idx], dtype=np.float32)
+    nn = np.empty((m, k), np.int64)
+    d = np.empty((m, k), np.float64)
+    for start in range(0, m, BLOCK):
+        D = 1 - V[start:start + BLOCK] @ V.T
+        D[np.arange(D.shape[0]), start + np.arange(D.shape[0])] = np.inf
+        part = np.argpartition(D, k, axis=1)[:, :k]
+        nn[start:start + BLOCK] = part
+        d[start:start + BLOCK] = np.take_along_axis(D, part, 1)
     rho = d.min(1)
     target = math.log2(k)
     lo, hi = np.full(m, 1e-6), np.full(m, 10.0)
@@ -210,10 +229,7 @@ def build_graph(cit, seed: Seed, opt: Options) -> Graph:
     t = time.perf_counter()
     parts = []
     if opt.links in ("hybrid", "refs"):
-        S = coupling(A, opt.idf)
-        if opt.refs_top:
-            S = top_k(S, opt.refs_top)
-        parts.append(S)
+        parts.append(coupling(A, opt.idf, opt.refs_top))
     if opt.links in ("hybrid", "text"):
         parts.append(text_graph(seed.vecs, seed.has_vec, opt.k_text))
     W = sparse.csr_matrix((len(seed.wids),) * 2, dtype=np.float64)
@@ -545,6 +561,19 @@ def experts_for(idx: np.ndarray, local: np.ndarray, gr: Graph, seed: Seed, cit, 
         rows, _, _ = au.of(nd)
         for r in rows.tolist():
             mine[r].append((int(seed.details[i].get("year") or 0), int(seed.wids[i])))
+    # OpenAlex sometimes splits one person into several author records (Ilkka Hanski twice in one group): within a
+    # group, records with the same name are one expert. (Two different people with one name in one niche: rare.)
+    by_name: dict[str, list[int]] = defaultdict(list)
+    for r in credited:
+        by_name[re.sub(r"[^a-z]", "", au.name(r).lower()) or str(r)].append(r)
+    for rs in by_name.values():
+        if len(rs) > 1:
+            keep = max(rs, key=lambda r: sum(credited[r]))
+            for r in rs:
+                if r != keep:
+                    credited[keep] += credited.pop(r)
+                    papers[keep] += papers.pop(r)
+                    mine[keep] += mine.pop(r, [])
     ranked = sorted(credited, key=lambda r: (-h_index(credited[r]), -sum(credited[r]), r))[:k]
     out = []
     for r in ranked:
