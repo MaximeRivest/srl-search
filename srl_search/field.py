@@ -2,8 +2,9 @@
 
 Why (experiments/topicmap/README.md): the 1,000 closest papers are a corner of a field of ~10-60k; no distance
 cut-off separates a field from its neighbours; exact phrases miss half of it; and ~30% of the studies meta-analyses
-cite have no English abstract, so only the field's own citations reach them. How, for <= $0.50 of AI labels and
-without Jev (TypeSafe's terms forbid training on its answers; srl_search/judges.py):
+cite have no English abstract, so only the field's own citations reach them. How, for ~$1 of AI answers: Kimi K3
+teaches small models (its providers allow training on its answers); Jev only checks papers and teaches nothing
+(srl_search/judges.py):
 
   1 teacher      the 300k papers closest in meaning to the topic; Kimi K3 judges 272 papers spread from nearest
                  to farthest, a quarter of them works the nearest papers cite (many with a title only)
@@ -16,7 +17,9 @@ without Jev (TypeSafe's terms forbid training on its answers; srl_search/judges.
                  judges papers with a title only, those the vector student is unsure about, and the teacher's
   6 judging      a combiner (student score + citation signals, fitted on the teacher's answers) scores every
                  candidate; the teacher's and decider's own answers come first; the cut-off maximises the F1
-                 expected from those probabilities
+                 expected from those probabilities; then Jev checks the well-cited papers near the cut-off
+                 (scores 0.1-0.7, cited 20+ times; ~20k papers, ~$0.55): its answers decide them, nothing learns
+                 from them (the classics in older words, and the neighbours that would top reading lists)
   7 map          the topic map of all of it (srl_search/topics.py; Leiden runs on 24 cores)
   8 subgroups    every group of 300+ papers split into its own groups
 
@@ -27,7 +30,7 @@ expensive part; maps are rebuilt from it when the map code changes (~5 min).
 
 Store: ROOT/<key>/job.json (status), field.json (the papers, how each was found, the labels), work/ (the job's
 models and files), maps/<code version>/main.json and group-<n>.json; ROOT/queue/<key>.job (jobs to run);
-ROOT/spend.json (teacher dollars per day); ROOT/PAUSED (new fields refused, with the reason).
+ROOT/spend.json (Kimi and Jev dollars per day); ROOT/PAUSED (new fields refused, with the reason).
 """
 from __future__ import annotations
 
@@ -51,13 +54,17 @@ import numpy as np
 from fastapi import HTTPException
 
 ROOT = Path(os.environ.get("SRL_FIELDS", "/mnt/fast/scholarsreadinglist/search/fields"))
-SELECTION_VERSION = "4"                  # 4: 400 teacher answers in two rounds (active learning), students learn
+SELECTION_VERSION = "5"                  # 5: + Jev checks well-cited papers near the cut-off; 4: 400 teacher answers in two rounds (active learning), students learn
                                          #    probabilities, citation combiner, expected-F1 cut-off; 3: held-back
                                          #    cut-offs; 2: first no-Jev recipe; 1: Jev
 TEACHER_USD = float(os.environ.get("SRL_FIELD_TEACHER_USD", "0.50"))   # Kimi K3 labels per field
 TEACHER_R1 = 272                         # first round, spread; ~$1.22 per 1,000 papers (measured)
 TEACHER_R2 = 128                         # second round, where the first classifier is unsure: 400 answers ~$0.49
 ACTIVE_BAND = (0.35, 0.85)               # the first classifier (class-balanced) is unsure here
+CHECK_BAND = (0.1, 0.7)                  # Jev decides the papers scoring here that are cited CHECK_CITES+ times:
+CHECK_CITES = 20                         #   the classics just below the cut-off, the wrong ones just above it
+CHECK_USD = float(os.environ.get("SRL_FIELD_CHECK_USD", "0.60"))   # Jev per field (~$0.027 per 1,000 papers);
+                                         #   most cited first when a field has more
 DECIDER_N = 10_000                       # papers the decider labels for the students
 BUDGET_USD = float(os.environ.get("SRL_FIELD_BUDGET_USD", "10"))    # teacher spend a day, all jobs together
 EST_USD = TEACHER_USD                    # what a new field is assumed to cost when deciding to accept it
@@ -347,6 +354,18 @@ def select_field(ctx: Ctx, job: Job, q: str, definition: str | None, keywords: s
                 out.append(J.paper_text(cit.title(nd) if nd >= 0 else "", None))
         return out
 
+    def pairs_of(ws) -> list[tuple[str, str | None]]:
+        det = _details(ctx, ws)
+        out = []
+        for w in ws:
+            d = det.get(int(w))
+            if d:
+                out.append((d.get("title"), d.get("abstract")))
+            else:
+                nd = int(cit.nodes([int(w)])[0])
+                out.append((cit.title(nd) if nd >= 0 else "", None))
+        return out
+
     def publications(ws) -> np.ndarray:
         det = _details(ctx, ws)
         ok = []
@@ -588,6 +607,30 @@ def select_field(ctx: Ctx, job: Job, q: str, definition: str | None, keywords: s
         if w in pos:
             final[pos[w]] = v
     cut, ef1 = _plugin_cut(final)
+    # Jev checks what readers will see: well-cited papers near the cut-off (measured on habitat fragmentation:
+    # precision 0.75 -> 0.82, recall 0.73 -> 0.77; among papers cited 50+ times 0.70 / 0.78 -> 0.86 / 0.86). Its
+    # answers decide those papers; nothing learns from them
+    cites = np.zeros(len(univ), np.int64)
+    nd_u = cit.nodes(univ)
+    cites[nd_u >= 0] = np.asarray(cit.cites)[nd_u[nd_u >= 0]]
+    chk = np.flatnonzero((final >= CHECK_BAND[0]) & (final < CHECK_BAND[1]) & (cites >= CHECK_CITES) & ~is_teacher)
+    chk = chk[np.argsort(-cites[chk], kind="stable")]
+    job.stage(5, f"Jev checks {len(chk):,} well-cited papers near the cut-off")
+    jev = J.Jev(min(CHECK_USD, max(0.0, BUDGET_USD - FieldStore(job.dir.parent).spent_today())))
+    t_jev = time.time()
+    jl = jev.label(pairs_of(univ[chk]), q, definition) if len(chk) else np.zeros(0)
+    _spend(job.dir.parent, jev.usd)
+    checked = {}
+    for i, v in zip(chk, jl):
+        if v == v:
+            checked[int(univ[i])] = float(v)
+            final[i] = float(v >= 0.5)
+    report["check"] = {"by": f"Jev ({J.JEV_MODEL})", "band": list(CHECK_BAND), "cited_at_least": CHECK_CITES,
+                       "papers": len(chk), "answered": len(checked), "failed": jev.failed,
+                       "in": int(sum(v >= 0.5 for v in checked.values())), "usd": round(jev.usd, 3),
+                       "seconds": round(time.time() - t_jev, 1)}
+    np.savez_compressed(work / "scores.npz", ids=univ, final=final, student=stud, route=np.array(
+        [0] * len(U_w) + [1] * len(H) + [2] * len(C), np.int8), features=feats.astype(np.float32))
     names = ("student", "cited by the field", "share of its citations", "share of its references", "no references")
     report["judging"] = {"cut": cut, "expected_f1": ef1, "expected_on_topic": round(float(final.sum())),
                          "combiner": {n_: round(float(c_), 3) for n_, c_ in zip(names, comb.coef_[0])},
@@ -601,12 +644,14 @@ def select_field(ctx: Ctx, job: Job, q: str, definition: str | None, keywords: s
     report["papers"] = len(field)
     report["by_route"] = {v: sum(1 for f in field.values() if f["via"] == v) for v in ("meaning", "phrase", "cited")}
     report["teacher_usd"] = round(teacher.usd, 3)
+    report["usd"] = round(teacher.usd + jev.usd, 3)
     job.done_stage(5, t)
     return {"version": SELECTION_VERSION, "made": _now(), "release": ctx.release["id"], "topic": q,
             "definition": definition, "keywords": keywords, "report": report,
             "papers": {str(w): f for w, f in field.items()},
             "labels": {"teacher": {str(w): v for w, v in labels.items()},
-                       "decider": {str(w): round(v, 3) for w, v in decided.items()}}}
+                       "decider": {str(w): round(v, 3) for w, v in decided.items()},
+                       "jev": {str(w): round(v, 3) for w, v in checked.items()}}}
 
 
 def _citation_features(cit, univ: np.ndarray, score: np.ndarray, student_logit: np.ndarray) -> np.ndarray:
@@ -711,7 +756,7 @@ def run_job(ctx: Ctx, store: Path, key: str) -> None:
         out = build_maps(ctx, job, sel, VERSION)
         job.st.update({"status": "done", "finished": _now(), "eta_s": 0, "detail": "",
                        "summary": {"papers": sel["report"]["papers"], "groups": len(out["groups"]),
-                                   "usd": sel["report"].get("teacher_usd", sel["report"].get("jev", {}).get("usd"))}})
+                                   "usd": sel["report"].get("usd", sel["report"].get("teacher_usd", sel["report"].get("jev", {}).get("usd")))}})
     except FinalError as e:
         job.st.update({"status": "failed", "final": True, "error": str(e), "finished": _now()})
     except Exception as e:  # noqa: BLE001

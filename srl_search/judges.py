@@ -1,5 +1,5 @@
-"""Judges of "is this paper about the topic?" for whole-field maps, without Jev (TypeSafe's terms forbid training on
-its answers). Measured on habitat fragmentation (experiments/topicmap/README.md, "Judging papers without Jev"):
+"""Judges of "is this paper about the topic?" for whole-field maps. Nothing is trained on Jev's answers (TypeSafe's
+terms): Jev only checks papers at the end (`Jev`). Measured on habitat fragmentation (experiments/topicmap/README.md, "Judging papers without Jev"):
 
   teacher   Kimi K3 (open weights; its providers' terms allow training on its answers), ~375 papers for <= $0.50
   decider   Qwen3.5-0.8B with a yes/no head (Perplexity's pplx-decider recipe), LoRA, 75 steps on the teacher's
@@ -160,6 +160,73 @@ class Teacher:
         return out
 
 
+# ------------------------------------------------------------------------------------------------ the checker
+JEV_MODEL = "jev-1.13.0"                 # pinned: the answers' meaning must not move under a running job
+JEV_USD_PER_TOKEN = 0.042 / 1e6          # input tokens; output is free (docs.typesafe.ai/models, 2026-10)
+
+
+class Jev:
+    """TypeSafe's Jev as a checker: it gives final answers for papers readers will see (the field's most cited near
+    the cut-off). Its answers decide those papers and are kept in field.json; no model is ever trained on them."""
+
+    def __init__(self, budget_usd: float, threads: int = 192):
+        self.key = os.environ.get("TYPESAFE_API_KEY")
+        if not self.key:
+            raise RuntimeError("TYPESAFE_API_KEY is not set")
+        self.budget, self.threads = budget_usd, threads
+        self.tokens = self.calls = self.failed = 0
+        self.lock = threading.Lock()
+
+    @staticmethod
+    def question(topic: str, definition: str | None) -> dict:
+        ins = {"topic": topic}
+        if definition:
+            ins["definition"] = definition
+        ins["question"] = ("Is `topic` a central subject of the paper described in `paper`?"
+                           + (" `definition` says what the topic covers." if definition else ""))
+        return {"type": "noul", "instructions": ins, "criteria": {
+            "true": "The paper studies the topic itself as a main subject: the phenomenon, its causes, consequences, "
+                    "mechanisms, measurement, methods, or how it is managed, in any system or organism.",
+            "false": "The topic is absent or only mentioned in passing; or the words mean something else in this "
+                     "paper; or the paper studies a neighbouring subject without studying the topic itself."}}
+
+    def _one(self, paper: dict, question: dict) -> float:
+        if self.usd >= self.budget:
+            return float("nan")
+        body = json.dumps({"state": {"paper": paper}, "model": JEV_MODEL, "questions": {"q": question}}).encode()
+        for attempt in range(6):
+            try:
+                req = urllib.request.Request("https://api.typesafe.ai/v1/systemone", data=body, headers={
+                    "Authorization": f"Bearer {self.key}", "Content-Type": "application/json"})
+                with urllib.request.urlopen(req, timeout=30) as r:
+                    out = json.load(r)
+                with self.lock:
+                    self.tokens += int(out.get("usage", {}).get("input_tokens", 0))
+                    self.calls += 1
+                return float(out["answers"]["q"]["noul"])
+            except urllib.error.HTTPError as e:
+                if e.code not in (429, 500, 502, 503, 504):
+                    break
+                time.sleep(min(float(e.headers.get("retry-after") or 0) or 2 ** attempt, 30))
+            except (OSError, ValueError, KeyError):
+                time.sleep(2 ** attempt)
+        with self.lock:
+            self.failed += 1
+        return float("nan")
+
+    def label(self, papers: list[tuple[str, str]], topic: str, definition: str | None) -> np.ndarray:
+        """P(on topic) for each (title, abstract); NaN when the service did not answer or the budget is spent."""
+        q = self.question(topic, definition)
+        clean = [{"title": re.sub(r"<[^>]+>", "", t or ""), "abstract": re.sub(r"<[^>]+>", " ", a or "")[:3000]}
+                 for t, a in papers]
+        with ThreadPoolExecutor(self.threads) as ex:
+            return np.array(list(ex.map(lambda p: self._one(p, q), clean)), dtype=np.float64)
+
+    @property
+    def usd(self) -> float:
+        return self.tokens * JEV_USD_PER_TOKEN
+
+
 # ------------------------------------------------------------------------------------------------ the GPU
 def gpu_free_mb() -> int:
     q = subprocess.run(["nvidia-smi", "--query-gpu=index,memory.free", "--format=csv,noheader,nounits"],
@@ -192,9 +259,9 @@ def gpu_env() -> dict:
             "TRITON_LIBCUDA_PATH": "/run/opengl-driver/lib"}
 
 
-def run(args: list[str], log: Path) -> None:
+def run(args: list[str], log: Path, env: dict | None = None) -> None:
     with open(log, "a") as f:
-        r = subprocess.run(args, env=gpu_env(), stdout=f, stderr=subprocess.STDOUT)
+        r = subprocess.run(args, env={**gpu_env(), **(env or {})}, stdout=f, stderr=subprocess.STDOUT)
     if r.returncode != 0:
         tail = log.read_text()[-1500:]
         raise RuntimeError(f"{args[1:3]} failed ({r.returncode}): {tail}")
@@ -212,10 +279,17 @@ def train_decider(rows: list[tuple[str, float]], topic: str, definition: str | N
 def decider_scores(model_dir: Path, texts: list[str], say) -> np.ndarray:
     f = model_dir / "score.jsonl"
     f.write_text("".join(json.dumps({"text": t}) + "\n" for t in texts))
-    wait_for_gpu(9000, say)
     vpy = os.environ.get("SRL_VLLM_PYTHON") or "python"
-    run([vpy, str(Path(__file__).with_name("vllm_decider.py")), str(model_dir / "merged"), str(f), str(model_dir / "scores.json"),
-         GPU], model_dir / "log.txt")
+    args = [vpy, str(Path(__file__).with_name("vllm_decider.py")), str(model_dir / "merged"), str(f),
+            str(model_dir / "scores.json"), GPU]
+    wait_for_gpu(10000, say)
+    try:
+        run(args, model_dir / "log.txt")
+    except RuntimeError:                        # a household service grew under it: once more, smaller
+        say("the GPU filled up; trying again with less memory")
+        time.sleep(20)
+        wait_for_gpu(8000, say)
+        run(args, model_dir / "log.txt", {"SRL_VLLM_UTIL": "0.3"})
     return np.array(json.loads((model_dir / "scores.json").read_text()))
 
 

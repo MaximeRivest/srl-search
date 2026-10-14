@@ -254,3 +254,27 @@ End-to-end run (habitat fragmentation, selection v4, 400 Kimi answers, $0.48, 14
 v4 is better than v3 everywhere but still short of v1 in precision and in the meta-analyses' studies. Every variant
 tried lands on the same curve (population F1 ~0.70-0.74, the cut-off only moves along it); v1 lies above it. What v1
 had is knowledge of the field's vocabulary, old and new, that a 0.8B model does not get from 400 examples.
+
+### Selection v5: Jev checks the well-cited papers near the cut-off (it teaches nothing)
+
+Precision matters more than recall for the map's groups (wrong papers come in clumps from neighbouring subjects and
+form fake groups) and for reading lists (only the first 10-20 papers of a group are read), except that the field's
+classics must be there. So a second yardstick for what readers see: Kimi K3 labelled 720 of the 168,842 candidates
+cited 50+ times, in strata of v4's score and citations ($0.79, `teacher/eval_classics.json`). Among them, scores below
+0.1: none on topic (of 180); 0.1 to the cut-off: 22% (~7,900 papers: missed classics); cut-off to 0.7: ~45% (~3,300:
+wrong papers that would top reading lists). Jev agrees with Kimi on 94.8% of the population sample, slightly stricter.
+
+Simulated on a replay of v4 (its saved answers; Jev labelled all yardstick papers for $0.08): Jev deciding papers
+scored 0.1-0.7 and cited 20+ times is best per dollar; wider bands cost more and do worse (above 0.7 Jev refuses
+papers Kimi accepts); a Jev threshold of 0.3 raises classics' recall (0.95) but lowers their precision (0.76).
+
+End-to-end run (habitat fragmentation, 13.6 min, Kimi $0.48 + Jev $0.46 for 17,289 papers in 53 s):
+
+| Selection | $ | Papers | Population P / R | Cited 50+ times P / R | Meta-analyses' studies (title only) |
+|---|---:|---:|---:|---:|---:|
+| v1 Jev | 1.56 | 35,123 | 0.91 / 0.64 | 0.83 / 0.83 | 0.86 (0.86) |
+| v4 | 0.48 | 44,749 | 0.73 / 0.67 | 0.71 / 0.78 | 0.77 (0.79) |
+| v5 | 0.94 | 38,655 | 0.82 / 0.69 | 0.94 / 0.83 | 0.82 (0.81) |
+
+Caveat: the band was chosen on the same classics yardstick (a fresh run, but the rule is tuned on it); one topic.
+Also: vLLM now leaves 4 GB of the card free and retries once with less (dictation grew by 1.4 GB under it: OOM).
