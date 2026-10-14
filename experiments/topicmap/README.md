@@ -159,3 +159,25 @@ Fully automatic (only the topic's words; archetypes chosen by Jev among the 300 
 Recall by period on fragmentation: before 2000 0.94, 2000s 0.92, 2010 on 0.81; dam-fragmented rivers 0.52 (was 0.06
 with the hand-made classifier). Weak point seen: the exact-phrase step uses the whole topic as one phrase, which finds
 almost nothing for long topics (45 matches for the microplastics wording); meaning and citations carry it.
+
+## Judging papers without Jev, fast and under $0.50 (experiments/topicmap/teacher/, 2026-10-14)
+
+TypeSafe's terms (agreement §2.3(b)) forbid training a model on Jev's output; the whole-field pipeline trained its
+classifier on Jev's labels, so new fields are paused (fields/PAUSED). Teacher instead: Kimi K3 (open weights, allows
+training), $1.31 per 1,000 papers, ~450 a second through tiny-classifiers' label.py. Truth below = Kimi's labels on
+1,414 held-out papers and on the 1,266 references of the 19 meta-analyses (388 with a title only).
+
+| Judge | Kimi labels | Held-out AUC | Meta-analyses AUC | Speed (one RTX 3090, shared) |
+|---|---:|---:|---:|---:|
+| small LLMs as they are (Qwen3.5-0.8B / 2B, LFM2.5-1.2B, Gemma-3-1B) | 0 | 0.58-0.77 | 0.57-0.80 | — |
+| Ettin-17M | 250 / 4,000 / 17,580 | 0.84 / 0.96 / 0.969 | 0.82 / 0.955 / 0.965 | 3,600/s |
+| Ettin-68M | 17,580 | 0.976 | 0.970 | 900/s |
+| Qwen3.5-0.8B decider (LoRA, yes/no head; pplx recipe) | 250 / 375 / 1,000 | 0.953 / 0.961 / 0.957 | 0.954 / 0.961 / 0.948 | 95-109/s (vLLM) |
+| … with the causal mask lifted | 250 / 1,000 | 0.951 / 0.963 | 0.942 / 0.944 | same |
+| Ettin-17M taught by the decider (375 Kimi + 10k decider labels, 2 passes, 21 s) | 375 | 0.951 | 0.952 | 3,600/s |
+| vectors + logistic regression, same labels (papers with a vector) | 375 (+10k) | 0.940 (0.950) | | instant |
+
+- Decider: 75 LoRA steps (145 s) reach 0.959; 150 steps 0.961. Merged (head in an untied output layer) and served by
+  vLLM 0.29 it gives the same scores (0.9605). Start-up: 112 s compiled, 21 s eager (95 vs 109 papers/s): eager wins.
+- Vector prefilter keeping 99% of on-topic papers: still keeps 58% of candidates; small gain.
+- Grouping the 33k-paper fragmentation map: 398 s on one core, 85 s with Leiden runs on 24 cores (same 11 groups).

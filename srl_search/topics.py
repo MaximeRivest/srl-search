@@ -67,6 +67,7 @@ class Options:
     max_groups: int = 9            # a person scans 5-9 groups; any group can be split further (group=N)
     min_size: int | None = None    # smallest group shown (default max(12, n/50)); smaller ones are "other papers"
     seed: int = 20161028           # Scimeetr's first commit day
+    workers: int = 1               # Leiden runs side by side (forked processes) for maps of PARALLEL_MIN+ papers
     lens_size: int = 8              # per reading list (experts too)
 
 
@@ -254,6 +255,35 @@ def _leiden(g: igraph.Graph, res: float) -> np.ndarray:
                                        n_iterations=-1).membership)
 
 
+# Leiden runs, each with its own seed (so the result is the same run in sequence or side by side). Big maps (the
+# whole-field worker) run them in forked processes: one run of a 33k-paper map takes ~10 s on one core, and a map
+# needs ~35. The search API (maps of <= 2,000 papers) never forks.
+PARALLEL_MIN = 5000
+_SHARED: dict = {}
+
+
+def _seeded_run(args) -> np.ndarray:
+    res, seed = args
+    _RNG.seed(seed)
+    return _leiden(_SHARED["g"], res)
+
+
+def _runs(g: igraph.Graph, jobs: list[tuple[float, int]], workers: int) -> list[np.ndarray]:
+    if workers <= 1 or g.vcount() < PARALLEL_MIN:
+        return [_seeded_run_on(g, r, sd) for r, sd in jobs]
+    import multiprocessing as mp
+    _SHARED["g"] = g                              # forked children see it without copying
+    with mp.get_context("fork").Pool(min(workers, len(jobs))) as pool:
+        out = pool.map(_seeded_run, jobs, chunksize=1)
+    _SHARED.clear()
+    return out
+
+
+def _seeded_run_on(g, res, seed):
+    _RNG.seed(seed)
+    return _leiden(g, res)
+
+
 def _ari(a, b) -> float:
     if np.array_equal(a, b):
         return 1.0                     # identical, even when one group (where the index itself is undefined)
@@ -270,11 +300,14 @@ def cluster(W: sparse.csr_matrix, opt: Options, min_size: int) -> tuple[np.ndarr
     consensus runs, 0-1; facts about the choice)."""
     n = W.shape[0]
     g = _igraph(W)
+    workers = opt.workers
     with _CLUSTER_LOCK:
         _RNG.seed(opt.seed)
         scan = []
-        for res in opt.resolutions:
-            ms = [_leiden(g, res) for _ in range(opt.scan_runs)]
+        jobs = [(res, opt.seed * 1000 + 10 * i + k) for i, res in enumerate(opt.resolutions) for k in range(opt.scan_runs)]
+        scan_runs = _runs(g, jobs, workers)
+        for i, res in enumerate(opt.resolutions):
+            ms = scan_runs[i * opt.scan_runs:(i + 1) * opt.scan_runs]
             stab = float(np.mean([_ari(ms[i], ms[j]) for i in range(len(ms)) for j in range(i + 1, len(ms))]))
             scan.append({"resolution": res, "groups": int(np.median([_big(m, min_size) for m in ms])),
                          "stability": round(stab, 3)})
@@ -286,7 +319,7 @@ def cluster(W: sparse.csr_matrix, opt: Options, min_size: int) -> tuple[np.ndarr
         w = np.asarray(g.es["weight"], dtype=np.float64)
         while True:
             res = opt.resolutions[ri]
-            runs = [_leiden(g, res) for _ in range(opt.runs)]
+            runs = _runs(g, [(res, opt.seed * 1000 + 500 + 50 * ri + k) for k in range(opt.runs)], workers)
             together = np.zeros(len(E))
             for m in runs:
                 together += m[E[:, 0]] == m[E[:, 1]]
@@ -294,7 +327,7 @@ def cluster(W: sparse.csr_matrix, opt: Options, min_size: int) -> tuple[np.ndarr
             keep = frac >= 0.5
             h = igraph.Graph(n=n, edges=E[keep].tolist(), directed=False)
             h.es["weight"] = (frac[keep] * w[keep]).tolist()
-            final = _leiden(h, res)
+            final = _seeded_run_on(h, res, opt.seed * 1000 + 999)
             if _big(final, min_size) <= opt.max_groups or ri == 0:
                 break
             ri -= 1                                  # too many groups for one screen: one step coarser

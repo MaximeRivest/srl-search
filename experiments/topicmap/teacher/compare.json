@@ -1,0 +1,62 @@
+{
+ "train": 5652,
+ "train_with_vector": 4964,
+ "test": {
+  "n": 1414,
+  "on_topic": 365,
+  "without_abstract": 158,
+  "ettin17": {
+   "auc": 0.97,
+   "accuracy": 0.926,
+   "recall": 0.855,
+   "precision": 0.86,
+   "recall_with_abstract": 0.874,
+   "recall_without_abstract": 0.692,
+   "accuracy_by_set": {
+    "judged": 0.946,
+    "spread": 0.93,
+    "cited": 0.91
+   }
+  },
+  "vectors_lr": {
+   "auc": 0.877,
+   "accuracy": 0.89,
+   "recall": 0.797,
+   "precision": 0.782,
+   "recall_with_abstract": 0.893,
+   "recall_without_abstract": 0.0,
+   "accuracy_by_set": {
+    "judged": 0.904,
+    "spread": 0.912,
+    "cited": 0.856
+   }
+  }
+ },
+ "refs": {
+  "n": 1266,
+  "on_topic": 640,
+  "without_abstract": 388,
+  "ettin17": {
+   "auc": 0.96,
+   "accuracy": 0.879,
+   "recall": 0.812,
+   "precision": 0.94,
+   "recall_with_abstract": 0.808,
+   "recall_without_abstract": 0.824
+  },
+  "vectors_lr": {
+   "auc": 0.739,
+   "accuracy": 0.776,
+   "recall": 0.58,
+   "precision": 0.961,
+   "recall_with_abstract": 0.821,
+   "recall_without_abstract": 0.0
+  }
+ },
+ "kimi_vs_jev": {
+  "n": 1566,
+  "agree": 0.95,
+  "kimi_yes_jev_no": 70,
+  "kimi_no_jev_yes": 8
+ }
+}

@@ -120,3 +120,16 @@ def test_paused_blocks_new_fields_but_not_map_rebuilds(tmp_path):
     with pytest.raises(F.Pending) as p:
         st.get("old topic", None, None, "v2", None)
     assert p.value.status["kind"] == "map"
+
+
+def test_leiden_runs_side_by_side_give_the_same_groups(monkeypatch):
+    rng = np.random.default_rng(3)
+    n = 600
+    blocks = np.repeat(np.arange(4), n // 4)
+    r, c = np.nonzero(np.triu((rng.random((n, n)) < np.where(blocks[:, None] == blocks[None, :], 0.05, 0.004)), 1))
+    W = sparse.csr_matrix((np.ones(len(r)), (r, c)), shape=(n, n))
+    W = (W + W.T).tocsr()
+    serial = T.cluster(W, T.Options(), 20)
+    monkeypatch.setattr(T, "PARALLEL_MIN", 10)
+    parallel = T.cluster(W, T.Options(workers=8), 20)
+    assert (serial[0] == parallel[0]).all() and serial[2]["resolution"] == parallel[2]["resolution"]

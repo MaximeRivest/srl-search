@@ -1,0 +1,43 @@
+{
+ "kimi375": {
+  "auc": 0.9398,
+  "evaluated": 2134,
+  "of": 2680,
+  "keep_0.98": {
+   "cutoff": 0.2012,
+   "eval_kept": 0.703,
+   "pool_kept": 0.567
+  },
+  "keep_0.99": {
+   "cutoff": 0.1618,
+   "eval_kept": 0.768,
+   "pool_kept": 0.696
+  },
+  "keep_0.995": {
+   "cutoff": 0.1444,
+   "eval_kept": 0.802,
+   "pool_kept": 0.755
+  }
+ },
+ "kimi375+decider10k": {
+  "auc": 0.9504,
+  "evaluated": 2134,
+  "of": 2680,
+  "keep_0.98": {
+   "cutoff": 0.0763,
+   "eval_kept": 0.653,
+   "pool_kept": 0.495
+  },
+  "keep_0.99": {
+   "cutoff": 0.0491,
+   "eval_kept": 0.701,
+   "pool_kept": 0.576
+  },
+  "keep_0.995": {
+   "cutoff": 0.0342,
+   "eval_kept": 0.739,
+   "pool_kept": 0.64
+  }
+ },
+ "pool_with_vector": 0.857
+}
