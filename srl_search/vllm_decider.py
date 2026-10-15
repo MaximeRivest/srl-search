@@ -3,6 +3,7 @@ of the first answer token. Runs in vLLM's own Python (SRL_VLLM_PYTHON): imports 
 
     $SRL_VLLM_PYTHON vllm_decider.py MERGED_DIR texts.jsonl scores.json GPU_INDEX
 
+A row of texts.jsonl may carry its own "system" (the question), else decider.json's is used.
 Eager mode: starts in ~20 s instead of ~110 s for ~13% fewer papers a second (measured; better for ~10k papers).
 Takes at most 40% of the card, or what is free minus 4 GB, whichever is less (SRL_VLLM_UTIL caps it lower): vLLM
 uses ~1.5 GB beyond its share, and the household services on the card grow while it runs (dictation: +1.4 GB seen).
@@ -26,14 +27,15 @@ llm = LLM(model=mdir, dtype="bfloat16", gpu_memory_utilization=util, max_model_l
 tok = llm.get_tokenizer()
 
 
-def prompt(text):
+def prompt(text, system):
     text = tok.decode(tok(text, add_special_tokens=False)["input_ids"][:700])
-    return tok.apply_chat_template([{"role": "system", "content": cfg["system"]}, {"role": "user", "content": text}],
+    return tok.apply_chat_template([{"role": "system", "content": system}, {"role": "user", "content": text}],
                                    tokenize=False, add_generation_prompt=True, enable_thinking=False)
 
 
-texts = [json.loads(l)["text"] for l in open(src)]
-outs = llm.generate([prompt(t) for t in texts], SamplingParams(max_tokens=1, temperature=0.0,
+# a row may carry its own question ("system"): the general field judge (experiments/fieldjudge) asks about any topic
+rows = [json.loads(l) for l in open(src)]
+outs = llm.generate([prompt(r["text"], r.get("system") or cfg["system"]) for r in rows], SamplingParams(max_tokens=1, temperature=0.0,
                                                                logprob_token_ids=[cfg["yes"], cfg["no"]]), use_tqdm=False)
 p = []
 for o in outs:

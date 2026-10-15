@@ -1,0 +1,2621 @@
+{
+ "topics": [
+  {
+   "topic": "Plant genomics and crop improvement",
+   "definition": "The study of plant genomes and their application to developing improved crop varieties through breeding and genetic engineering.",
+   "field": "Agricultural and Biological Sciences",
+   "id": 0
+  },
+  {
+   "topic": "Soil microbiome",
+   "definition": "The community of microorganisms living in soil and their roles in nutrient cycling, plant health, and ecosystem function.",
+   "field": "Agricultural and Biological Sciences",
+   "id": 1
+  },
+  {
+   "topic": "CRISPR-Cas9 in agriculture",
+   "definition": "The application of CRISPR-Cas9 gene editing technology to modify crops and livestock for improved traits.",
+   "field": "Agricultural and Biological Sciences",
+   "id": 2
+  },
+  {
+   "topic": "Nitrogen fixation",
+   "definition": null,
+   "field": "Agricultural and Biological Sciences",
+   "id": 3
+  },
+  {
+   "topic": "Aquaculture nutrition",
+   "definition": "The study of dietary requirements and feed formulations for farmed fish, shellfish, and other aquatic organisms.",
+   "field": "Agricultural and Biological Sciences",
+   "id": 4
+  },
+  {
+   "topic": "Pesticide resistance management",
+   "definition": null,
+   "field": "Agricultural and Biological Sciences",
+   "id": 5
+  },
+  {
+   "topic": "Mycorrhizal associations",
+   "definition": "Symbiotic relationships between fungi and plant roots that enhance nutrient uptake and plant growth.",
+   "field": "Agricultural and Biological Sciences",
+   "id": 6
+  },
+  {
+   "topic": "Precision agriculture",
+   "definition": null,
+   "field": "Agricultural and Biological Sciences",
+   "id": 7
+  },
+  {
+   "topic": "Bovine mastitis",
+   "definition": "Inflammation of the mammary gland in dairy cattle, typically caused by bacterial infection, affecting milk quality and yield.",
+   "field": "Agricultural and Biological Sciences",
+   "id": 8
+  },
+  {
+   "topic": "Photosynthesis efficiency",
+   "definition": null,
+   "field": "Agricultural and Biological Sciences",
+   "id": 9
+  },
+  {
+   "topic": "Agroforestry systems",
+   "definition": "Land-use practices that integrate trees with crops or livestock to improve productivity and environmental sustainability.",
+   "field": "Agricultural and Biological Sciences",
+   "id": 10
+  },
+  {
+   "topic": "Plant-microbe interactions",
+   "definition": null,
+   "field": "Agricultural and Biological Sciences",
+   "id": 11
+  },
+  {
+   "topic": "Gene drive",
+   "definition": "A genetic engineering technology that biases inheritance to spread specific genes rapidly through populations, used in agriculture for pest control; distinct from genetic drift or gene flow.",
+   "field": "Agricultural and Biological Sciences",
+   "id": 12
+  },
+  {
+   "topic": "Vertical farming",
+   "definition": null,
+   "field": "Agricultural and Biological Sciences",
+   "id": 13
+  },
+  {
+   "topic": "Fusarium head blight",
+   "definition": "A fungal disease affecting wheat, barley, and other cereals caused by Fusarium species, reducing yield and contaminating grain with mycotoxins.",
+   "field": "Agricultural and Biological Sciences",
+   "id": 14
+  },
+  {
+   "topic": "Biochar soil amendment",
+   "definition": null,
+   "field": "Agricultural and Biological Sciences",
+   "id": 15
+  },
+  {
+   "topic": "Marker-assisted selection",
+   "definition": "A breeding technique that uses DNA markers linked to desirable traits to select superior plants or animals more efficiently.",
+   "field": "Agricultural and Biological Sciences",
+   "id": 16
+  },
+  {
+   "topic": "Transformer",
+   "definition": "In agricultural contexts, refers to electrical equipment used in farm power systems and irrigation infrastructure; distinct from the machine learning architecture or electrical engineering devices in general.",
+   "field": "Agricultural and Biological Sciences",
+   "id": 17
+  },
+  {
+   "topic": "digital humanities",
+   "definition": null,
+   "field": "Arts and Humanities",
+   "id": 18
+  },
+  {
+   "topic": "postcolonial literature",
+   "definition": null,
+   "field": "Arts and Humanities",
+   "id": 19
+  },
+  {
+   "topic": "medieval studies",
+   "definition": null,
+   "field": "Arts and Humanities",
+   "id": 20
+  },
+  {
+   "topic": "cultural memory",
+   "definition": "The study of how societies remember and transmit collective memories through texts, monuments, rituals, and media.",
+   "field": "Arts and Humanities",
+   "id": 21
+  },
+  {
+   "topic": "ecocriticism",
+   "definition": "Literary and cultural criticism examining representations of nature, environment, and human-nonhuman relations.",
+   "field": "Arts and Humanities",
+   "id": 22
+  },
+  {
+   "topic": "book history",
+   "definition": null,
+   "field": "Arts and Humanities",
+   "id": 23
+  },
+  {
+   "topic": "translation studies",
+   "definition": null,
+   "field": "Arts and Humanities",
+   "id": 24
+  },
+  {
+   "topic": "performance studies",
+   "definition": "An interdisciplinary field analyzing embodied actions, rituals, and theatrical events as cultural performances.",
+   "field": "Arts and Humanities",
+   "id": 25
+  },
+  {
+   "topic": "sound studies",
+   "definition": null,
+   "field": "Arts and Humanities",
+   "id": 26
+  },
+  {
+   "topic": "critical race theory",
+   "definition": null,
+   "field": "Arts and Humanities",
+   "id": 27
+  },
+  {
+   "topic": "feminist philosophy",
+   "definition": null,
+   "field": "Arts and Humanities",
+   "id": 28
+  },
+  {
+   "topic": "affect theory",
+   "definition": "An approach in humanities and social sciences examining pre-cognitive emotional intensities and bodily responses.",
+   "field": "Arts and Humanities",
+   "id": 29
+  },
+  {
+   "topic": "archive studies",
+   "definition": null,
+   "field": "Arts and Humanities",
+   "id": 30
+  },
+  {
+   "topic": "world literature",
+   "definition": null,
+   "field": "Arts and Humanities",
+   "id": 31
+  },
+  {
+   "topic": "visual culture",
+   "definition": "The study of images, visual media, and practices of seeing across art, science, and everyday life.",
+   "field": "Arts and Humanities",
+   "id": 32
+  },
+  {
+   "topic": "heritage studies",
+   "definition": null,
+   "field": "Arts and Humanities",
+   "id": 33
+  },
+  {
+   "topic": "adaptation studies",
+   "definition": "The analysis of how texts are transformed across media, genres, and historical periods.",
+   "field": "Arts and Humanities",
+   "id": 34
+  },
+  {
+   "topic": "networks",
+   "definition": "In humanities, the study of social, intellectual, and material connections among people, texts, and objects; distinct from neural networks in computer science or electrical networks in engineering.",
+   "field": "Arts and Humanities",
+   "id": 35
+  },
+  {
+   "topic": "CRISPR gene editing",
+   "definition": null,
+   "field": "Biochemistry, Genetics and Molecular Biology",
+   "id": 36
+  },
+  {
+   "topic": "single-cell RNA sequencing",
+   "definition": null,
+   "field": "Biochemistry, Genetics and Molecular Biology",
+   "id": 37
+  },
+  {
+   "topic": "protein folding",
+   "definition": "The study of how amino acid chains adopt their functional three-dimensional structures, including folding pathways, chaperones, and misfolding diseases.",
+   "field": "Biochemistry, Genetics and Molecular Biology",
+   "id": 38
+  },
+  {
+   "topic": "gut microbiome and host metabolism",
+   "definition": null,
+   "field": "Biochemistry, Genetics and Molecular Biology",
+   "id": 39
+  },
+  {
+   "topic": "epigenetic inheritance",
+   "definition": null,
+   "field": "Biochemistry, Genetics and Molecular Biology",
+   "id": 40
+  },
+  {
+   "topic": "liquid-liquid phase separation in cells",
+   "definition": "The phenomenon by which proteins and nucleic acids demix to form membraneless biomolecular condensates that organize cellular biochemistry.",
+   "field": "Biochemistry, Genetics and Molecular Biology",
+   "id": 41
+  },
+  {
+   "topic": "mitochondrial dysfunction in neurodegeneration",
+   "definition": null,
+   "field": "Biochemistry, Genetics and Molecular Biology",
+   "id": 42
+  },
+  {
+   "topic": "long non-coding RNA",
+   "definition": null,
+   "field": "Biochemistry, Genetics and Molecular Biology",
+   "id": 43
+  },
+  {
+   "topic": "tumor microenvironment",
+   "definition": null,
+   "field": "Biochemistry, Genetics and Molecular Biology",
+   "id": 44
+  },
+  {
+   "topic": "optogenetics",
+   "definition": "A technique using light-sensitive proteins such as channelrhodopsins to control the activity of genetically targeted cells, especially neurons.",
+   "field": "Biochemistry, Genetics and Molecular Biology",
+   "id": 45
+  },
+  {
+   "topic": "BRCA1 and homologous recombination repair",
+   "definition": null,
+   "field": "Biochemistry, Genetics and Molecular Biology",
+   "id": 46
+  },
+  {
+   "topic": "senescence-associated secretory phenotype",
+   "definition": null,
+   "field": "Biochemistry, Genetics and Molecular Biology",
+   "id": 47
+  },
+  {
+   "topic": "GPCR signaling",
+   "definition": "The molecular mechanisms by which G protein-coupled receptors detect extracellular ligands and transduce signals through heterotrimeric G proteins and arrestins.",
+   "field": "Biochemistry, Genetics and Molecular Biology",
+   "id": 48
+  },
+  {
+   "topic": "transformer models for protein structure prediction",
+   "definition": "Neural network architectures based on attention mechanisms (not electrical transformers) applied to predict protein folding, as in AlphaFold.",
+   "field": "Biochemistry, Genetics and Molecular Biology",
+   "id": 49
+  },
+  {
+   "topic": "MHC class I antigen presentation",
+   "definition": null,
+   "field": "Biochemistry, Genetics and Molecular Biology",
+   "id": 50
+  },
+  {
+   "topic": "molecular dynamics simulations of membrane proteins",
+   "definition": null,
+   "field": "Biochemistry, Genetics and Molecular Biology",
+   "id": 51
+  },
+  {
+   "topic": "Mercury methylation",
+   "definition": "The microbial conversion of inorganic mercury to methylmercury in anaerobic environments, a key step in mercury bioaccumulation, studied via hgcAB gene clusters (not methylation of mercury-containing DNA or other chemical contexts).",
+   "field": "Biochemistry, Genetics and Molecular Biology",
+   "id": 52
+  },
+  {
+   "topic": "base editing",
+   "definition": null,
+   "field": "Biochemistry, Genetics and Molecular Biology",
+   "id": 53
+  },
+  {
+   "topic": "Corporate Governance",
+   "definition": null,
+   "field": "Business, Management and Accounting",
+   "id": 54
+  },
+  {
+   "topic": "Behavioral Economics in Accounting",
+   "definition": "The study of psychological, cognitive, and emotional factors affecting the accounting decisions of individuals and institutions.",
+   "field": "Business, Management and Accounting",
+   "id": 55
+  },
+  {
+   "topic": "Supply Chain Resilience",
+   "definition": null,
+   "field": "Business, Management and Accounting",
+   "id": 56
+  },
+  {
+   "topic": "ESG Investing",
+   "definition": null,
+   "field": "Business, Management and Accounting",
+   "id": 57
+  },
+  {
+   "topic": "Organizational Ambidexterity",
+   "definition": "The ability of an organization to simultaneously explore new opportunities and exploit existing competencies.",
+   "field": "Business, Management and Accounting",
+   "id": 58
+  },
+  {
+   "topic": "Fintech in Emerging Markets",
+   "definition": null,
+   "field": "Business, Management and Accounting",
+   "id": 59
+  },
+  {
+   "topic": "Dynamic Capabilities",
+   "definition": "The firm's ability to integrate, build, and reconfigure internal and external competencies to address rapidly changing environments.",
+   "field": "Business, Management and Accounting",
+   "id": 60
+  },
+  {
+   "topic": "Sustainable HRM",
+   "definition": null,
+   "field": "Business, Management and Accounting",
+   "id": 61
+  },
+  {
+   "topic": "Blockchain in Accounting",
+   "definition": "The application of distributed ledger technology to improve transparency, security, and efficiency in accounting practices.",
+   "field": "Business, Management and Accounting",
+   "id": 62
+  },
+  {
+   "topic": "Servitization",
+   "definition": null,
+   "field": "Business, Management and Accounting",
+   "id": 63
+  },
+  {
+   "topic": "Crowdfunding",
+   "definition": null,
+   "field": "Business, Management and Accounting",
+   "id": 64
+  },
+  {
+   "topic": "Digital Transformation",
+   "definition": null,
+   "field": "Business, Management and Accounting",
+   "id": 65
+  },
+  {
+   "topic": "Lean Six Sigma",
+   "definition": "A methodology that combines Lean manufacturing principles and Six Sigma quality control to improve business processes.",
+   "field": "Business, Management and Accounting",
+   "id": 66
+  },
+  {
+   "topic": "Psychological Safety",
+   "definition": "A shared belief held by members of a team that the team is safe for interpersonal risk-taking.",
+   "field": "Business, Management and Accounting",
+   "id": 67
+  },
+  {
+   "topic": "Transfer Pricing",
+   "definition": null,
+   "field": "Business, Management and Accounting",
+   "id": 68
+  },
+  {
+   "topic": "LLM in Business",
+   "definition": "Large Language Models (AI) used for business applications, distinct from the Master of Laws degree.",
+   "field": "Business, Management and Accounting",
+   "id": 69
+  },
+  {
+   "topic": "Agile Management",
+   "definition": "An iterative approach to project management and software development, distinct from general organizational flexibility.",
+   "field": "Business, Management and Accounting",
+   "id": 70
+  },
+  {
+   "topic": "Audit Data Analytics",
+   "definition": null,
+   "field": "Business, Management and Accounting",
+   "id": 71
+  },
+  {
+   "topic": "process systems engineering",
+   "definition": null,
+   "field": "Chemical Engineering",
+   "id": 72
+  },
+  {
+   "topic": "catalysis",
+   "definition": null,
+   "field": "Chemical Engineering",
+   "id": 73
+  },
+  {
+   "topic": "CO2 capture",
+   "definition": "Technologies for separating and capturing carbon dioxide from industrial emissions or directly from air.",
+   "field": "Chemical Engineering",
+   "id": 74
+  },
+  {
+   "topic": "lithium-ion battery degradation",
+   "definition": null,
+   "field": "Chemical Engineering",
+   "id": 75
+  },
+  {
+   "topic": "metal-organic frameworks",
+   "definition": null,
+   "field": "Chemical Engineering",
+   "id": 76
+  },
+  {
+   "topic": "microfluidics",
+   "definition": "The manipulation of fluids at the microscale for chemical and biological applications.",
+   "field": "Chemical Engineering",
+   "id": 77
+  },
+  {
+   "topic": "bioreactor design",
+   "definition": null,
+   "field": "Chemical Engineering",
+   "id": 78
+  },
+  {
+   "topic": "membrane separation",
+   "definition": null,
+   "field": "Chemical Engineering",
+   "id": 79
+  },
+  {
+   "topic": "photocatalysis",
+   "definition": "The acceleration of chemical reactions using light-activated catalyst materials.",
+   "field": "Chemical Engineering",
+   "id": 80
+  },
+  {
+   "topic": "supercritical fluids",
+   "definition": null,
+   "field": "Chemical Engineering",
+   "id": 81
+  },
+  {
+   "topic": "electrochemical ammonia synthesis",
+   "definition": null,
+   "field": "Chemical Engineering",
+   "id": 82
+  },
+  {
+   "topic": "zeolites",
+   "definition": null,
+   "field": "Chemical Engineering",
+   "id": 83
+  },
+  {
+   "topic": "CRISPR",
+   "definition": "A gene-editing technology used in metabolic engineering and bioprocess optimization.",
+   "field": "Chemical Engineering",
+   "id": 84
+  },
+  {
+   "topic": "transformers",
+   "definition": "Electrical devices for voltage conversion in power systems, not machine learning models.",
+   "field": "Chemical Engineering",
+   "id": 85
+  },
+  {
+   "topic": "polymer electrolyte membranes",
+   "definition": null,
+   "field": "Chemical Engineering",
+   "id": 86
+  },
+  {
+   "topic": "chemical looping combustion",
+   "definition": null,
+   "field": "Chemical Engineering",
+   "id": 87
+  },
+  {
+   "topic": "ionic liquids",
+   "definition": "Salts with melting points below 100°C used as solvents or catalysts in chemical processes.",
+   "field": "Chemical Engineering",
+   "id": 88
+  },
+  {
+   "topic": "fluidized bed reactors",
+   "definition": null,
+   "field": "Chemical Engineering",
+   "id": 89
+  },
+  {
+   "topic": "Metal-Organic Frameworks (MOFs)",
+   "definition": "Crystalline porous materials composed of metal ions or clusters coordinated to organic ligands, studied for gas storage, separation, and catalysis.",
+   "field": "Chemistry",
+   "id": 90
+  },
+  {
+   "topic": "CRISPR-Cas9 gene editing",
+   "definition": "A genome engineering technology using a Cas9 nuclease guided by RNA to create targeted double-strand breaks in DNA.",
+   "field": "Chemistry",
+   "id": 91
+  },
+  {
+   "topic": "Perovskite solar cells",
+   "definition": "Photovoltaic devices using materials with the ABX3 perovskite crystal structure as the light-harvesting active layer.",
+   "field": "Chemistry",
+   "id": 92
+  },
+  {
+   "topic": "Asymmetric organocatalysis",
+   "definition": null,
+   "field": "Chemistry",
+   "id": 93
+  },
+  {
+   "topic": "Lithium-ion battery electrolytes",
+   "definition": "The ion-conducting medium (liquid, solid, or gel) that facilitates lithium-ion transport between the cathode and anode.",
+   "field": "Chemistry",
+   "id": 94
+  },
+  {
+   "topic": "Photoredox catalysis",
+   "definition": null,
+   "field": "Chemistry",
+   "id": 95
+  },
+  {
+   "topic": "PROTACs (Proteolysis Targeting Chimeras)",
+   "definition": "Heterobifunctional small molecules that induce targeted protein degradation by recruiting an E3 ubiquitin ligase to a protein of interest.",
+   "field": "Chemistry",
+   "id": 96
+  },
+  {
+   "topic": "Zeolite catalysis",
+   "definition": null,
+   "field": "Chemistry",
+   "id": 97
+  },
+  {
+   "topic": "Covalent Organic Frameworks (COFs)",
+   "definition": null,
+   "field": "Chemistry",
+   "id": 98
+  },
+  {
+   "topic": "Single-atom catalysts",
+   "definition": "Catalytic materials where isolated individual metal atoms are dispersed on a support, maximizing atomic efficiency and often exhibiting unique selectivity.",
+   "field": "Chemistry",
+   "id": 99
+  },
+  {
+   "topic": "Deep eutectic solvents",
+   "definition": null,
+   "field": "Chemistry",
+   "id": 100
+  },
+  {
+   "topic": "Microplastics environmental fate",
+   "definition": "The transport, degradation, and ecological impact of plastic particles smaller than 5 mm in environmental systems.",
+   "field": "Chemistry",
+   "id": 101
+  },
+  {
+   "topic": "G-quadruplex DNA",
+   "definition": null,
+   "field": "Chemistry",
+   "id": 102
+  },
+  {
+   "topic": "Electrochemical CO2 reduction",
+   "definition": null,
+   "field": "Chemistry",
+   "id": 103
+  },
+  {
+   "topic": "Antibody-drug conjugates (ADCs)",
+   "definition": "Biopharmaceutical drugs consisting of a monoclonal antibody linked to a cytotoxic payload, designed for targeted delivery to cancer cells.",
+   "field": "Chemistry",
+   "id": 104
+  },
+  {
+   "topic": "Molecular dynamics simulations of intrinsically disordered proteins",
+   "definition": null,
+   "field": "Chemistry",
+   "id": 105
+  },
+  {
+   "topic": "Transformers in chemistry",
+   "definition": "Neural network architectures based on self-attention mechanisms, applied to molecular property prediction, reaction prediction, and generative chemistry (distinct from electrical transformers).",
+   "field": "Chemistry",
+   "id": 106
+  },
+  {
+   "topic": "Mercury in environmental chemistry",
+   "definition": "The biogeochemical cycling, methylation, and toxicology of mercury species in ecosystems (distinct from the planet Mercury or the element's use in physics).",
+   "field": "Chemistry",
+   "id": 107
+  },
+  {
+   "topic": "Machine Learning",
+   "definition": null,
+   "field": "Computer Science",
+   "id": 108
+  },
+  {
+   "topic": "Natural Language Processing",
+   "definition": "The study of computational methods for understanding, generating, and manipulating human language.",
+   "field": "Computer Science",
+   "id": 109
+  },
+  {
+   "topic": "Graph Neural Networks",
+   "definition": null,
+   "field": "Computer Science",
+   "id": 110
+  },
+  {
+   "topic": "Federated Learning",
+   "definition": null,
+   "field": "Computer Science",
+   "id": 111
+  },
+  {
+   "topic": "Explainable AI",
+   "definition": null,
+   "field": "Computer Science",
+   "id": 112
+  },
+  {
+   "topic": "Reinforcement Learning from Human Feedback",
+   "definition": "A technique for aligning AI systems with human preferences by training reward models on human judgments.",
+   "field": "Computer Science",
+   "id": 113
+  },
+  {
+   "topic": "Neural Architecture Search",
+   "definition": null,
+   "field": "Computer Science",
+   "id": 114
+  },
+  {
+   "topic": "Differential Privacy",
+   "definition": null,
+   "field": "Computer Science",
+   "id": 115
+  },
+  {
+   "topic": "Quantum Error Correction",
+   "definition": null,
+   "field": "Computer Science",
+   "id": 116
+  },
+  {
+   "topic": "LLM",
+   "definition": "Large Language Models in artificial intelligence, not the Master of Laws degree.",
+   "field": "Computer Science",
+   "id": 117
+  },
+  {
+   "topic": "Adversarial Robustness",
+   "definition": null,
+   "field": "Computer Science",
+   "id": 118
+  },
+  {
+   "topic": "Knowledge Distillation",
+   "definition": null,
+   "field": "Computer Science",
+   "id": 119
+  },
+  {
+   "topic": "Vision Transformers",
+   "definition": "The application of transformer architectures to computer vision tasks by treating images as sequences of patches.",
+   "field": "Computer Science",
+   "id": 120
+  },
+  {
+   "topic": "Catastrophic Forgetting",
+   "definition": "The phenomenon where neural networks lose previously learned information when trained on new tasks sequentially.",
+   "field": "Computer Science",
+   "id": 121
+  },
+  {
+   "topic": "Mixture of Experts",
+   "definition": null,
+   "field": "Computer Science",
+   "id": 122
+  },
+  {
+   "topic": "Retrieval-Augmented Generation",
+   "definition": null,
+   "field": "Computer Science",
+   "id": 123
+  },
+  {
+   "topic": "Grokking",
+   "definition": "The phenomenon where neural networks suddenly generalize long after achieving perfect training accuracy through memorization.",
+   "field": "Computer Science",
+   "id": 124
+  },
+  {
+   "topic": "Decision Sciences",
+   "definition": null,
+   "field": "Decision Sciences",
+   "id": 125
+  },
+  {
+   "topic": "Behavioral decision making",
+   "definition": "The study of how people actually make decisions, incorporating psychological, cognitive, emotional, and social factors that deviate from rational choice models.",
+   "field": "Decision Sciences",
+   "id": 126
+  },
+  {
+   "topic": "Multi-criteria decision analysis",
+   "definition": "Methods and frameworks for evaluating options when decisions involve multiple, often conflicting criteria or objectives.",
+   "field": "Decision Sciences",
+   "id": 127
+  },
+  {
+   "topic": "Heuristics and biases",
+   "definition": null,
+   "field": "Decision Sciences",
+   "id": 128
+  },
+  {
+   "topic": "Prospect theory",
+   "definition": null,
+   "field": "Decision Sciences",
+   "id": 129
+  },
+  {
+   "topic": "Bounded rationality",
+   "definition": null,
+   "field": "Decision Sciences",
+   "id": 130
+  },
+  {
+   "topic": "Decision support systems",
+   "definition": "Computer-based information systems that support business or organizational decision-making activities, helping users compile and analyze data to solve problems and make choices.",
+   "field": "Decision Sciences",
+   "id": 131
+  },
+  {
+   "topic": "Analytic hierarchy process",
+   "definition": null,
+   "field": "Decision Sciences",
+   "id": 132
+  },
+  {
+   "topic": "Group decision making",
+   "definition": null,
+   "field": "Decision Sciences",
+   "id": 133
+  },
+  {
+   "topic": "Risk perception",
+   "definition": "The subjective judgment that people make about the characteristics and severity of risks, often diverging from expert assessments and influencing policy and behavior.",
+   "field": "Decision Sciences",
+   "id": 134
+  },
+  {
+   "topic": "Choice overload",
+   "definition": null,
+   "field": "Decision Sciences",
+   "id": 135
+  },
+  {
+   "topic": "Nudge theory",
+   "definition": null,
+   "field": "Decision Sciences",
+   "id": 136
+  },
+  {
+   "topic": "Reinforcement learning",
+   "definition": "A machine learning paradigm where agents learn optimal decision-making policies through trial-and-error interactions with an environment to maximize cumulative rewards.",
+   "field": "Decision Sciences",
+   "id": 137
+  },
+  {
+   "topic": "Bayesian decision theory",
+   "definition": null,
+   "field": "Decision Sciences",
+   "id": 138
+  },
+  {
+   "topic": "Game theory",
+   "definition": null,
+   "field": "Decision Sciences",
+   "id": 139
+  },
+  {
+   "topic": "Judgment aggregation",
+   "definition": "The study of how to combine individual judgments or preferences into collective decisions, particularly in contexts where majority rule may lead to inconsistent outcomes.",
+   "field": "Decision Sciences",
+   "id": 140
+  },
+  {
+   "topic": "Decision fatigue",
+   "definition": "The deteriorating quality of decisions made by an individual after a long session of decision making, due to depletion of mental resources.",
+   "field": "Decision Sciences",
+   "id": 141
+  },
+  {
+   "topic": "LLM decision making",
+   "definition": "The study of how large language models make choices, judgments, and recommendations, including their biases, reasoning patterns, and potential as decision support tools.",
+   "field": "Decision Sciences",
+   "id": 142
+  },
+  {
+   "topic": "Shared decision making",
+   "definition": "A collaborative process in healthcare where clinicians and patients work together to make decisions about tests, treatments, and care plans based on clinical evidence and patient preferences.",
+   "field": "Decision Sciences",
+   "id": 143
+  },
+  {
+   "topic": "dental caries",
+   "definition": null,
+   "field": "Dentistry",
+   "id": 144
+  },
+  {
+   "topic": "periodontitis",
+   "definition": "Inflammatory disease affecting the supporting structures of teeth, including gingiva, periodontal ligament, and alveolar bone.",
+   "field": "Dentistry",
+   "id": 145
+  },
+  {
+   "topic": "dental implants",
+   "definition": null,
+   "field": "Dentistry",
+   "id": 146
+  },
+  {
+   "topic": "orthodontics",
+   "definition": null,
+   "field": "Dentistry",
+   "id": 147
+  },
+  {
+   "topic": "endodontics",
+   "definition": "Branch of dentistry dealing with the dental pulp and tissues surrounding the roots of teeth.",
+   "field": "Dentistry",
+   "id": 148
+  },
+  {
+   "topic": "dental materials",
+   "definition": null,
+   "field": "Dentistry",
+   "id": 149
+  },
+  {
+   "topic": "oral cancer",
+   "definition": null,
+   "field": "Dentistry",
+   "id": 150
+  },
+  {
+   "topic": "dental anxiety",
+   "definition": null,
+   "field": "Dentistry",
+   "id": 151
+  },
+  {
+   "topic": "saliva diagnostics",
+   "definition": "Use of saliva as a diagnostic fluid for detecting oral and systemic diseases.",
+   "field": "Dentistry",
+   "id": 152
+  },
+  {
+   "topic": "dental 3D printing",
+   "definition": null,
+   "field": "Dentistry",
+   "id": 153
+  },
+  {
+   "topic": "dental stem cells",
+   "definition": null,
+   "field": "Dentistry",
+   "id": 154
+  },
+  {
+   "topic": "oral microbiome",
+   "definition": "The community of microorganisms residing in the oral cavity and their role in health and disease.",
+   "field": "Dentistry",
+   "id": 155
+  },
+  {
+   "topic": "dental radiography",
+   "definition": null,
+   "field": "Dentistry",
+   "id": 156
+  },
+  {
+   "topic": "dental anesthesia",
+   "definition": null,
+   "field": "Dentistry",
+   "id": 157
+  },
+  {
+   "topic": "dental erosion",
+   "definition": null,
+   "field": "Dentistry",
+   "id": 158
+  },
+  {
+   "topic": "dental trauma",
+   "definition": null,
+   "field": "Dentistry",
+   "id": 159
+  },
+  {
+   "topic": "dental occlusion",
+   "definition": "The contact relationship between the upper and lower teeth when they approach each other.",
+   "field": "Dentistry",
+   "id": 160
+  },
+  {
+   "topic": "dental public health",
+   "definition": null,
+   "field": "Dentistry",
+   "id": 161
+  },
+  {
+   "topic": "Seismic tomography",
+   "definition": "Imaging Earth's interior structure using seismic wave travel times.",
+   "field": "Earth and Planetary Sciences",
+   "id": 162
+  },
+  {
+   "topic": "Plate tectonics",
+   "definition": null,
+   "field": "Earth and Planetary Sciences",
+   "id": 163
+  },
+  {
+   "topic": "Mantle convection",
+   "definition": "The slow circulation of Earth's mantle driving plate motion.",
+   "field": "Earth and Planetary Sciences",
+   "id": 164
+  },
+  {
+   "topic": "Subduction zones",
+   "definition": null,
+   "field": "Earth and Planetary Sciences",
+   "id": 165
+  },
+  {
+   "topic": "Volcanic degassing",
+   "definition": null,
+   "field": "Earth and Planetary Sciences",
+   "id": 166
+  },
+  {
+   "topic": "Paleomagnetism",
+   "definition": "Study of Earth's ancient magnetic field recorded in rocks.",
+   "field": "Earth and Planetary Sciences",
+   "id": 167
+  },
+  {
+   "topic": "Crustal deformation",
+   "definition": null,
+   "field": "Earth and Planetary Sciences",
+   "id": 168
+  },
+  {
+   "topic": "Geochronology",
+   "definition": null,
+   "field": "Earth and Planetary Sciences",
+   "id": 169
+  },
+  {
+   "topic": "Isotope geochemistry",
+   "definition": "Using isotopic ratios to trace geological processes and ages.",
+   "field": "Earth and Planetary Sciences",
+   "id": 170
+  },
+  {
+   "topic": "Planetary habitability",
+   "definition": null,
+   "field": "Earth and Planetary Sciences",
+   "id": 171
+  },
+  {
+   "topic": "Exoplanet atmospheres",
+   "definition": "Characterization of gases surrounding planets outside our solar system.",
+   "field": "Earth and Planetary Sciences",
+   "id": 172
+  },
+  {
+   "topic": "Mars surface processes",
+   "definition": null,
+   "field": "Earth and Planetary Sciences",
+   "id": 173
+  },
+  {
+   "topic": "Lunar regolith",
+   "definition": null,
+   "field": "Earth and Planetary Sciences",
+   "id": 174
+  },
+  {
+   "topic": "Asteroid impact cratering",
+   "definition": null,
+   "field": "Earth and Planetary Sciences",
+   "id": 175
+  },
+  {
+   "topic": "Ice sheet dynamics",
+   "definition": null,
+   "field": "Earth and Planetary Sciences",
+   "id": 176
+  },
+  {
+   "topic": "Paleoclimate proxies",
+   "definition": "Natural archives used to reconstruct past climate conditions.",
+   "field": "Earth and Planetary Sciences",
+   "id": 177
+  },
+  {
+   "topic": "Hydrothermal vents",
+   "definition": null,
+   "field": "Earth and Planetary Sciences",
+   "id": 178
+  },
+  {
+   "topic": "behavioral economics",
+   "definition": null,
+   "field": "Economics, Econometrics and Finance",
+   "id": 179
+  },
+  {
+   "topic": "monetary policy transmission",
+   "definition": null,
+   "field": "Economics, Econometrics and Finance",
+   "id": 180
+  },
+  {
+   "topic": "causal inference in economics",
+   "definition": null,
+   "field": "Economics, Econometrics and Finance",
+   "id": 181
+  },
+  {
+   "topic": "financial econometrics",
+   "definition": null,
+   "field": "Economics, Econometrics and Finance",
+   "id": 182
+  },
+  {
+   "topic": "income inequality measurement",
+   "definition": null,
+   "field": "Economics, Econometrics and Finance",
+   "id": 183
+  },
+  {
+   "topic": "machine learning in asset pricing",
+   "definition": "Application of ML methods to predict returns, construct factors, and price assets.",
+   "field": "Economics, Econometrics and Finance",
+   "id": 184
+  },
+  {
+   "topic": "DSGE models",
+   "definition": null,
+   "field": "Economics, Econometrics and Finance",
+   "id": 185
+  },
+  {
+   "topic": "labor market discrimination",
+   "definition": null,
+   "field": "Economics, Econometrics and Finance",
+   "id": 186
+  },
+  {
+   "topic": "cryptocurrency market microstructure",
+   "definition": "Study of trading mechanisms, liquidity, price discovery, and market design in crypto exchanges.",
+   "field": "Economics, Econometrics and Finance",
+   "id": 187
+  },
+  {
+   "topic": "difference-in-differences",
+   "definition": null,
+   "field": "Economics, Econometrics and Finance",
+   "id": 188
+  },
+  {
+   "topic": "sovereign debt crises",
+   "definition": null,
+   "field": "Economics, Econometrics and Finance",
+   "id": 189
+  },
+  {
+   "topic": "housing market bubbles",
+   "definition": null,
+   "field": "Economics, Econometrics and Finance",
+   "id": 190
+  },
+  {
+   "topic": "RCTs in development economics",
+   "definition": null,
+   "field": "Economics, Econometrics and Finance",
+   "id": 191
+  },
+  {
+   "topic": "high-frequency trading",
+   "definition": null,
+   "field": "Economics, Econometrics and Finance",
+   "id": 192
+  },
+  {
+   "topic": "GARCH models",
+   "definition": "Family of volatility models capturing time-varying conditional variance in financial time series.",
+   "field": "Economics, Econometrics and Finance",
+   "id": 193
+  },
+  {
+   "topic": "transformers in time series forecasting",
+   "definition": "Neural attention architectures adapted for economic and financial time series prediction, distinct from electrical transformers.",
+   "field": "Economics, Econometrics and Finance",
+   "id": 194
+  },
+  {
+   "topic": "VAR models in macroeconomics",
+   "definition": null,
+   "field": "Economics, Econometrics and Finance",
+   "id": 195
+  },
+  {
+   "topic": "Renewable Energy Systems",
+   "definition": null,
+   "field": "Energy",
+   "id": 196
+  },
+  {
+   "topic": "Green Hydrogen Production",
+   "definition": null,
+   "field": "Energy",
+   "id": 197
+  },
+  {
+   "topic": "Carbon Capture and Storage",
+   "definition": "Technologies that capture CO2 emissions from industrial sources or the atmosphere and store them underground or in durable products.",
+   "field": "Energy",
+   "id": 198
+  },
+  {
+   "topic": "Solid-State Batteries",
+   "definition": null,
+   "field": "Energy",
+   "id": 199
+  },
+  {
+   "topic": "Nuclear Fusion",
+   "definition": "Research into generating energy by fusing light atomic nuclei, including magnetic confinement (tokamaks) and inertial confinement approaches.",
+   "field": "Energy",
+   "id": 200
+  },
+  {
+   "topic": "Photocatalytic Water Splitting",
+   "definition": "The use of semiconductor photocatalysts to split water into hydrogen and oxygen using solar energy.",
+   "field": "Energy",
+   "id": 201
+  },
+  {
+   "topic": "Grid-Scale Energy Storage",
+   "definition": null,
+   "field": "Energy",
+   "id": 202
+  },
+  {
+   "topic": "Organic Photovoltaics",
+   "definition": "Solar cells based on organic semiconductors (polymers or small molecules), valued for flexibility, low weight, and solution processability.",
+   "field": "Energy",
+   "id": 203
+  },
+  {
+   "topic": "Thermoelectric Materials",
+   "definition": "Materials that convert temperature gradients directly into electrical voltage (Seebeck effect) or vice versa, used for waste heat recovery and solid-state cooling.",
+   "field": "Energy",
+   "id": 204
+  },
+  {
+   "topic": "Wind Turbine Aerodynamics",
+   "definition": null,
+   "field": "Energy",
+   "id": 205
+  },
+  {
+   "topic": "Biofuel Production from Algae",
+   "definition": null,
+   "field": "Energy",
+   "id": 206
+  },
+  {
+   "topic": "Supercapacitors",
+   "definition": "Electrochemical energy storage devices with high power density and long cycle life, bridging the gap between conventional capacitors and batteries.",
+   "field": "Energy",
+   "id": 207
+  },
+  {
+   "topic": "Building Energy Efficiency",
+   "definition": null,
+   "field": "Energy",
+   "id": 208
+  },
+  {
+   "topic": "Direct Air Capture",
+   "definition": "Chemical processes that extract CO2 directly from ambient air, typically using sorbents or solvents, as a negative emissions technology.",
+   "field": "Energy",
+   "id": 209
+  },
+  {
+   "topic": "Fuel Cell Catalysts",
+   "definition": null,
+   "field": "Energy",
+   "id": 210
+  },
+  {
+   "topic": "Transformers in Power Grids",
+   "definition": "Electrical devices that step voltage up or down in AC power transmission and distribution systems — not the neural network architecture used in machine learning.",
+   "field": "Energy",
+   "id": 211
+  },
+  {
+   "topic": "Plasma Catalysis for Ammonia Synthesis",
+   "definition": "The use of non-thermal plasma combined with catalysts to synthesize ammonia from nitrogen and hydrogen under mild conditions, as an alternative to Haber-Bosch.",
+   "field": "Energy",
+   "id": 212
+  },
+  {
+   "topic": "Cell Balancing in Battery Packs",
+   "definition": "Techniques for equalizing the state of charge across individual cells in a multi-cell battery pack to maximize usable capacity and lifespan — 'cell' here refers to electrochemical cells, not biological cells.",
+   "field": "Energy",
+   "id": 213
+  },
+  {
+   "topic": "Tidal Energy Conversion",
+   "definition": null,
+   "field": "Energy",
+   "id": 214
+  },
+  {
+   "topic": "Metal-Air Batteries",
+   "definition": null,
+   "field": "Energy",
+   "id": 215
+  },
+  {
+   "topic": "Computational fluid dynamics",
+   "definition": "The use of numerical methods and algorithms to solve and analyze problems involving fluid flows.",
+   "field": "Engineering",
+   "id": 216
+  },
+  {
+   "topic": "MEMS",
+   "definition": "Micro-Electro-Mechanical Systems: the technology of microscopic devices combining electrical and mechanical components.",
+   "field": "Engineering",
+   "id": 217
+  },
+  {
+   "topic": "Additive manufacturing of metals",
+   "definition": null,
+   "field": "Engineering",
+   "id": 218
+  },
+  {
+   "topic": "Control theory",
+   "definition": "A broad subfield dealing with the behavior of dynamical systems and the design of controllers to achieve desired system behavior.",
+   "field": "Engineering",
+   "id": 219
+  },
+  {
+   "topic": "Digital twin",
+   "definition": "A virtual model designed to accurately reflect a physical object, process, or system, used for simulation, monitoring, and optimization.",
+   "field": "Engineering",
+   "id": 220
+  },
+  {
+   "topic": "Structural health monitoring",
+   "definition": null,
+   "field": "Engineering",
+   "id": 221
+  },
+  {
+   "topic": "Biochar for soil amendment",
+   "definition": "The application of charcoal produced from biomass to soil to improve fertility, sequester carbon, and enhance agricultural productivity.",
+   "field": "Engineering",
+   "id": 222
+  },
+  {
+   "topic": "Wastewater treatment",
+   "definition": "The processes used to remove contaminants from wastewater and convert it into an effluent that can be returned to the water cycle.",
+   "field": "Engineering",
+   "id": 223
+  },
+  {
+   "topic": "5G networks",
+   "definition": "The fifth generation of cellular network technology, designed to provide higher speeds, lower latency, and greater capacity than previous generations.",
+   "field": "Engineering",
+   "id": 224
+  },
+  {
+   "topic": "Shape memory alloys",
+   "definition": null,
+   "field": "Engineering",
+   "id": 225
+  },
+  {
+   "topic": "climate change adaptation",
+   "definition": "Research on how natural and human systems adjust to actual or expected climate effects, including vulnerability assessment, adaptation planning, and policy implementation.",
+   "field": "Environmental Science",
+   "id": 226
+  },
+  {
+   "topic": "microplastics in aquatic ecosystems",
+   "definition": "Studies on the sources, distribution, fate, and ecological impacts of plastic particles smaller than 5mm in marine and freshwater environments.",
+   "field": "Environmental Science",
+   "id": 227
+  },
+  {
+   "topic": "remote sensing of deforestation",
+   "definition": null,
+   "field": "Environmental Science",
+   "id": 228
+  },
+  {
+   "topic": "soil carbon sequestration",
+   "definition": "Research on practices and mechanisms for increasing soil organic carbon storage to mitigate climate change and improve soil health.",
+   "field": "Environmental Science",
+   "id": 229
+  },
+  {
+   "topic": "PFAS remediation",
+   "definition": "Methods for removing or degrading per- and polyfluoroalkyl substances (PFAS) from contaminated water, soil, and other media.",
+   "field": "Environmental Science",
+   "id": 230
+  },
+  {
+   "topic": "urban heat island effect",
+   "definition": null,
+   "field": "Environmental Science",
+   "id": 231
+  },
+  {
+   "topic": "biodiversity offsetting",
+   "definition": null,
+   "field": "Environmental Science",
+   "id": 232
+  },
+  {
+   "topic": "eutrophication of freshwater lakes",
+   "definition": null,
+   "field": "Environmental Science",
+   "id": 233
+  },
+  {
+   "topic": "life cycle assessment (LCA)",
+   "definition": "A methodology for evaluating the environmental impacts of a product, process, or service throughout its entire life cycle from raw material extraction to disposal.",
+   "field": "Environmental Science",
+   "id": 234
+  },
+  {
+   "topic": "ocean acidification",
+   "definition": null,
+   "field": "Environmental Science",
+   "id": 235
+  },
+  {
+   "topic": "constructed wetlands for wastewater treatment",
+   "definition": null,
+   "field": "Environmental Science",
+   "id": 236
+  },
+  {
+   "topic": "environmental DNA (eDNA) monitoring",
+   "definition": "The use of DNA shed by organisms into the environment (water, soil, air) to detect species presence and assess biodiversity without direct observation.",
+   "field": "Environmental Science",
+   "id": 237
+  },
+  {
+   "topic": "atmospheric aerosol-cloud interactions",
+   "definition": null,
+   "field": "Environmental Science",
+   "id": 238
+  },
+  {
+   "topic": "green infrastructure stormwater management",
+   "definition": null,
+   "field": "Environmental Science",
+   "id": 239
+  },
+  {
+   "topic": "antibiotic resistance genes in the environment",
+   "definition": null,
+   "field": "Environmental Science",
+   "id": 240
+  },
+  {
+   "topic": "mercury methylation in wetlands",
+   "definition": null,
+   "field": "Environmental Science",
+   "id": 241
+  },
+  {
+   "topic": "coral reef restoration",
+   "definition": null,
+   "field": "Environmental Science",
+   "id": 242
+  },
+  {
+   "topic": "Health professions education",
+   "definition": "The study of teaching, learning, and assessment across medicine, nursing, pharmacy, and allied health training.",
+   "field": "Health Professions",
+   "id": 243
+  },
+  {
+   "topic": "Interprofessional education (IPE)",
+   "definition": null,
+   "field": "Health Professions",
+   "id": 244
+  },
+  {
+   "topic": "Clinical reasoning",
+   "definition": "The cognitive processes by which health professionals gather information, generate hypotheses, and make diagnostic and management decisions.",
+   "field": "Health Professions",
+   "id": 245
+  },
+  {
+   "topic": "Simulation-based medical education",
+   "definition": null,
+   "field": "Health Professions",
+   "id": 246
+  },
+  {
+   "topic": "Entrustable professional activities (EPAs)",
+   "definition": null,
+   "field": "Health Professions",
+   "id": 247
+  },
+  {
+   "topic": "Competency-based medical education (CBME)",
+   "definition": "An outcomes-driven curricular model in which progression depends on demonstrated abilities rather than time in training.",
+   "field": "Health Professions",
+   "id": 248
+  },
+  {
+   "topic": "Telemedicine",
+   "definition": null,
+   "field": "Health Professions",
+   "id": 249
+  },
+  {
+   "topic": "Digital health interventions",
+   "definition": null,
+   "field": "Health Professions",
+   "id": 250
+  },
+  {
+   "topic": "Patient safety",
+   "definition": "The prevention of errors and adverse effects associated with health care delivery.",
+   "field": "Health Professions",
+   "id": 251
+  },
+  {
+   "topic": "Diagnostic error",
+   "definition": null,
+   "field": "Health Professions",
+   "id": 252
+  },
+  {
+   "topic": "Shared decision-making (SDM)",
+   "definition": null,
+   "field": "Health Professions",
+   "id": 253
+  },
+  {
+   "topic": "Motivational interviewing",
+   "definition": "A client-centered counseling style for eliciting behavior change by helping patients explore and resolve ambivalence.",
+   "field": "Health Professions",
+   "id": 254
+  },
+  {
+   "topic": "Burnout in health care workers",
+   "definition": null,
+   "field": "Health Professions",
+   "id": 255
+  },
+  {
+   "topic": "Moral distress",
+   "definition": "The psychological discomfort experienced when clinicians know the ethically appropriate action but feel constrained from taking it.",
+   "field": "Health Professions",
+   "id": 256
+  },
+  {
+   "topic": "Antimicrobial stewardship",
+   "definition": null,
+   "field": "Health Professions",
+   "id": 257
+  },
+  {
+   "topic": "HPV vaccine hesitancy",
+   "definition": null,
+   "field": "Health Professions",
+   "id": 258
+  },
+  {
+   "topic": "Cultural competence in health care",
+   "definition": null,
+   "field": "Health Professions",
+   "id": 259
+  },
+  {
+   "topic": "Transformers in clinical NLP",
+   "definition": "Here meaning the neural-network architecture (e.g., BERT, GPT) applied to clinical text, not electrical power transformers.",
+   "field": "Health Professions",
+   "id": 260
+  },
+  {
+   "topic": "T cell receptor signaling",
+   "definition": "The molecular pathways and protein interactions triggered when T cell receptors recognize antigen, leading to T cell activation and effector function.",
+   "field": "Immunology and Microbiology",
+   "id": 261
+  },
+  {
+   "topic": "antimicrobial resistance mechanisms",
+   "definition": null,
+   "field": "Immunology and Microbiology",
+   "id": 262
+  },
+  {
+   "topic": "gut microbiome and immune system interactions",
+   "definition": "How commensal microorganisms in the gastrointestinal tract influence development, regulation, and dysfunction of host immune responses.",
+   "field": "Immunology and Microbiology",
+   "id": 263
+  },
+  {
+   "topic": "CAR-T cell therapy",
+   "definition": null,
+   "field": "Immunology and Microbiology",
+   "id": 264
+  },
+  {
+   "topic": "biofilm formation and dispersal",
+   "definition": null,
+   "field": "Immunology and Microbiology",
+   "id": 265
+  },
+  {
+   "topic": "innate lymphoid cells",
+   "definition": "A family of immune cells that mirror T cell functions but lack antigen-specific receptors, playing key roles in tissue homeostasis and early immune defense.",
+   "field": "Immunology and Microbiology",
+   "id": 266
+  },
+  {
+   "topic": "CRISPR-Cas systems in bacteria",
+   "definition": null,
+   "field": "Immunology and Microbiology",
+   "id": 267
+  },
+  {
+   "topic": "vaccine adjuvants",
+   "definition": null,
+   "field": "Immunology and Microbiology",
+   "id": 268
+  },
+  {
+   "topic": "neutrophil extracellular traps",
+   "definition": "Web-like structures of DNA and proteins released by neutrophils to trap and kill pathogens, implicated in both infection control and autoimmune disease.",
+   "field": "Immunology and Microbiology",
+   "id": 269
+  },
+  {
+   "topic": "horizontal gene transfer in pathogens",
+   "definition": null,
+   "field": "Immunology and Microbiology",
+   "id": 270
+  },
+  {
+   "topic": "tumor microenvironment immune evasion",
+   "definition": null,
+   "field": "Immunology and Microbiology",
+   "id": 271
+  },
+  {
+   "topic": "bacterial quorum sensing",
+   "definition": "Cell-to-cell communication systems that allow bacteria to coordinate gene expression based on population density, regulating virulence and biofilm formation.",
+   "field": "Immunology and Microbiology",
+   "id": 272
+  },
+  {
+   "topic": "checkpoint inhibitors",
+   "definition": "Therapeutic antibodies that block inhibitory immune checkpoints like PD-1/PD-L1 to enhance anti-tumor immunity; distinct from checkpoint mechanisms in cell cycle regulation or software version control.",
+   "field": "Immunology and Microbiology",
+   "id": 273
+  },
+  {
+   "topic": "mycobacterial persistence",
+   "definition": null,
+   "field": "Immunology and Microbiology",
+   "id": 274
+  },
+  {
+   "topic": "trained immunity",
+   "definition": "The epigenetic and metabolic reprogramming of innate immune cells that leads to enhanced responses upon secondary challenge, independent of adaptive immunity.",
+   "field": "Immunology and Microbiology",
+   "id": 275
+  },
+  {
+   "topic": "phage therapy",
+   "definition": null,
+   "field": "Immunology and Microbiology",
+   "id": 276
+  },
+  {
+   "topic": "inflammasome activation",
+   "definition": null,
+   "field": "Immunology and Microbiology",
+   "id": 277
+  },
+  {
+   "topic": "vectors",
+   "definition": "DNA molecules (plasmids, viral genomes) used to deliver genetic material into cells for cloning or expression; distinct from disease-transmitting arthropods or mathematical quantities with direction.",
+   "field": "Immunology and Microbiology",
+   "id": 278
+  },
+  {
+   "topic": "MXenes",
+   "definition": null,
+   "field": "Materials Science",
+   "id": 279
+  },
+  {
+   "topic": "high-entropy alloys",
+   "definition": null,
+   "field": "Materials Science",
+   "id": 280
+  },
+  {
+   "topic": "metal-organic frameworks for gas storage",
+   "definition": null,
+   "field": "Materials Science",
+   "id": 281
+  },
+  {
+   "topic": "electrocatalysis for hydrogen evolution reaction",
+   "definition": null,
+   "field": "Materials Science",
+   "id": 282
+  },
+  {
+   "topic": "biodegradable magnesium implants",
+   "definition": null,
+   "field": "Materials Science",
+   "id": 283
+  },
+  {
+   "topic": "2D materials beyond graphene",
+   "definition": null,
+   "field": "Materials Science",
+   "id": 284
+  },
+  {
+   "topic": "phase change memory materials",
+   "definition": "Chalcogenide compounds (e.g., Ge-Sb-Te alloys) that switch rapidly between amorphous and crystalline states to store data in non-volatile memory devices.",
+   "field": "Materials Science",
+   "id": 285
+  },
+  {
+   "topic": "CALPHAD",
+   "definition": "CALPHAD (CALculation of PHAse Diagrams): a computational thermodynamics method for modeling phase equilibria and phase diagrams of multicomponent alloy systems — not to be confused with other uses of the acronym.",
+   "field": "Materials Science",
+   "id": 286
+  },
+  {
+   "topic": "lithium dendrite suppression",
+   "definition": null,
+   "field": "Materials Science",
+   "id": 287
+  },
+  {
+   "topic": "self-healing polymers",
+   "definition": null,
+   "field": "Materials Science",
+   "id": 288
+  },
+  {
+   "topic": "transformers in power systems",
+   "definition": "Electrical transformers: static electromagnetic devices that transfer energy between circuits via induction to step voltage up or down in power grids — distinct from transformer neural network architectures in machine learning.",
+   "field": "Materials Science",
+   "id": 289
+  },
+  {
+   "topic": "corrosion of steel in concrete",
+   "definition": null,
+   "field": "Materials Science",
+   "id": 290
+  },
+  {
+   "topic": "topological insulators",
+   "definition": "Materials that are electrical insulators in their bulk but host conducting surface or edge states protected by time-reversal symmetry.",
+   "field": "Materials Science",
+   "id": 291
+  },
+  {
+   "topic": "atomic layer deposition of high-k dielectrics",
+   "definition": null,
+   "field": "Materials Science",
+   "id": 292
+  },
+  {
+   "topic": "Algebraic Geometry",
+   "definition": "The study of geometric properties of solutions to polynomial equations, using techniques from abstract algebra.",
+   "field": "Mathematics",
+   "id": 293
+  },
+  {
+   "topic": "Stochastic Differential Equations",
+   "definition": null,
+   "field": "Mathematics",
+   "id": 294
+  },
+  {
+   "topic": "Homotopy Type Theory",
+   "definition": "A branch of mathematical logic and computer science that interprets types as topological spaces and proofs as paths.",
+   "field": "Mathematics",
+   "id": 295
+  },
+  {
+   "topic": "Optimal Transport",
+   "definition": null,
+   "field": "Mathematics",
+   "id": 296
+  },
+  {
+   "topic": "Representation Theory of Finite Groups",
+   "definition": null,
+   "field": "Mathematics",
+   "id": 297
+  },
+  {
+   "topic": "Riemann Hypothesis",
+   "definition": "The conjecture that all non-trivial zeros of the Riemann zeta function have real part 1/2, central to the distribution of prime numbers.",
+   "field": "Mathematics",
+   "id": 298
+  },
+  {
+   "topic": "Compressed Sensing",
+   "definition": null,
+   "field": "Mathematics",
+   "id": 299
+  },
+  {
+   "topic": "Elliptic Curve Cryptography",
+   "definition": null,
+   "field": "Mathematics",
+   "id": 300
+  },
+  {
+   "topic": "Tropical Geometry",
+   "definition": "A piecewise-linear version of algebraic geometry where addition is replaced by minimum and multiplication by addition.",
+   "field": "Mathematics",
+   "id": 301
+  },
+  {
+   "topic": "Mathematical Oncology",
+   "definition": null,
+   "field": "Mathematics",
+   "id": 302
+  },
+  {
+   "topic": "Persistent Homology",
+   "definition": null,
+   "field": "Mathematics",
+   "id": 303
+  },
+  {
+   "topic": "Fractional Calculus",
+   "definition": null,
+   "field": "Mathematics",
+   "id": 304
+  },
+  {
+   "topic": "Mean Field Games",
+   "definition": null,
+   "field": "Mathematics",
+   "id": 305
+  },
+  {
+   "topic": "Fields",
+   "definition": "In mathematics: algebraic structures with addition, subtraction, multiplication, and division operations, not agricultural or electromagnetic fields.",
+   "field": "Mathematics",
+   "id": 306
+  },
+  {
+   "topic": "Catastrophe Theory",
+   "definition": null,
+   "field": "Mathematics",
+   "id": 307
+  },
+  {
+   "topic": "immunotherapy",
+   "definition": null,
+   "field": "Medicine",
+   "id": 308
+  },
+  {
+   "topic": "gut microbiome and depression",
+   "definition": null,
+   "field": "Medicine",
+   "id": 309
+  },
+  {
+   "topic": "CRISPR gene editing in sickle cell disease",
+   "definition": null,
+   "field": "Medicine",
+   "id": 310
+  },
+  {
+   "topic": "GLP-1 receptor agonists",
+   "definition": "Drugs that mimic the GLP-1 hormone to lower blood sugar and reduce appetite, used for diabetes and obesity.",
+   "field": "Medicine",
+   "id": 311
+  },
+  {
+   "topic": "sepsis",
+   "definition": null,
+   "field": "Medicine",
+   "id": 312
+  },
+  {
+   "topic": "machine learning for ECG interpretation",
+   "definition": null,
+   "field": "Medicine",
+   "id": 313
+  },
+  {
+   "topic": "long COVID",
+   "definition": "Persistent symptoms and organ dysfunction lasting months after acute SARS-CoV-2 infection.",
+   "field": "Medicine",
+   "id": 314
+  },
+  {
+   "topic": "nanoparticles",
+   "definition": "Here: nanoscale drug-delivery and imaging agents used in medicine, not nanoparticles in materials science, physics, or environmental chemistry.",
+   "field": "Medicine",
+   "id": 315
+  },
+  {
+   "topic": "antibiotic resistance in Klebsiella pneumoniae",
+   "definition": null,
+   "field": "Medicine",
+   "id": 316
+  },
+  {
+   "topic": "telemedicine for rural mental health",
+   "definition": null,
+   "field": "Medicine",
+   "id": 317
+  },
+  {
+   "topic": "plasma",
+   "definition": "Here: blood plasma and its uses in transfusion and fractionated therapies, not ionized gas in physics or plasma displays.",
+   "field": "Medicine",
+   "id": 318
+  },
+  {
+   "topic": "tumor microenvironment in pancreatic cancer",
+   "definition": null,
+   "field": "Medicine",
+   "id": 319
+  },
+  {
+   "topic": "organoids for drug screening",
+   "definition": null,
+   "field": "Medicine",
+   "id": 320
+  },
+  {
+   "topic": "mRNA vaccine reactogenicity",
+   "definition": "The short-term inflammatory side effects (fever, fatigue, injection-site pain) caused by mRNA vaccines.",
+   "field": "Medicine",
+   "id": 321
+  },
+  {
+   "topic": "delirium in ICU patients",
+   "definition": null,
+   "field": "Medicine",
+   "id": 322
+  },
+  {
+   "topic": "single-cell RNA sequencing of the tumor immune infiltrate",
+   "definition": null,
+   "field": "Medicine",
+   "id": 323
+  },
+  {
+   "topic": "vaginal mesh complications",
+   "definition": "Adverse outcomes such as erosion, pain, and organ perforation following surgical mesh implants for pelvic organ prolapse or incontinence.",
+   "field": "Medicine",
+   "id": 324
+  },
+  {
+   "topic": "neuroplasticity",
+   "definition": "The brain's ability to reorganize itself by forming new neural connections throughout life.",
+   "field": "Neuroscience",
+   "id": 325
+  },
+  {
+   "topic": "default mode network",
+   "definition": "A network of brain regions that is active when a person is not focused on the outside world and the brain is at wakeful rest.",
+   "field": "Neuroscience",
+   "id": 326
+  },
+  {
+   "topic": "Alzheimer's disease",
+   "definition": "A progressive neurodegenerative disease characterized by memory loss and cognitive decline.",
+   "field": "Neuroscience",
+   "id": 327
+  },
+  {
+   "topic": "spike-timing-dependent plasticity (STDP)",
+   "definition": null,
+   "field": "Neuroscience",
+   "id": 328
+  },
+  {
+   "topic": "cognitive neuroscience",
+   "definition": "The scientific field that is concerned with the study of the biological processes and aspects that underlie cognition.",
+   "field": "Neuroscience",
+   "id": 329
+  },
+  {
+   "topic": "fMRI functional connectivity",
+   "definition": null,
+   "field": "Neuroscience",
+   "id": 330
+  },
+  {
+   "topic": "Parkinson's disease",
+   "definition": null,
+   "field": "Neuroscience",
+   "id": 331
+  },
+  {
+   "topic": "neurogenesis",
+   "definition": "The process by which new neurons are formed in the brain.",
+   "field": "Neuroscience",
+   "id": 332
+  },
+  {
+   "topic": "hippocampus and memory",
+   "definition": null,
+   "field": "Neuroscience",
+   "id": 333
+  },
+  {
+   "topic": "consciousness",
+   "definition": "The state of being awake and aware of one's surroundings.",
+   "field": "Neuroscience",
+   "id": 334
+  },
+  {
+   "topic": "brain-computer interfaces (BCI)",
+   "definition": null,
+   "field": "Neuroscience",
+   "id": 335
+  },
+  {
+   "topic": "autism spectrum disorder (ASD)",
+   "definition": null,
+   "field": "Neuroscience",
+   "id": 336
+  },
+  {
+   "topic": "synaptic pruning",
+   "definition": "The process of synapse elimination that occurs between early childhood and the onset of puberty.",
+   "field": "Neuroscience",
+   "id": 337
+  },
+  {
+   "topic": "neuroeconomics",
+   "definition": null,
+   "field": "Neuroscience",
+   "id": 338
+  },
+  {
+   "topic": "GABAergic inhibition",
+   "definition": null,
+   "field": "Neuroscience",
+   "id": 339
+  },
+  {
+   "topic": "transformers in neuroscience",
+   "definition": "The application of transformer-based machine learning models to analyze neural data, distinct from electrical transformers.",
+   "field": "Neuroscience",
+   "id": 340
+  },
+  {
+   "topic": "LLMs for cognitive modeling",
+   "definition": "The use of Large Language Models to simulate and understand human cognitive processes, not to be confused with a Master of Laws degree.",
+   "field": "Neuroscience",
+   "id": 341
+  },
+  {
+   "topic": "geriatric nursing",
+   "definition": null,
+   "field": "Nursing",
+   "id": 342
+  },
+  {
+   "topic": "nurse burnout",
+   "definition": "The study of emotional exhaustion, depersonalization, and reduced personal accomplishment among nursing professionals, including its causes, prevalence, and interventions.",
+   "field": "Nursing",
+   "id": 343
+  },
+  {
+   "topic": "pressure ulcer prevention",
+   "definition": null,
+   "field": "Nursing",
+   "id": 344
+  },
+  {
+   "topic": "oncology nursing",
+   "definition": null,
+   "field": "Nursing",
+   "id": 345
+  },
+  {
+   "topic": "telehealth nursing",
+   "definition": "The use of telecommunications technology by nurses to provide remote patient care, monitoring, education, and consultation.",
+   "field": "Nursing",
+   "id": 346
+  },
+  {
+   "topic": "nurse staffing ratios",
+   "definition": null,
+   "field": "Nursing",
+   "id": 347
+  },
+  {
+   "topic": "fall prevention in hospitals",
+   "definition": null,
+   "field": "Nursing",
+   "id": 348
+  },
+  {
+   "topic": "medication errors in nursing",
+   "definition": "Research on the causes, incidence, reporting, and prevention of errors made by nurses in the preparation and administration of medications.",
+   "field": "Nursing",
+   "id": 349
+  },
+  {
+   "topic": "palliative care nursing",
+   "definition": null,
+   "field": "Nursing",
+   "id": 350
+  },
+  {
+   "topic": "wound care nursing",
+   "definition": null,
+   "field": "Nursing",
+   "id": 351
+  },
+  {
+   "topic": "nursing informatics",
+   "definition": "The integration of nursing science, computer science, and information science to manage and communicate data, information, and knowledge in nursing practice.",
+   "field": "Nursing",
+   "id": 352
+  },
+  {
+   "topic": "critical care nursing",
+   "definition": null,
+   "field": "Nursing",
+   "id": 353
+  },
+  {
+   "topic": "pediatric pain management",
+   "definition": null,
+   "field": "Nursing",
+   "id": 354
+  },
+  {
+   "topic": "transitional care interventions",
+   "definition": "Interventions designed to ensure coordination and continuity of health care as patients transfer between different locations or levels of care, such as hospital to home.",
+   "field": "Nursing",
+   "id": 355
+  },
+  {
+   "topic": "nursing simulation education",
+   "definition": null,
+   "field": "Nursing",
+   "id": 356
+  },
+  {
+   "topic": "compassion fatigue",
+   "definition": null,
+   "field": "Nursing",
+   "id": 357
+  },
+  {
+   "topic": "community health nursing",
+   "definition": null,
+   "field": "Nursing",
+   "id": 358
+  },
+  {
+   "topic": "EBP implementation",
+   "definition": "Evidence-Based Practice implementation: the study of strategies to integrate research findings and best evidence into routine clinical nursing practice.",
+   "field": "Nursing",
+   "id": 359
+  },
+  {
+   "topic": "Pharmacokinetics and Pharmacodynamics",
+   "definition": "The study of drug absorption, distribution, metabolism, excretion (ADME) and the relationship between drug concentration and effect.",
+   "field": "Pharmacology, Toxicology and Pharmaceutics",
+   "id": 360
+  },
+  {
+   "topic": "Nanoparticle drug delivery systems",
+   "definition": "Use of nanoscale carriers to improve drug targeting, bioavailability, and controlled release.",
+   "field": "Pharmacology, Toxicology and Pharmaceutics",
+   "id": 361
+  },
+  {
+   "topic": "Drug-induced liver injury (DILI)",
+   "definition": "Hepatotoxicity caused by medications, herbs, or dietary supplements.",
+   "field": "Pharmacology, Toxicology and Pharmaceutics",
+   "id": 362
+  },
+  {
+   "topic": "Blood-brain barrier penetration",
+   "definition": "Strategies and mechanisms for delivering therapeutics across the blood-brain barrier.",
+   "field": "Pharmacology, Toxicology and Pharmaceutics",
+   "id": 363
+  },
+  {
+   "topic": "Orphan drug development",
+   "definition": "Pharmaceutical development for rare diseases affecting small patient populations.",
+   "field": "Pharmacology, Toxicology and Pharmaceutics",
+   "id": 364
+  },
+  {
+   "topic": "Pharmacogenomics",
+   "definition": "Study of how genetic variations affect individual drug response and metabolism.",
+   "field": "Pharmacology, Toxicology and Pharmaceutics",
+   "id": 365
+  },
+  {
+   "topic": "Endocrine disrupting chemicals",
+   "definition": "Exogenous substances that interfere with hormone biosynthesis, metabolism, or action.",
+   "field": "Pharmacology, Toxicology and Pharmaceutics",
+   "id": 366
+  },
+  {
+   "topic": "mRNA vaccine technology",
+   "definition": "Vaccine platform using messenger RNA to instruct cells to produce antigens.",
+   "field": "Pharmacology, Toxicology and Pharmaceutics",
+   "id": 367
+  },
+  {
+   "topic": "Monoamine oxidase inhibitors",
+   "definition": "Class of antidepressants that inhibit monoamine oxidase enzymes, preventing neurotransmitter breakdown.",
+   "field": "Pharmacology, Toxicology and Pharmaceutics",
+   "id": 368
+  },
+  {
+   "topic": "Transformers in drug discovery",
+   "definition": "Deep learning architectures (not electrical transformers) used for molecular property prediction and drug design.",
+   "field": "Pharmacology, Toxicology and Pharmaceutics",
+   "id": 369
+  },
+  {
+   "topic": "QT prolongation",
+   "definition": "Cardiac repolarization abnormality that can lead to torsades de pointes, often drug-induced.",
+   "field": "Pharmacology, Toxicology and Pharmaceutics",
+   "id": 370
+  },
+  {
+   "topic": "Liposomal formulations",
+   "definition": "Drug delivery systems using lipid bilayer vesicles to encapsulate therapeutics.",
+   "field": "Pharmacology, Toxicology and Pharmaceutics",
+   "id": 371
+  },
+  {
+   "topic": "Neuroinflammation in Alzheimer's disease",
+   "definition": "Immune-mediated inflammatory processes in the brain contributing to Alzheimer's pathology.",
+   "field": "Pharmacology, Toxicology and Pharmaceutics",
+   "id": 372
+  },
+  {
+   "topic": "Biosimilars",
+   "definition": "Biologic medical products highly similar to already approved reference products.",
+   "field": "Pharmacology, Toxicology and Pharmaceutics",
+   "id": 373
+  },
+  {
+   "topic": "Zebrafish toxicity screening",
+   "definition": "Use of zebrafish embryos and larvae as in vivo models for high-throughput toxicology testing.",
+   "field": "Pharmacology, Toxicology and Pharmaceutics",
+   "id": 374
+  },
+  {
+   "topic": "condensed matter physics",
+   "definition": null,
+   "field": "Physics and Astronomy",
+   "id": 375
+  },
+  {
+   "topic": "gravitational wave detection LIGO",
+   "definition": null,
+   "field": "Physics and Astronomy",
+   "id": 376
+  },
+  {
+   "topic": "high-temperature superconductivity",
+   "definition": "Research on materials that exhibit superconductivity at temperatures significantly above absolute zero, typically above 77 K, and the mechanisms behind them.",
+   "field": "Physics and Astronomy",
+   "id": 377
+  },
+  {
+   "topic": "dark matter direct detection",
+   "definition": null,
+   "field": "Physics and Astronomy",
+   "id": 378
+  },
+  {
+   "topic": "quantum entanglement",
+   "definition": null,
+   "field": "Physics and Astronomy",
+   "id": 379
+  },
+  {
+   "topic": "stellar nucleosynthesis",
+   "definition": "The study of how chemical elements are produced through nuclear reactions inside stars and during stellar explosions.",
+   "field": "Physics and Astronomy",
+   "id": 380
+  },
+  {
+   "topic": "active galactic nuclei feedback",
+   "definition": null,
+   "field": "Physics and Astronomy",
+   "id": 381
+  },
+  {
+   "topic": "magnetohydrodynamic turbulence",
+   "definition": null,
+   "field": "Physics and Astronomy",
+   "id": 382
+  },
+  {
+   "topic": "cosmic microwave background polarization",
+   "definition": null,
+   "field": "Physics and Astronomy",
+   "id": 383
+  },
+  {
+   "topic": "Bose-Einstein condensates in optical lattices",
+   "definition": null,
+   "field": "Physics and Astronomy",
+   "id": 384
+  },
+  {
+   "topic": "fast radio bursts",
+   "definition": "The study of millisecond-duration, highly energetic radio transients of extragalactic origin and their unknown progenitors.",
+   "field": "Physics and Astronomy",
+   "id": 385
+  },
+  {
+   "topic": "holography",
+   "definition": "In theoretical physics, the holographic principle and gauge/gravity duality (AdS/CFT) relating gravitational theories in a volume to quantum field theories on its boundary—not optical imaging techniques.",
+   "field": "Physics and Astronomy",
+   "id": 386
+  },
+  {
+   "topic": "plasma wakefield acceleration",
+   "definition": null,
+   "field": "Physics and Astronomy",
+   "id": 387
+  },
+  {
+   "topic": "strings",
+   "definition": "String theory: the theoretical framework modeling fundamental particles as one-dimensional vibrating strings, aiming to unify quantum mechanics and gravity—not musical instruments, textiles, or computer science data types.",
+   "field": "Physics and Astronomy",
+   "id": 388
+  },
+  {
+   "topic": "Cognitive Psychology",
+   "definition": "The study of mental processes such as attention, memory, perception, and problem-solving.",
+   "field": "Psychology",
+   "id": 389
+  },
+  {
+   "topic": "Clinical Psychology",
+   "definition": "The branch of psychology focused on diagnosing and treating mental, emotional, and behavioral disorders.",
+   "field": "Psychology",
+   "id": 390
+  },
+  {
+   "topic": "Social Psychology",
+   "definition": "The scientific study of how people's thoughts, feelings, and behaviors are influenced by the actual, imagined, or implied presence of others.",
+   "field": "Psychology",
+   "id": 391
+  },
+  {
+   "topic": "Developmental Psychology",
+   "definition": "The study of human growth and changes across the lifespan, including physical, cognitive, and social development.",
+   "field": "Psychology",
+   "id": 392
+  },
+  {
+   "topic": "Neuropsychology",
+   "definition": "The study of the relationship between brain function and behavior, often involving patients with brain injuries.",
+   "field": "Psychology",
+   "id": 393
+  },
+  {
+   "topic": "PTSD",
+   "definition": "Post-Traumatic Stress Disorder, a mental health condition triggered by experiencing or witnessing a terrifying event.",
+   "field": "Psychology",
+   "id": 394
+  },
+  {
+   "topic": "CBT",
+   "definition": "Cognitive Behavioral Therapy, a psycho-social intervention that aims to improve mental health by changing cognitive distortions and behaviors.",
+   "field": "Psychology",
+   "id": 395
+  },
+  {
+   "topic": "Mindfulness-Based Stress Reduction",
+   "definition": "An evidence-based program that uses mindfulness meditation to help people manage stress, anxiety, and pain.",
+   "field": "Psychology",
+   "id": 396
+  },
+  {
+   "topic": "Attachment Theory",
+   "definition": "A psychological model that describes the dynamics of long-term interpersonal relationships between humans.",
+   "field": "Psychology",
+   "id": 397
+  },
+  {
+   "topic": "Emotional Intelligence",
+   "definition": "The ability to perceive, use, understand, manage, and handle emotions in positive ways.",
+   "field": "Psychology",
+   "id": 398
+  },
+  {
+   "topic": "Sleep and Memory Consolidation",
+   "definition": "The study of how sleep stages contribute to the stabilization and strengthening of memory traces.",
+   "field": "Psychology",
+   "id": 399
+  },
+  {
+   "topic": "Bilingualism and Cognition",
+   "definition": "The study of how speaking two or more languages affects cognitive processes like executive function and attention.",
+   "field": "Psychology",
+   "id": 400
+  },
+  {
+   "topic": "Autism Spectrum Disorder",
+   "definition": "A developmental disorder characterized by difficulties with social interaction and communication and by restricted or repetitive patterns of thought and behavior.",
+   "field": "Psychology",
+   "id": 401
+  },
+  {
+   "topic": "ADHD",
+   "definition": "Attention-Deficit/Hyperactivity Disorder, a neurodevelopmental disorder characterized by inattention, hyperactivity, and impulsivity.",
+   "field": "Psychology",
+   "id": 402
+  },
+  {
+   "topic": "fMRI",
+   "definition": "Functional Magnetic Resonance Imaging, a neuroimaging procedure using MRI technology that measures brain activity by detecting changes associated with blood flow.",
+   "field": "Psychology",
+   "id": 403
+  },
+  {
+   "topic": "Transcranial Magnetic Stimulation",
+   "definition": "A non-invasive procedure that uses magnetic fields to stimulate nerve cells in the brain to improve symptoms of depression and other neurological conditions.",
+   "field": "Psychology",
+   "id": 404
+  },
+  {
+   "topic": "Computational social science",
+   "definition": null,
+   "field": "Social Sciences",
+   "id": 405
+  },
+  {
+   "topic": "Social network analysis",
+   "definition": "The process of investigating social structures through the use of networks and graph theory.",
+   "field": "Social Sciences",
+   "id": 406
+  },
+  {
+   "topic": "Artificial intelligence ethics",
+   "definition": null,
+   "field": "Social Sciences",
+   "id": 407
+  },
+  {
+   "topic": "Global health security",
+   "definition": "The activities required, both proactive and reactive, to minimize the danger and impact of acute public health events that endanger people's health across geographical regions and international boundaries.",
+   "field": "Social Sciences",
+   "id": 408
+  },
+  {
+   "topic": "Migration studies",
+   "definition": null,
+   "field": "Social Sciences",
+   "id": 409
+  },
+  {
+   "topic": "Renewable energy policy",
+   "definition": null,
+   "field": "Social Sciences",
+   "id": 410
+  },
+  {
+   "topic": "Cultural heritage preservation",
+   "definition": null,
+   "field": "Social Sciences",
+   "id": 411
+  },
+  {
+   "topic": "Urban planning and development",
+   "definition": null,
+   "field": "Social Sciences",
+   "id": 412
+  },
+  {
+   "topic": "Food security",
+   "definition": null,
+   "field": "Social Sciences",
+   "id": 413
+  },
+  {
+   "topic": "Digital divide",
+   "definition": "The gap between demographics and regions that have access to modern information and communications technology, and those that don't or have restricted access.",
+   "field": "Social Sciences",
+   "id": 414
+  },
+  {
+   "topic": "Gender inequality",
+   "definition": null,
+   "field": "Social Sciences",
+   "id": 415
+  },
+  {
+   "topic": "Crisis communication",
+   "definition": null,
+   "field": "Social Sciences",
+   "id": 416
+  },
+  {
+   "topic": "Sustainable tourism",
+   "definition": null,
+   "field": "Social Sciences",
+   "id": 417
+  },
+  {
+   "topic": "Public-private partnerships in infrastructure",
+   "definition": "Cooperation between the public and private sectors for the financing, design, implementation, and operation of infrastructure facilities and services.",
+   "field": "Social Sciences",
+   "id": 418
+  },
+  {
+   "topic": "Veterinary epidemiology",
+   "definition": "The study of disease distribution, determinants, and control in animal populations.",
+   "field": "Veterinary",
+   "id": 419
+  },
+  {
+   "topic": "Antimicrobial resistance in livestock",
+   "definition": null,
+   "field": "Veterinary",
+   "id": 420
+  },
+  {
+   "topic": "Canine parvovirus",
+   "definition": "A highly contagious viral disease causing severe gastroenteritis and immunosuppression in dogs.",
+   "field": "Veterinary",
+   "id": 421
+  },
+  {
+   "topic": "Feline infectious peritonitis",
+   "definition": null,
+   "field": "Veterinary",
+   "id": 422
+  },
+  {
+   "topic": "Veterinary immunology",
+   "definition": "The study of immune system function, vaccines, and immunological disorders in animals.",
+   "field": "Veterinary",
+   "id": 423
+  },
+  {
+   "topic": "Porcine reproductive and respiratory syndrome",
+   "definition": null,
+   "field": "Veterinary",
+   "id": 424
+  },
+  {
+   "topic": "Equine laminitis",
+   "definition": null,
+   "field": "Veterinary",
+   "id": 425
+  },
+  {
+   "topic": "Veterinary anesthesia",
+   "definition": null,
+   "field": "Veterinary",
+   "id": 426
+  },
+  {
+   "topic": "Zoonotic disease transmission",
+   "definition": "The study of pathogens that spread between animals and humans.",
+   "field": "Veterinary",
+   "id": 427
+  },
+  {
+   "topic": "Avian influenza",
+   "definition": null,
+   "field": "Veterinary",
+   "id": 428
+  },
+  {
+   "topic": "Veterinary oncology",
+   "definition": null,
+   "field": "Veterinary",
+   "id": 429
+  },
+  {
+   "topic": "Foot-and-mouth disease",
+   "definition": null,
+   "field": "Veterinary",
+   "id": 430
+  },
+  {
+   "topic": "Veterinary parasitology",
+   "definition": null,
+   "field": "Veterinary",
+   "id": 431
+  },
+  {
+   "topic": "Rabies",
+   "definition": null,
+   "field": "Veterinary",
+   "id": 432
+  },
+  {
+   "topic": "Transformative learning in veterinary education",
+   "definition": "A pedagogical theory describing how veterinary students' perspectives shift through critical reflection, distinct from transformer models in machine learning or electrical transformers.",
+   "field": "Veterinary",
+   "id": 433
+  },
+  {
+   "topic": "Mercury toxicosis in companion animals",
+   "definition": "Heavy metal poisoning in pets, distinct from mercury as a chemical element in other scientific contexts or the planet Mercury in astronomy.",
+   "field": "Veterinary",
+   "id": 434
+  },
+  {
+   "topic": "Veterinary diagnostic imaging",
+   "definition": null,
+   "field": "Veterinary",
+   "id": 435
+  }
+ ],
+ "dropped": []
+}
