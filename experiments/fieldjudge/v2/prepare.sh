@@ -12,19 +12,29 @@ mkdir -p "$DATA"
 exec 9>"$DATA/prepare.lock"
 flock -n 9 || exit 1
 status() { printf '%s %s\n' "$(date -Is)" "$*" | tee "$DATA/PREPARE_STATUS.txt"; }
-trap 'status "STOPPED at line $LINENO; inspect the unit log before resuming"' ERR
+failed() {
+  code=$?
+  if [ "$code" -eq 75 ]; then
+    status 'RETRY WAIT: temporary failure; systemd will resume from checkpoints in 5 minutes'
+  else
+    status 'PAUSED: inspect stage-status/ and the unit log; safety/quality gates are not auto-retried'
+    code=78
+  fi
+  exit "$code"
+}
+trap failed ERR
 # Do not duplicate an already-running topic generation process.
 while systemctl --user is-active --quiet fj-v2-topics; do sleep 30; done
 status 'topic generation and overlap screening'
-"$SUB" topics.py
+"$SUB" run_stage.py topics.py --defer-blocked-fields
 status 'freeze retrieval benchmark'
-"$CPU" collect.py benchmark
+"$CPU" run_stage.py collect.py benchmark
 status 'freeze title-only benchmark'
-"$CPU" collect.py benchmark-titles
+"$CPU" run_stage.py collect.py benchmark-titles
 status 'group overlapping topic families before choosing train/validation splits'
-"$CPU" group_split.py
+"$CPU" run_stage.py group_split.py
 status 'collect validation families first, then training families'
-"$CPU" collect.py families
+"$CPU" run_stage.py collect.py families
 status 'mine difficult pairs with the existing local models; yields between chunks to live maps'
-"$CPU" mine.py
-status 'PREPARED: 100000 pairs. Labeling and model training are separate gated stages.'
+"$CPU" run_stage.py mine.py
+status 'PREPARED available screened families: see dataset-status.json for counts and deferred subjects. Labeling and training remain gated.'

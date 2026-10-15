@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field
 from functai import ai, _ai
 from common import ROOT, OLD, settings, write_json, digest
 from allowance import check
+from control import provider_failure
 
 RECIPE = json.loads(Path(__file__).with_name("recipe.json").read_text())
 
@@ -62,17 +63,20 @@ def screen(families: list[dict], reserved: list[dict]) -> list[Screening]:
 def normalize(s):
     return " ".join(s.casefold().replace("-", " ").split())
 
-def generate():
+def generate(defer_blocked_fields=False):
     target = ROOT / "topics.json"
     if target.exists():
         saved = json.loads(target.read_text())
         if saved["recipe_sha256"] != digest(RECIPE):
             raise ValueError("recipe changed under frozen topics")
-        print("Topics already frozen:", len(saved["families"]))
+        if saved.get('deferred') and not defer_blocked_fields:
+            raise RuntimeError('frozen manifest has deferred subjects; explicit --defer-blocked-fields required')
+        print("Topics already frozen:", len(saved["families"]), 'deferred subjects:', len(saved.get('deferred', [])))
         return
     reserved = RECIPE["new_holdouts"] + RECIPE["development_holdouts"]
     fields = sorted({t["field"] for t in json.loads((OLD / "topics.json").read_text())["topics"]})
     accepted, seen, rejects = [], set(), []
+    deferred = []
     quota = {field: 500 // len(fields) + (i < 500 % len(fields)) for i, field in enumerate(fields)}
     for field in fields:
         selected = []
@@ -90,7 +94,7 @@ def generate():
                 result = propose.using(**settings("sol")).map([args], threads=1).to_dicts()[0]
                 if result.get("error"):
                     write_json(path.with_suffix(".failure.json"), result)
-                    raise RuntimeError("topic generation failed; rerun after inspection")
+                    provider_failure(result["error"], "topic generation")
                 grouped = {}
                 for value in result["pred_result"]:
                     scope = ProposedScope.model_validate(value).model_dump()
@@ -136,7 +140,7 @@ def generate():
                     if 'Refusal' in str(result['error']):
                         flagged.update(c['id'] for c in candidates)
                         break
-                    raise RuntimeError("screen failed")
+                    provider_failure(result["error"], "topic screening")
                 verdicts = [Screening.model_validate(v).model_dump() for v in result["pred_result"]]
                 if [v["id"] for v in verdicts] != [c["id"] for c in candidates]:
                     raise ValueError("screen IDs mismatch")
@@ -155,15 +159,22 @@ def generate():
                 selected.append(family)
             print(field, len(selected), "/", quota[field], flush=True)
         if len(selected) < quota[field]:
-            write_json(ROOT / "topic-generation" / "shortfall.json", {"field": field, "selected": selected, "quota": quota[field]})
-            raise RuntimeError("Insufficient distinct families: inspect shortfall, do not silently lower coverage")
+            shortfall = {'field': field, 'selected': selected, 'quota': quota[field], 'missing': quota[field]-len(selected)}
+            write_json(ROOT / 'topic-generation' / f'shortfall-{digest(field)[:12]}.json', shortfall)
+            if not defer_blocked_fields:
+                raise RuntimeError("Insufficient distinct families: inspect shortfall, do not silently lower coverage")
+            deferred.append({'field': field, 'accepted': len(selected), 'quota': quota[field], 'missing': quota[field]-len(selected)})
+            print('DEFERRED FOR REVIEW',field,'missing',quota[field]-len(selected),'families; other subjects continue',flush=True)
         accepted.extend(selected)
     # Group siblings/parents/alternative meanings before splitting; never random-split paper pairs.
     random.Random(3026).shuffle(accepted)
     for i, family in enumerate(accepted):
         family["split"] = "validation" if i < 50 else "train"
-    write_json(target, {"recipe_sha256": digest(RECIPE), "families": accepted, "rejected": rejects})
+    write_json(target, {"recipe_sha256": digest(RECIPE), "families": accepted, "rejected": rejects,
+                        'deferred': deferred, 'target_families': 500, 'complete': not deferred})
     print("FROZEN", len(accepted), "families", flush=True)
 
 if __name__ == "__main__":
-    generate()
+    ap=argparse.ArgumentParser()
+    ap.add_argument('--defer-blocked-fields',action='store_true',help='Continue other subjects while preserving explicit coverage shortfalls; no training approval.')
+    generate(ap.parse_args().defer_blocked_fields)

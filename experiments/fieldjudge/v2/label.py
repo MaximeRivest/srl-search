@@ -13,6 +13,7 @@ import json
 from pathlib import Path
 from common import ROOT, PROMPT_VERSION, Case, classify, settings, validate_response, presented, make_cases, digest, write_json
 from allowance import check
+from control import provider_failure
 
 
 def run(model, split, batch_size, limit_pairs=None):
@@ -56,7 +57,16 @@ def run(model, split, batch_size, limit_pairs=None):
         raw_path = folder / f"raw-{start:06d}.json"
         prior = json.loads(raw_path.read_text()) if raw_path.exists() else None
         if prior and any('Refusal' in str(r.get('error')) for r in prior):
-            result = prior
+            if len(prior) != len(requests):
+                raise ValueError('saved raw wave length mismatch')
+            result = list(prior)
+            # Preserve refusals, but retry transient errors in OTHER requests of the same wave.
+            retry_indices = [i for i,r in enumerate(prior) if r.get('error') and 'Refusal' not in str(r['error'])]
+            if retry_indices:
+                retries = fn.map([{'cases': [Case(**c) for c in presented(requests[i])]} for i in retry_indices], threads=2).to_dicts()
+                for i,row in zip(retry_indices,retries):
+                    result[i] = row
+                write_json(raw_path,result)
         else:
             result = fn.map([{"cases": [Case(**c) for c in presented(b)]} for b in requests], threads=2).to_dicts()
             write_json(raw_path, result)
@@ -67,7 +77,7 @@ def run(model, split, batch_size, limit_pairs=None):
                     passes[int(i >= len(group))] += [dict(id=c['id'],label='insufficient_evidence',relation='ambiguous',
                         evidence='',reason='No classification: provider refused.',evidence_verified=False,provider_refused=True) for c in batch]
                     continue
-                raise RuntimeError(f"{model}: provider/parser failure; inspect raw wave, rerun later")
+                provider_failure(row["error"], f"{model} labeling wave {start}")
             passes[int(i >= len(group))] += validate_response(batch,row["pred_result"])
         repeat = {v['id']:v for v in passes[1]}
         verdicts = [{**v, 'order_stable':v['label']==repeat[v['id']]['label'], 'repeat':repeat[v['id']]} for v in passes[0]]

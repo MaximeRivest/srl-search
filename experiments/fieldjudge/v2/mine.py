@@ -39,9 +39,12 @@ def gate():
         time.sleep(30)
 
 def run():
+    manifest=json.loads((ROOT/'topics.json').read_text())
     families = [json.loads(p.read_text()) for p in sorted((ROOT / "families").glob("*.json"))]
-    if len(families) != 500:
-        raise ValueError("expected 500 complete family shards")
+    expected={f['id'] for f in manifest['families']}
+    if not expected or {f['family_id'] for f in families} != expected:
+        raise ValueError("family shards do not match the screened topic manifest")
+    expected_pairs = 200 * len(expected)
     rows = [r for f in families for r in f["mining_pool"]]
     work = ROOT / "mining"
     work.mkdir(exist_ok=True)
@@ -80,7 +83,7 @@ def run():
         selected = [{**r, "source": source, "mining_scores": {n:p[r['id']] for n,p in predictions.items()}}
                     for group, source in ((boundary,"boundary"),(disagree,"model_disagreement")) for r in group]
         all_rows += f["coverage"] + f["cross_scope"] + selected
-    if len(all_rows) != 100000 or len({r["id"] for r in all_rows}) != 100000:
+    if len(all_rows) != expected_pairs or len({r["id"] for r in all_rows}) != expected_pairs:
         raise ValueError("target count/unique pair mismatch")
     # Only export after cross-split identity checks, independent of collection's own guard.
     owners = {}
@@ -96,7 +99,9 @@ def run():
         temp = path.with_suffix(".tmp")
         temp.write_text("".join(json.dumps(r,ensure_ascii=False)+"\n" for r in subset))
         os.replace(temp,path)
-    print("EXPORTED",len(all_rows),"pairs",flush=True)
+    write(ROOT/'dataset-status.json', {'pairs':len(all_rows),'target_pairs':100000,'deferred':manifest.get('deferred',[]),
+                                      'complete':bool(manifest.get('complete',True)),'training_approved':False})
+    print("EXPORTED",len(all_rows),"pairs of target 100000; deferred subjects:",len(manifest.get('deferred',[])),flush=True)
 
 if __name__ == "__main__":
     run()

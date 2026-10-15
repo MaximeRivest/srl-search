@@ -120,9 +120,28 @@ python export.py                     # provisional labels + unresolved review fi
 python -m unittest test_contract -v
 ```
 
-`prepare.sh` runs the data-preparation stages in order, pins the corpus release,
-and stops on errors. `first_cohort.sh MODEL` waits for preparation and deliberately
-stops after 2,000 production pairs. Neither starts fine-tuning. Next gates are:
+`launch.sh` starts three independent systemd user services. They are not children
+of Chattering: closing the browser/conversation or disconnecting does not stop
+them (user lingering is enabled). These are transient services, so after a machine
+reboot run `launch.sh` again. `launch.sh --restart` reloads changed code and resumes
+from checkpoints. Logs: `journalctl --user -u fj-v2-prepare -f`.
+
+`run_stage.py` distinguishes temporary network/provider failures (exit 75, retry
+after five minutes) from data, account, allowance and quality failures (exit 78,
+pause for inspection). Retry is capped at eight starts/hour. A real systemd test
+simulated one dropped connection and verified one restart and successful recovery.
+The labelers wait through preparation's auto-restart intervals. Completed services
+remain `active/exited`, distinguishable from `active/running`.
+
+`prepare.sh` pins the corpus release. It explicitly allows deferred topic sections:
+Opus refused all four immunology screening proposals, so those 19 families are
+recorded as missing, not retried or counted as covered. Other subjects proceed.
+`topics.json` records `deferred` and `complete`; `dataset-status.json` records the
+actual pair count against the 100,000 target and `training_approved: false`. No
+final training/release approval is implied by collecting a partial dataset.
+
+`first_cohort.sh MODEL` waits for preparation and deliberately stops after 2,000
+production pairs. Neither starts fine-tuning. Next gates are:
 first-cohort audit (including correlated false positives), resolution of the hard
 review pool, training-data leakage audit, matched-data 0.8B/2B training and ablations,
 then the new benchmark and actual reading lists. No live-site changes in this work.
