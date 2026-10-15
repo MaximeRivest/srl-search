@@ -1,8 +1,9 @@
 # Round 2: Sol + Opus data for a general field judge
 
 **Current status: accelerated streaming run.** The user explicitly prioritized
-labels over order checks and heavyweight preparation. Sol and Opus now label once,
-25 papers/request, with short ID + label outputs. No new model is trained or
+labels over order checks and heavyweight preparation. Sol and Opus label in
+25-paper requests with short ID + label outputs. The remaining work is now split
+between them, not double-judged (see below). No new model is trained or
 deployed. The old staged jobs are stopped; the accelerated labelers do NOT stop at
 2,000 pairs. Source and data live separately:
 
@@ -10,6 +11,24 @@ deployed. The old staged jobs are stopped; the accelerated labelers do NOT stop 
 - Data/progress: `/mnt/fast/scholarsreadinglist/fieldjudge/v2/`
 - Search/corpus scripts: `search-dev/.venv/bin/python`
 - Subscription/FunctAI scripts: `sciencemadereadable/.venv/bin/python`
+
+## Remaining work split between teachers (2026-10-15)
+
+At the user's request, both workers were stopped before freezing `fast/assignment.json`.
+34,319 pairs already had an answer from at least one teacher (including uncertainty).
+They are not requested again. The remaining 65,681 pairs were split disjointly:
+32,840 to Sol and 32,841 to Opus. Whole batches are used where possible, with family
+and overall balancing; prior refusals go to the other teacher, never retried with
+the same one. If both refused, the pair stays for review. Assignment is immutable
+across restarts. `partition.py` verifies source checksums and locks both worker files
+while creating the plan; tests prove no overlap and exact remaining coverage.
+
+Earlier double judgments are retained, including disagreements. `export_fast.py`
+now distinguishes `provisional_single_teacher` from `provisional_agreement`; a
+missing second opinion is expected for assigned work, not a pending task. It still
+flags uncertainty, refusals, Kimi conflicts where old labels exist, and leakage.
+This saves about half the remaining labeling work but removes the second-opinion
+check for these pairs. No automatic training or deployment.
 
 ## Active fast path (supersedes the staged commands below)
 
@@ -33,7 +52,7 @@ journalctl --user -u fj-fast-collect -f
 - Cut repeated order checks, quotations, rationales, GPU hard-example mining and
   the all-data-ready barrier. The extra retrieval examples are random, explicitly
   not model-mined. This trades some annotation consistency/targeting for throughput.
-- Keep two independent teachers, exactly matched IDs (output ordering is irrelevant),
+- Keep both teacher implementations (disjoint remaining assignments as above), exactly matched IDs (output ordering is irrelevant),
   uncertainty, refusals, disagreements, held-out paper protection, quota checks,
   cached replies, atomic checkpoints and five-minute retries on temporary failures.
 - Initial observed throughput: Sol ~300 pairs/min; Opus ~500 pairs/min. Refusals

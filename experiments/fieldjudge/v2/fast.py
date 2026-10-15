@@ -115,6 +115,9 @@ def run(model):
                       else lm15.OpenAICodexLM(transport=transport))
     if model=='opus':config['max_tokens']=2048
     fn=label_batch.using(**config)
+    assignment_path=FAST/'assignment.json'
+    assignment=json.loads(assignment_path.read_text()) if assignment_path.exists() else None
+    assigned=assignment['batches'][model] if assignment else None
     done={p.stem for p in folder.glob('*.json') if p.stem!='status'}
     counts=Counter()
     for key in done:
@@ -122,17 +125,31 @@ def run(model):
         counts.update(v['label'] or 'unanswered' for v in old['answers'])
     started=time.time();initial=sum(counts.values()); consecutive_bad=0
     while True:
-        pending=[p for p in sorted((FAST/'queue').glob('*.json')) if p.stem not in done]
+        pending=[p for p in sorted((FAST/'queue').glob('*.json')) if p.stem not in done and (assigned is None or p.stem in assigned)]
+        remaining=sum(len(assigned[p.stem]) for p in pending) if assigned is not None else None
         if not pending:
-            write_json(folder/'status.json',{'state':'waiting_for_input','counts':dict(counts),'pairs':sum(counts.values()),'updated':time.time()})
-            if (FAST/'producer-done.json').exists():
+            complete=assignment is not None or (FAST/'producer-done.json').exists()
+            write_json(folder/'status.json',{'state':'done' if complete else 'waiting_for_input','counts':dict(counts),
+                       'pairs':sum(counts.values()),'assigned_remaining':remaining,
+                       'mode':'partitioned' if assignment else 'dual','updated':time.time()})
+            if complete:
                 print('DONE',model,sum(counts.values()),flush=True);return
             time.sleep(5);continue
         check(model)
-        paths=pending[:2];batches=[json.loads(p.read_text()) for p in paths]
+        paths=pending[:2];source_batches=[json.loads(p.read_text()) for p in paths]
+        batches=[]
+        for path,batch in zip(paths,source_batches):
+            if assignment:
+                if digest(batch)!=assignment['source_batch_hashes'][path.stem]:
+                    raise ValueError('queue changed after partition')
+                wanted=set(assigned[path.stem])
+                selected=[r for r in batch['pairs'] if r['id'] in wanted]
+                if {r['id'] for r in selected}!=wanted:raise ValueError('assigned IDs missing from source batch')
+                batch={**batch,'pairs':selected}
+            batches.append(batch)
         t=time.time()
         result=fn.map([request(b) for b in batches],threads=2).to_dicts()
-        for path,batch,row in zip(paths,batches,result):
+        for path,source_batch,batch,row in zip(paths,source_batches,batches,result):
             error=row.get('error')
             if error:
                 write_json(FAST/'errors'/model/f'{path.stem}.json',row)
@@ -148,13 +165,18 @@ def run(model):
                     answers=[{'id':r['id'],'label':None,'error':'invalid_ids_or_schema'} for r in batch['pairs']]
             bad=all(v['label'] is None for v in answers)
             consecutive_bad=consecutive_bad+1 if bad else 0
-            write_json(folder/path.name,{'teacher':model,'batch_sha256':digest(batch),'seconds':row.get('seconds'),
-                                         'answers':answers,'protocol':'single-pass-labels-only-v1'})
+            write_json(folder/path.name,{'teacher':model,'batch_sha256':digest(source_batch),
+                                         'request_sha256':digest(batch),'requested_ids':[r['id'] for r in batch['pairs']],
+                                         'seconds':row.get('seconds'),'answers':answers,
+                                         'protocol':'partitioned-single-pass-v1' if assignment else 'single-pass-labels-only-v1'})
             done.add(path.stem);counts.update(v['label'] or 'unanswered' for v in answers)
             if consecutive_bad>=5:
                 raise NeedsAttention('five consecutive invalid/refused batches; paused rather than filling the dataset with failures')
         n=sum(counts.values())
         write_json(folder/'status.json',{'state':'labeling','pairs':n,'counts':dict(counts),'updated':time.time(),
+                                        'mode':'partitioned' if assignment else 'dual',
+                                        'assigned_total':assignment['assigned_pairs'].get(model,0) if assignment else None,
+                                        'assigned_remaining':sum(len(ids) for key,ids in assigned.items() if key not in done) if assigned is not None else None,
                                         'pairs_per_minute':round((n-initial)*60/max(1,time.time()-started),1)})
         print(model,n,'pairs',dict(counts),'wave seconds',round(time.time()-t,1),flush=True)
 
