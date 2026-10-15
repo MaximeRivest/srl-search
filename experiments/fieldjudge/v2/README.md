@@ -1,13 +1,52 @@
 # Round 2: Sol + Opus data for a general field judge
 
-**Status:** data preparation and independent benchmark labeling started. No new
-model is trained or deployed. Full-scale labeling is gated; the first production
-cohort stops at 2,000 pairs for audit. Source and data live separately:
+**Current status: accelerated streaming run.** The user explicitly prioritized
+labels over order checks and heavyweight preparation. Sol and Opus now label once,
+25 papers/request, with short ID + label outputs. No new model is trained or
+deployed. The old staged jobs are stopped; the accelerated labelers do NOT stop at
+2,000 pairs. Source and data live separately:
 
 - Code: `experiments/fieldjudge/v2/`
 - Data/progress: `/mnt/fast/scholarsreadinglist/fieldjudge/v2/`
 - Search/corpus scripts: `search-dev/.venv/bin/python`
 - Subscription/FunctAI scripts: `sciencemadereadable/.venv/bin/python`
+
+## Active fast path (supersedes the staged commands below)
+
+```sh
+./launch_fast.sh                     # independent processes; resumes checkpoints
+python fast.py status               # actual queue and per-teacher counts
+python export_fast.py --partial     # joined provisional labels + disagreements
+journalctl --user -u fj-fast-sol -f
+journalctl --user -u fj-fast-opus -f
+journalctl --user -u fj-fast-collect -f
+```
+
+- Immediately enrich 34,273 existing pairs with both teachers (exclude the old
+  validation topics, reserved topic terms and all frozen test IDs/normalized titles).
+- Add 367 already dual-screened new families (1,835 scopes) as each CPU collection
+  finishes. The six remaining ungenerated areas and refused immunology section do
+  not block work. Existing-paper enrichment provides additional field diversity.
+- Stop collection at 100,000 queued pairs total. Distinct papers are fewer because
+  cross-topic judgments are intentional. Files live under `fast/`, separate from
+  the original double-pass protocol.
+- Cut repeated order checks, quotations, rationales, GPU hard-example mining and
+  the all-data-ready barrier. The extra retrieval examples are random, explicitly
+  not model-mined. This trades some annotation consistency/targeting for throughput.
+- Keep two independent teachers, exactly matched IDs (output ordering is irrelevant),
+  uncertainty, refusals, disagreements, held-out paper protection, quota checks,
+  cached replies, atomic checkpoints and five-minute retries on temporary failures.
+- Initial observed throughput: Sol ~300 pairs/min; Opus ~500 pairs/min. Refusals
+  are counted separately, not disguised as successful labels. No completion-time
+  guarantee: shared quotas and provider stalls can interrupt this rate.
+- Existing Kimi labels are available as free checks on legacy enrichment. They are
+  never shown to the teachers. New independent Kimi benchmark cost: $6.22.
+- `export_fast.py` removes cross-split work/title overlaps and flags disagreement
+  with old Kimi labels. Outputs remain provisional: whole-family overlap and
+  disputed cases still need auditing BEFORE training, not before producing labels.
+
+The sections below preserve the original recipe and pilot findings; their
+order-check and first-cohort gates are **not** the active accelerated workflow.
 
 ## Scope and accounting
 

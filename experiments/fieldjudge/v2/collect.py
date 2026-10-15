@@ -44,7 +44,8 @@ def title_key(text):
     return hashlib.sha256(re.sub(r"[^\w]", "", text.splitlines()[0].casefold()).encode()).hexdigest()
 
 class Collector:
-    def __init__(self):
+    def __init__(self, family_dir=None):
+        self.family_dir = Path(family_dir) if family_dir else ROOT/'families'
         self.ctx = F.Ctx()
         self.cit = self.ctx.cit
         self.eng = self.ctx.engine
@@ -79,7 +80,7 @@ class Collector:
                 if not self.own(row):
                     raise ValueError("benchmark ownership conflict")
         for split in ("validation", "train"):
-            for path in sorted((ROOT / "families").glob("*.json")):
+            for path in sorted(self.family_dir.glob("*.json")):
                 data = json.loads(path.read_text())
                 if data["split"] == split:
                     for row in data["coverage"] + data["cross_scope"] + data["mining_pool"]:
@@ -174,7 +175,7 @@ class Collector:
             print('TITLE BENCHMARK',scope['topic'],len(pairs),flush=True)
 
     def family(self, family):
-        path = ROOT / "families" / f"{family['id']}.json"
+        path = self.family_dir / f"{family['id']}.json"
         if path.exists():
             return
         split = family["split"]

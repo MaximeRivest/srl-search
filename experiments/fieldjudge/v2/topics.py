@@ -63,8 +63,8 @@ def screen(families: list[dict], reserved: list[dict]) -> list[Screening]:
 def normalize(s):
     return " ".join(s.casefold().replace("-", " ").split())
 
-def generate(defer_blocked_fields=False):
-    target = ROOT / "topics.json"
+def generate(defer_blocked_fields=False, available_only=False):
+    target = ROOT / ('topics-available.json' if available_only else 'topics.json')
     if target.exists():
         saved = json.loads(target.read_text())
         if saved["recipe_sha256"] != digest(RECIPE):
@@ -90,6 +90,8 @@ def generate(defer_blocked_fields=False):
             if path.exists():
                 proposals = json.loads(path.read_text())["families"]
             else:
+                if available_only:
+                    break  # export completed screening only; do not wait or make any model calls
                 check("sol")
                 result = propose.using(**settings("sol")).map([args], threads=1).to_dicts()[0]
                 if result.get("error"):
@@ -133,6 +135,9 @@ def generate(defer_blocked_fields=False):
                 if failure.exists() and 'Refusal' in str(json.loads(failure.read_text()).get('error')):
                     flagged.update(c['id'] for c in candidates)
                     break  # no repeat of a refused screening request; retain and reject this proposal batch
+                if available_only:
+                    flagged.update(c['id'] for c in candidates)
+                    break
                 check(model)
                 result = screen.using(**settings(model)).map([dict(families=candidates, reserved=reserved)], threads=1).to_dicts()[0]
                 if result.get("error"):
@@ -171,10 +176,12 @@ def generate(defer_blocked_fields=False):
     for i, family in enumerate(accepted):
         family["split"] = "validation" if i < 50 else "train"
     write_json(target, {"recipe_sha256": digest(RECIPE), "families": accepted, "rejected": rejects,
-                        'deferred': deferred, 'target_families': 500, 'complete': not deferred})
+                        'deferred': deferred, 'target_families': 500, 'complete': not deferred, 'available_only': available_only})
     print("FROZEN", len(accepted), "families", flush=True)
 
 if __name__ == "__main__":
     ap=argparse.ArgumentParser()
     ap.add_argument('--defer-blocked-fields',action='store_true',help='Continue other subjects while preserving explicit coverage shortfalls; no training approval.')
-    generate(ap.parse_args().defer_blocked_fields)
+    ap.add_argument('--available-only',action='store_true',help='Export already-screened families, without model calls.')
+    args=ap.parse_args()
+    generate(args.defer_blocked_fields or args.available_only, args.available_only)
