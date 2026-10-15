@@ -1,0 +1,31 @@
+{
+  "version": "fieldjudge-v2-1",
+  "target_pairs": 100000,
+  "target_families": 500,
+  "scopes_per_family": 5,
+  "pairs_per_family": {"coverage": 100, "cross_scope": 50, "model_mined": 50},
+  "coverage_per_scope": {"retrieval_spread": 12, "cited": 6, "random_candidate": 2},
+  "mining_candidates_per_family": 100,
+  "heldout_family_fraction": 0.1,
+  "teachers": ["sol", "opus"],
+  "batch_size": 25,
+  "concurrent_requests_per_teacher": 2,
+  "allowance_stop_percent": 85,
+  "disagreement_policy": "Retain both independent judgments. Agreement is a provisional label; disagreement or abstention is unresolved, not a calibrated 0.5 probability. No arbitrary tie-break. Audit separately before training.",
+  "benchmark_policy": "Existing habitat fragmentation and LLM post-training benchmarks are development diagnostics. New topic families and their test papers are excluded before training data collection. New benchmark labels are silver unless independently reviewed.",
+  "training_policy": "Retrain from the public base weights, not the old fine-tunes; validation by family, no paper/text/title duplication between splits. Same-data comparison of 0.8B and 2B, with a matched-size Kimi-v1 baseline and a no-mining ablation. No automatic deployment or publication of weights.",
+  "new_holdouts": [
+    {"topic": "CAR-T cell exhaustion", "definition": "Mechanisms, measurement and prevention of dysfunctional or exhausted chimeric antigen receptor T cells in cancer treatment.", "exclude": ["CAR-T", "chimeric antigen receptor", "T cell exhaustion", "T-cell exhaustion", "adoptive T cell"]},
+    {"topic": "sulfide solid electrolytes for lithium batteries", "definition": "Transport, stability and interfaces of sulfide solid electrolytes used in lithium solid-state batteries.", "exclude": ["solid electrolyte", "solid-state batter", "sulfide electrolyte", "sulphide electrolyte"]},
+    {"topic": "difference-in-differences with staggered treatment", "definition": "Identification, estimation and inference in difference-in-differences designs with staggered treatment adoption, not causal inference in general.", "exclude": ["difference-in-differences", "difference in differences", "staggered adoption", "staggered treatment", "synthetic control"]},
+    {"topic": "medieval manuscript stemmatics", "definition": "Reconstructing transmission and relationships of medieval manuscripts and textual witnesses, including methods for building and evaluating stemmata.", "exclude": ["stemmatic", "stemma", "textual criticism", "manuscript transmission"]},
+    {"topic": "subglacial drainage networks", "definition": "Structure, evolution and physical behavior of water drainage beneath glaciers and ice sheets.", "exclude": ["subglacial", "glacial hydrology", "glacier hydrology", "basal drainage"]},
+    {"topic": "retrieval-augmented generation attribution", "definition": "Whether claims generated with retrieved sources are supported by those sources, and methods to measure or improve citation faithfulness in retrieval-augmented language models.", "exclude": ["retrieval-augmented", "retrieval augmented", "citation faithfulness", "generated attribution", "grounded generation"]},
+    {"topic": "transformer inrush currents", "definition": "Magnetizing inrush transients, their analysis, mitigation and protection in electrical power transformers, not neural network architectures.", "exclude": ["inrush", "power transformer", "electrical transformer", "transformer protection"]},
+    {"topic": "bat white-nose syndrome", "definition": "The fungal disease white-nose syndrome in bats, its pathogen, epidemiology, effects and management.", "exclude": ["white-nose", "white nose", "Pseudogymnoascus", "Geomyces destructans"]}
+  ],
+  "development_holdouts": [
+    {"topic": "habitat fragmentation", "definition": "Ecological habitat fragmentation, including patches, isolation, edges, connectivity and metapopulations.", "exclude": ["habitat fragmentation", "forest fragmentation", "landscape connectivity", "ecological corridor", "metapopulation", "island biogeography", "edge effects"]},
+    {"topic": "LLM post-training", "definition": "Post-pretraining training of large language models: instruction tuning, preference learning and reinforcement learning for reasoning or alignment.", "exclude": ["post-training", "post training", "instruction tuning", "RLHF", "preference optimization", "reinforcement learning from", "reward model", "alignment training"]}
+  ]
+}

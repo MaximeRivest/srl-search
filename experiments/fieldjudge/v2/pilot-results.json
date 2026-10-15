@@ -1,0 +1,41 @@
+{
+  "sol": {
+    "model": "sol",
+    "batch_size": 25,
+    "paired_n": 100,
+    "same_batch_single": 95,
+    "unverified_evidence": 1,
+    "same_reordered": 94,
+    "labels": {
+      "on_topic": 82,
+      "insufficient_evidence": 19,
+      "off_topic": 99
+    },
+    "passed": false,
+    "note": "95/100 is an operational pilot gate, not a population accuracy estimate."
+  },
+  "opus": {
+    "model": "opus",
+    "batch_size": 25,
+    "paired_n": 100,
+    "same_batch_single": 94,
+    "unverified_evidence": 6,
+    "same_reordered": 98,
+    "labels": {
+      "on_topic": 81,
+      "insufficient_evidence": 11,
+      "off_topic": 108
+    },
+    "passed": false,
+    "note": "95/100 is an operational pilot gate, not a population accuracy estimate."
+  },
+  "dual_teacher_order_check": {
+    "protocol": "dual-teacher-order-check-v1",
+    "n": 100,
+    "accepted": 72,
+    "consistent_with_both_singletons": 69,
+    "agreement_on_accepted": 0.9583333333333334,
+    "passed": true,
+    "note": "Small development pilot. Measures stability, not correctness; batch-order checks double label-generation calls."
+  }
+}
