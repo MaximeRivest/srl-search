@@ -87,3 +87,26 @@ per-topic decider trains and labels). The 0.8B is faster but mixed (worse on fra
 post-training, whose estimates are noisy: single papers stand for ~1,100 candidates). Why the judge's better
 classics do not carry through: the per-topic decider is already ~0.98 AUC on its own topic, and the final answer comes
 from the students, the combiner and Jev; the general judge's leniency moves the whole map, its classics only a few.
+
+## The reading lists (`readinglists.py`, `readinglists.json`)
+
+Each replay arm's selection mapped into groups (main map), the top 10 of every paper list of every group (what readers
+see first), every distinct one judged by Kimi for its topic ($2.16 for 1,595 papers). "Core" lists are the works a
+group cites most (foundations, often methods), so they are partly off topic by design in every arm.
+
+| Topic | Judge | Groups | Reading-list papers on topic | "Start here" on topic | Same papers as per-topic |
+|---|---|---:|---:|---:|---:|
+| fragmentation | per-topic | 11 | 80% | 97% | - |
+| fragmentation | general 2B | 12 | 79% | 94% | 40% |
+| fragmentation | general 0.8B | 14 | 67% | 75% | 28% |
+| LLM post-training | per-topic | 11 | 49% | 46% | - |
+| LLM post-training | general 2B | 10 | 61% | 67% | 34% |
+| LLM post-training | general 0.8B | 9 | 65% | 76% | 30% |
+
+Only 30-40% of reading-list papers are the same between arms: groups split differently (fragmentation 2B: amphibians
+and bats as groups, no farmland-consolidation group). On fragmentation the 2B's lists are as good as the per-topic
+ones; the 0.8B adds mostly-off-topic groups (elephants and protected areas, caribou). On LLM post-training the
+per-topic map has 4 mostly-off-topic groups (BERT-era machine translation, vision-language, text-to-image diffusion,
+speech recognition: their lists 10-38% on topic); the general models' maps have none, and their "start here" lists go
+from 46% to 67-76% on topic. So where readers look, the general judges help on the topic the per-topic decider gets
+wrong, and the 2B costs nothing on the other. One run per arm, two topics.
