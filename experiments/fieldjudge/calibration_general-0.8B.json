@@ -1,0 +1,45 @@
+{
+ "frag": {
+  "raw@0.5": [
+   0.668,
+   0.83,
+   0.741
+  ],
+  "calibrated@0.5": [
+   0.788,
+   0.718,
+   0.751
+  ],
+  "calibrated@expected-F1 (0.37)": [
+   0.694,
+   0.782,
+   0.735
+  ],
+  "teacher_auc_of_raw": null,
+  "expected_on_topic_share": 0.09,
+  "kimi_on_topic_share": 0.0759,
+  "meta_refs found (calibrated@0.5)": 0.812,
+  "cited50 found (calibrated@0.5)": 0.386
+ },
+ "llm": {
+  "raw@0.5": [
+   0.727,
+   0.627,
+   0.673
+  ],
+  "calibrated@0.5": [
+   0.727,
+   0.627,
+   0.673
+  ],
+  "calibrated@expected-F1 (0.39)": [
+   0.71,
+   0.683,
+   0.696
+  ],
+  "teacher_auc_of_raw": null,
+  "expected_on_topic_share": 0.0483,
+  "kimi_on_topic_share": 0.0471,
+  "landmarks found (calibrated@0.5)": 0.818
+ }
+}

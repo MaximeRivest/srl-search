@@ -1,0 +1,158 @@
+{
+ "jev": {
+  "frag": {
+   "population": {
+    "auc": 0.9897,
+    "agree": 0.9773,
+    "agree_sample": 0.9483,
+    "precision": 0.891,
+    "recall": 0.798,
+    "f1": 0.842
+   },
+   "cited50": {
+    "auc": 0.9929,
+    "agree": 0.9847,
+    "agree_sample": 0.9111,
+    "precision": 0.841,
+    "recall": 0.837,
+    "f1": 0.839
+   },
+   "meta_refs": {
+    "found": 0.887,
+    "n": 640,
+    "found_title_only": 0.894
+   }
+  },
+  "llm": {
+   "population": {
+    "auc": 0.995,
+    "agree": 0.9836,
+    "agree_sample": 0.9031,
+    "precision": 0.84,
+    "recall": 0.804,
+    "f1": 0.822
+   },
+   "landmarks": {
+    "found": 0.955,
+    "n": 44
+   }
+  }
+ },
+ "general-0.8B": {
+  "frag": {
+   "population": {
+    "auc": 0.9801,
+    "agree": 0.9559,
+    "agree_sample": 0.8946,
+    "precision": 0.668,
+    "recall": 0.83,
+    "f1": 0.741
+   },
+   "cited50": {
+    "auc": 0.9865,
+    "agree": 0.9641,
+    "agree_sample": 0.8611,
+    "precision": 0.579,
+    "recall": 0.897,
+    "f1": 0.704
+   },
+   "meta_refs": {
+    "found": 0.884,
+    "n": 640,
+    "found_title_only": 0.904
+   }
+  },
+  "llm": {
+   "population": {
+    "auc": 0.9831,
+    "agree": 0.9714,
+    "agree_sample": 0.8309,
+    "precision": 0.727,
+    "recall": 0.627,
+    "f1": 0.673
+   },
+   "landmarks": {
+    "found": 0.818,
+    "n": 44
+   }
+  }
+ },
+ "per-topic": {
+  "frag": {
+   "population": {
+    "auc": 0.9797,
+    "agree": 0.9645,
+    "agree_sample": 0.9136,
+    "precision": 0.785,
+    "recall": 0.732,
+    "f1": 0.758
+   },
+   "cited50": {
+    "auc": 0.9825,
+    "agree": 0.9777,
+    "agree_sample": 0.8861,
+    "precision": 0.749,
+    "recall": 0.799,
+    "f1": 0.773
+   },
+   "meta_refs": {
+    "found": 0.784,
+    "n": 640,
+    "found_title_only": 0.761
+   }
+  },
+  "llm": {
+   "population": {
+    "auc": 0.985,
+    "agree": 0.9635,
+    "agree_sample": 0.7515,
+    "precision": 0.58,
+    "recall": 0.818,
+    "f1": 0.679
+   },
+   "landmarks": {
+    "found": 0.886,
+    "n": 44
+   }
+  }
+ },
+ "general-2B": {
+  "frag": {
+   "population": {
+    "auc": 0.987,
+    "agree": 0.9722,
+    "agree_sample": 0.923,
+    "precision": 0.812,
+    "recall": 0.825,
+    "f1": 0.818
+   },
+   "cited50": {
+    "auc": 0.9941,
+    "agree": 0.9853,
+    "agree_sample": 0.8931,
+    "precision": 0.832,
+    "recall": 0.865,
+    "f1": 0.848
+   },
+   "meta_refs": {
+    "found": 0.867,
+    "n": 640,
+    "found_title_only": 0.931
+   }
+  },
+  "llm": {
+   "population": {
+    "auc": 0.9823,
+    "agree": 0.9598,
+    "agree_sample": 0.834,
+    "precision": 0.55,
+    "recall": 0.802,
+    "f1": 0.653
+   },
+   "landmarks": {
+    "found": 0.909,
+    "n": 44
+   }
+  }
+ }
+}
