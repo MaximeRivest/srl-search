@@ -314,7 +314,9 @@ class FieldStore:
         out = []
         for p in self.root.glob("*/job.json"):
             st = _read(p) or {}
-            if st.get("status") != "done" or not (p.parent / "field.json").exists():
+            if not (p.parent / "field.json").exists():
+                continue
+            if st.get("status") != "done" and st.get("kind") != "map":   # a map being rebuilt (new map code) stays listed
                 continue
             req, summ = st.get("request") or {}, st.get("summary") or {}
             out.append({"key": p.parent.name, "topic": req.get("q"), "definition": req.get("definition"),
