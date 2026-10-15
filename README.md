@@ -141,8 +141,11 @@ cache, load limits, titles and map positions) `srl_search/topic_service.py`, cit
   fuzzy kNN), half the weight each → Leiden, the resolution giving ~7 groups, consensus of 20 runs → names
   (phrases over-represented in each group) → lenses from the group's own citations: core, distinctive, rising,
   start_here, bridges, newest, experts (position-weighted local h-index over OpenAlex's disambiguated authors);
-  the same lists for the whole map ("overall", read=0); word clouds (topics.py: each group's phrases against the
-  other groups, the whole map's against all of science counted in the keyword index; LDAvis relevance, lambda 0.4).
+  the same lists for the whole map ("overall", read=0); word clouds as Scimeetr drew them (topics.py: the most
+  frequent phrases with how many times as often each is used as in the other groups, or for the whole map as in
+  all of science, counted in the keyword index; a third of them the most telling, by LDAvis relevance, lambda 0.4);
+  each group of 60+ papers split with the map (topic_service.SPLIT_FROM; whole fields: 300+), its subgroups
+  carried in the map (`subgroups`, `papers.sub`) and cached as the group=N answer.
 - Reads the release's citation index (`paths.citations`, memory-mapped, shared with citewalk through the page cache)
   and its authorship index (`<citations>/authors/`, built by `citewalk/build_authors.py`, ~20 min). Without the
   authorship index the experts lens is empty; without the citation index /topics answers 503.

@@ -485,17 +485,19 @@ def name_groups(terms: list[set], group: np.ndarray, G: int, query: str, surface
 
 
 # -------------------------------------------------------------------------------------------------- word clouds
-# Scimeetr (2016) showed each group's words by relative frequency: how much more often a group's papers use a word
-# than its parent's. Here each word gets LDAvis's relevance, lambda * log p + (1 - lambda) * log(p / q), p the share of
-# the group's papers that use it and q the share elsewhere (Sievert & Shirley 2014, doi:10.3115/v1/w14-3110).
-# lambda = 1 is plain frequency, 0 pure lift (rare words win). A group is compared with the rest of the map; the
-# whole map with all of science (the keyword index). lambda = 0.4, Scimeetr's: LDAvis's readers did best near 0.6
-# against a whole corpus, but groups of one topic share most of their words, and at 0.6 everyday words used a
-# little more often ("changes" x1.4) outranked the group's own ("beetles" x13) on habitat fragmentation's map.
+# Scimeetr's word clouds (2016-17, ScholarsReadingList's uploader/views.py): a group's most frequent words, sized by
+# how often its papers use them and coloured by relative frequency, blue when the group uses a word more than the
+# rest, red when less, grey when about as much. Relative frequency here: p / q, p the share of the group's papers
+# that use the phrase, q the share among the map's other papers (the whole map against all of science, counted in
+# the keyword index). Most of the words are the most frequent (what the group talks about); a third are its most
+# telling, by LDAvis's relevance lambda * log p + (1 - lambda) * log(p / q) (Sievert & Shirley 2014,
+# doi:10.3115/v1/w14-3110) with Scimeetr's lambda 0.4 (at 0.6 everyday words outranked a group's own), so rarer
+# words that set it apart show too, small and deep blue.
 CLOUD_LAMBDA = 0.4
 CLOUD_SIZE = 30
+CLOUD_TELLING = 10             # of CLOUD_SIZE: the most telling words not already among the most frequent
+CLOUD_MIN_LIFT = 1.5           # a "telling" word is used at least this many times as often as elsewhere
 CLOUD_CANDIDATES = 160         # the whole map: its most common phrases, counted in all of science (cached)
-CLOUD_MIN_LIFT = 1.5           # a word used about as often elsewhere says nothing about the group
 
 
 def relevance(p: float, q: float, lam: float = CLOUD_LAMBDA) -> float:
@@ -503,26 +505,36 @@ def relevance(p: float, q: float, lam: float = CLOUD_LAMBDA) -> float:
 
 
 def _cloud(cands: dict[str, tuple[float, float]], df: Counter, surfaces: dict, k: int) -> list[dict]:
-    """cands: phrase key -> (p, q). The k most relevant, a phrase standing for its words: a word whose papers are
-    mostly those of a longer phrase holding it ("fragmentation" under "habitat fragmentation") is left out."""
-    ranked = sorted(cands, key=lambda x: (-relevance(*cands[x]), x))[:6 * k]
-    keys = set(ranked)
-    out = []
-    for key in ranked:
-        if any(len(x) > len(key) and f" {key} " in f" {x} " and df[x] >= 0.7 * df[key] for x in keys):
-            continue
-        p, q = cands[key]
-        out.append({"t": display(surfaces[key]), "share": round(p, 4), "lift": round(p / q, 1),
-                    "score": round(relevance(p, q), 3)})
-        if len(out) == k:
+    """cands: phrase key -> (p, q). Up to k words, most frequent first: k - CLOUD_TELLING by frequency, the rest by
+    relevance among those used at least CLOUD_MIN_LIFT times as often as elsewhere. A phrase stands for its words:
+    a word whose papers are mostly those of a longer phrase holding it ("fragmentation" under "habitat
+    fragmentation") is left out."""
+    def ok(key, pool):
+        return not any(len(x) > len(key) and f" {key} " in f" {x} " and df[x] >= 0.7 * df[key] for x in pool)
+    by_freq = sorted(cands, key=lambda x: (-cands[x][0], x))
+    pool = set(by_freq[:6 * k])
+    chosen: list[str] = [x for x in by_freq[:6 * k] if ok(x, pool)][:k - CLOUD_TELLING]
+    telling = sorted((x for x in cands if cands[x][0] > CLOUD_MIN_LIFT * cands[x][1]),
+                     key=lambda x: (-relevance(*cands[x]), x))[:6 * k]
+    tpool = set(telling) | pool
+    for x in telling:
+        if len(chosen) == k:
             break
-    return out
+        if x not in chosen and ok(x, tpool):
+            chosen.append(x)
+    for x in by_freq[:6 * k]:                          # few telling words: more of the frequent ones
+        if len(chosen) == k:
+            break
+        if x not in chosen and ok(x, pool):
+            chosen.append(x)
+    chosen.sort(key=lambda x: (-cands[x][0], x))
+    return [{"t": display(surfaces[x]), "share": round(cands[x][0], 4), "lift": round(cands[x][0] / cands[x][1], 2),
+             "score": round(relevance(*cands[x]), 3)} for x in chosen]
 
 
 def group_clouds(terms: list[set], group: np.ndarray, G: int, query: str, surfaces: dict,
                  counts: tuple[Counter, list[Counter]], k: int = CLOUD_SIZE) -> list[list[dict]]:
-    """Each group's words, by relevance against the rest of the map (only words it uses more than the others).
-    The question's own words are left out: every group uses them."""
+    """Each group's words against the rest of the map. The question's own words are left out: every group uses them."""
     qstems = {stem(w) for w in TOKEN.findall(query or "")}
     n = len(terms)
     df_all, dfs = counts
@@ -535,17 +547,15 @@ def group_clouds(terms: list[set], group: np.ndarray, G: int, query: str, surfac
         for key, f in df.items():
             if f < need or all(t in qstems for t in key.split()):
                 continue
-            p, q = f / ng, (df_all[key] - f + 0.5) / (n - ng + 1)
-            if p > CLOUD_MIN_LIFT * q:
-                cands[key] = (p, q)
+            cands[key] = (f / ng, (df_all[key] - f + 0.5) / (n - ng + 1))
         out.append(_cloud(cands, df, surfaces, k))
     return out
 
 
 def topic_cloud(terms: list[set], query: str, surfaces: dict, df_all: Counter, background,
                 k: int = CLOUD_SIZE) -> list[dict]:
-    """The whole map's words, by relevance against all of science. background(phrases) -> ({phrase: papers in
-    the corpus that use it}, corpus size), or None (no cloud: against itself, every word has lift 1)."""
+    """The whole map's words against all of science. background(phrases) -> ({phrase: papers in the corpus that
+    use it}, corpus size), or None (no cloud: against itself, every word has lift 1)."""
     if background is None or not terms:
         return []
     qstems = {stem(w) for w in TOKEN.findall(query or "")}
@@ -564,10 +574,8 @@ def topic_cloud(terms: list[set], query: str, surfaces: dict, df_all: Counter, b
         c = counts.get(shown[key])
         if c is None or not N:
             continue
-        p = df_all[key] / n
-        q = max(c, df_all[key]) / N           # the corpus holds the map's papers (and stems more, so may count more)
-        if p > CLOUD_MIN_LIFT * q:
-            cands[key] = (p, q)
+        # the corpus holds the map's papers (and stems more, so it may count more)
+        cands[key] = (df_all[key] / n, max(c, df_all[key]) / N)
     return _cloud(cands, df_all, surfaces, k)
 
 

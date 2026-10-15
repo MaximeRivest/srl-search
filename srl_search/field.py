@@ -861,7 +861,7 @@ class FinalError(Exception):
 
 def build_maps(ctx: Ctx, job: Job, sel: dict, version: str) -> dict:
     from srl_search import topics as T
-    from srl_search.topic_service import finish
+    from srl_search.topic_service import embed_splits, finish
     cit = ctx.cit
     t = time.time()
     job.stage(6, f"grouping {len(sel['papers']):,} papers")
@@ -899,6 +899,7 @@ def build_maps(ctx: Ctx, job: Job, sel: dict, version: str) -> dict:
 
     t = time.time()
     big = [g for g in out["groups"] if g["size"] >= SPLIT_MIN]
+    splits = {}
     by_w = {int(w): i for i, w in enumerate(seed.wids)}
     for j, g in enumerate(big):
         job.stage(7, f"splitting group {g['id']} ({g['size']:,} papers), {j + 1} of {len(big)}")
@@ -911,6 +912,8 @@ def build_maps(ctx: Ctx, job: Job, sel: dict, version: str) -> dict:
         sub.update({"question": q, "mode": "field", "filters": {}, "asked_papers": len(members),
                     "parent": {"group": g["id"], "name": g["name"], "size": g["size"]}})
         _write(dirm / f"group-{g['id']}.json", sub)
+        splits[g["id"]] = sub
+    embed_splits(out, splits)
     _write(dirm / "main.json", out)                    # last: a version with its main map is complete
     job.done_stage(7, t)
     return out

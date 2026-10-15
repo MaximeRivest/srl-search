@@ -115,12 +115,17 @@ weighted by rarity + nearest neighbours in meaning, half each; Leiden, consensus
   `experts` (authors by a position-weighted h-index inside the group: h of their works each cited by ≥ h
   group papers, first author full credit, last author half; OpenAlex's disambiguated authors).
   Papers in lenses carry `in_map` (true: one of the mapped papers; false: a cited work outside them, e.g. a
-  classic without an English abstract). `cloud`: up to 30 words the group uses more than the other groups,
-  most telling first: `t`, `share` (of its papers), `lift` (how many times as often as elsewhere), `score`
-  (LDAvis relevance, lambda 0.4: frequency and lift together; Scimeetr's relative frequency).
+  classic without an English abstract). `cloud`: up to 30 words, most used first (Scimeetr's word clouds): `t`,
+  `share` (of the group's papers that use it), `lift` (how many times as often as in the other groups: above 1
+  more, below 1 less), `score` (LDAvis relevance, lambda 0.4). Two thirds are the group's most frequent words,
+  one third its most telling (used at least 1.5 times as often as elsewhere).
+  `subgroups` (groups of 60+ papers in a 1,000-paper map, 300+ in a whole-field map): how the group divides,
+  each with `id`, `name`, `size`, `years`, `cloud` (against the rest of the group), `lenses`, ...; the same as
+  `group=N` gives (made with the map, so that opens at once). `subgroups_other`: papers in no subgroup.
 - `overall`: the whole topic as one group: `size`, `years`, its own `lenses` (core, rising, start_here, newest,
   experts: from every mapped paper's citations) and `cloud` (the words its papers use more than all of science).
-- `papers`: every mapped paper's `id`, `group` (0 = in no group), `between`, `x`, `y`.
+- `papers`: every mapped paper's `id`, `group` (0 = in no group), `sub` (its subgroup in that group, 0 = none),
+  `between`, `x`, `y`.
 - `coverage` (`with_references`: how many have references in OpenAlex; `references_thin` when under 65%,
   then the groups lean on wording), `method` (resolution, consensus agreement, ...), `timing`.
 `group=N` splits group N of the same map into its own groups. 3–30 s the first time, then cached until the

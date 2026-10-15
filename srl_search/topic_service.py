@@ -40,6 +40,11 @@ CACHE_KEEP = 20000             # files per release (~150 KB each)
 # One answer about a group stays under ~64k characters (~16-20k tokens): AI apps cap a tool's answer (Claude Code at
 # 25k tokens by default) and cut what is over, so pages carry the rest instead.
 PAGE_CHARS = 64_000
+# Groups of a 1,000-paper map at least this big are split when the map is made: the overview shows how each group
+# divides, and "split this group" opens at once (the same split, cached under its own request).
+SPLIT_FROM = 60
+# What the map carries of each subgroup (its papers: papers.sub; the split's own map has everything)
+SUB_KEYS = ("id", "name", "phrases", "size", "years", "typical", "centre", "cites_groups", "between", "cloud", "lenses")
 
 
 def clean_abstract(a: str | None) -> str | None:
@@ -181,9 +186,7 @@ class TopicService:
             mode = "keyword" if self.api.KEYWORDS and self.api.looks_boolean(q) else "semantic"
         if mode == "keyword" and not self.api.KEYWORDS:
             raise HTTPException(503, "keyword search is not built yet")
-        key_obj = [VERSION, q, papers, mode, year_from, year_to, group]
-        key = hashlib.sha256(json.dumps(key_obj).encode()).hexdigest()[:32]
-        path = self.cache / f"{key}.json"
+        path = self._path(q, papers, mode, year_from, year_to, group)
         if path.exists():
             out = json.loads(path.read_text())
             out["cached"] = True
@@ -193,7 +196,7 @@ class TopicService:
             raise HTTPException(409, f"Map {what} first (map_topic, or /topics with the same question and options): "
                                      "reading a group uses that map. Maps are kept until the next nightly data update.")
         with self.locks_guard:
-            lock = self.locks.setdefault(key, threading.Lock())
+            lock = self.locks.setdefault(path.name, threading.Lock())
         with lock:                                     # the same map asked twice at once: computed once
             if path.exists():
                 out = json.loads(path.read_text())
@@ -213,19 +216,26 @@ class TopicService:
                 out["timing"]["all_ms"] = round((time.perf_counter() - t0) * 1000)
             finally:
                 self.slots.release()
-            body = json.dumps(out, ensure_ascii=False, separators=(",", ":"), allow_nan=False)   # never a broken answer
-            try:                                       # a full disk or a removed folder costs the cache, not the answer
-                self.cache.mkdir(parents=True, exist_ok=True)
-                tmp = path.with_suffix(f".tmp{os.getpid()}.{threading.get_ident()}")
-                tmp.write_text(body)
-                os.replace(tmp, path)
-                self._prune()
-            except OSError as e:
-                print(f"topics: not cached ({e})", file=sys.stderr, flush=True)
+            self._store(path, out)
         with self.locks_guard:
-            self.locks.pop(key, None)
+            self.locks.pop(path.name, None)
         out["cached"] = False
         return out
+
+    def _path(self, q, papers, mode, year_from, year_to, group) -> Path:
+        key_obj = [VERSION, q, papers, mode, year_from, year_to, group]
+        return self.cache / f"{hashlib.sha256(json.dumps(key_obj).encode()).hexdigest()[:32]}.json"
+
+    def _store(self, path: Path, out: dict) -> None:
+        body = json.dumps(out, ensure_ascii=False, separators=(",", ":"), allow_nan=False)   # never a broken answer
+        try:                                           # a full disk or a removed folder costs the cache, not the answer
+            self.cache.mkdir(parents=True, exist_ok=True)
+            tmp = path.with_suffix(f".tmp{os.getpid()}.{threading.get_ident()}")
+            tmp.write_text(body)
+            os.replace(tmp, path)
+            self._prune()
+        except OSError as e:
+            print(f"topics: not cached ({e})", file=sys.stderr, flush=True)
 
     def compute(self, q, papers, mode, year_from, year_to) -> dict:
         f = self._filters(year_from, year_to)
@@ -242,15 +252,30 @@ class TopicService:
         raw["timing"]["papers_ms"] = t_seed
         out = self.finish(raw, seed)
         out.update({"question": q, "mode": mode, "filters": f, "asked_papers": papers, **how})
+        t = time.perf_counter()
+        group_of = np.array(out["papers"]["group"])
+        splits = {}
+        for g in out["groups"]:
+            if g["size"] >= SPLIT_FROM:
+                sub = self.compute_group(q, out, g["id"], seed.subset(np.flatnonzero(group_of == g["id"])))
+                self._store(self._path(q, papers, mode, year_from, year_to, g["id"]), sub)
+                splits[g["id"]] = sub
+        embed_splits(out, splits)
+        out["timing"]["subgroups_ms"] = round((time.perf_counter() - t) * 1000)
         return out
 
-    def compute_group(self, q, parent: dict, group: int) -> dict:
+    def compute_group(self, q, parent: dict, group: int, seed: T.Seed | None = None) -> dict:
+        """Group `group` of the map split into its own groups. seed: its papers, already at hand (the map being
+        made): the same as seed_of gives (details and unit vectors), without the closeness to the question."""
         g = next((x for x in parent["groups"] if x["id"] == group), None)
         if g is None:
             raise HTTPException(404, f"no group {group}; this map has groups 1-{len(parent['groups'])}")
         ws = [int(p[1:]) for p, gg in zip(parent["papers"]["id"], parent["papers"]["group"]) if gg == group]
         t = time.perf_counter()
-        seed = self.seed_of(ws)
+        if seed is not None:
+            seed = T.Seed(seed.wids, seed.vecs, seed.has_vec, seed.details, None)
+        else:
+            seed = self.seed_of(ws)
         t_seed = round((time.perf_counter() - t) * 1000)
         opt = T.Options(min_size=max(8, len(ws) // 25), min_groups=2, max_groups=8)
         raw = T.build(seed, self.cit, q, opt, background=self.background())
@@ -370,6 +395,20 @@ def overall_group(out: dict) -> dict | None:
         return None
     name = f"the whole of group {out['parent']['group']}" if out.get("parent") else "the whole topic"
     return {**o, "id": 0, "name": name, "phrases": [x["t"] for x in o.get("cloud", [])[:4]]}
+
+
+def embed_splits(out: dict, splits: dict[int, dict]) -> None:
+    """Each split group's subgroups into the map (SUB_KEYS: what the overview draws and reads, with no other
+    request), and each paper's subgroup: papers.sub (0: in no subgroup, or its group was not split)."""
+    sub_of = {}
+    for sp in splits.values():
+        sub_of.update(zip(sp["papers"]["id"], sp["papers"]["group"]))
+    for g in out["groups"]:
+        sp = splits.get(g["id"])
+        if sp:
+            g["subgroups"] = [{k: x.get(k) for k in SUB_KEYS} for x in sp["groups"]]
+            g["subgroups_other"] = sp["coverage"]["other"]
+    out["papers"]["sub"] = [sub_of.get(pid, 0) for pid in out["papers"]["id"]]
 
 
 def finish(api, cit, raw: dict, seed: T.Seed, release: str) -> dict:
@@ -533,6 +572,10 @@ def as_text(out: dict, base: str, page: int = 1) -> str:
                          + (f" · mostly {yrs[0]}–{yrs[2]}" if yrs else "")
                          + (f" · builds most on groups {uses}" if uses else "")
                          + f" (details on page {next(i for i, pg in enumerate(pages, 1) if g['id'] - 1 + first in pg)})")
+            if g.get("subgroups"):
+                lines.append("  divides into: " + "; ".join(f"{g['id']}.{x['id']} {x['name']} ({x['size']})"
+                                                           for x in g["subgroups"])
+                             + f" (map_topic group={g['id']} for their reading lists)")
         lines.append("")
     else:
         lines += [f"Page {page} of {len(pages)} of the map (page 1 has the groups at a glance).", ""]

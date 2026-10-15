@@ -2,6 +2,7 @@
 the groups are found, named by their own words, their reading lists come from their own citations, and the same
 input always gives the same answer. No index is loaded."""
 import math
+from collections import Counter
 import threading
 import time
 from types import SimpleNamespace
@@ -436,15 +437,34 @@ def test_each_group_has_a_cloud_of_its_own_words():
     group, truth = planted(out)
     for g in out["groups"]:
         planted_g = np.bincount(truth[group == g["id"]]).argmax()
-        words = [w["t"].lower() for w in g["cloud"]]
-        assert any(w in words for w in WORDS[planted_g]), (words, WORDS[planted_g])
-        assert all(w["lift"] >= T.CLOUD_MIN_LIFT and 0 < w["share"] <= 1 for w in g["cloud"])
-        assert [w["score"] for w in g["cloud"]] == sorted((w["score"] for w in g["cloud"]), reverse=True)
-        assert "coral reefs" not in words and "reef" not in words            # the question's words
+        words = {w["t"].lower(): w for w in g["cloud"]}
+        mine = [w for w in WORDS[planted_g] if w in words]
+        assert mine and all(words[w]["lift"] > 10 for w in mine), (words, WORDS[planted_g])   # deep blue
+        # what every group says is in the cloud too, coloured as such (grey: about as often as elsewhere)
+        assert 0.8 < words["reefs matter"]["lift"] < 1.25
+        shares = [w["share"] for w in g["cloud"]]
+        assert shares == sorted(shares, reverse=True) and all(0 < x <= 1 for x in shares)   # biggest first
+        assert "coral reefs" not in words and "reef" not in words                           # the question's words
         others = {w for k, v in WORDS.items() if k != planted_g for w in v}
-        assert not others & set(words)                                         # nothing of the other groups
+        assert not others & set(words)
         # a word standing inside one of its phrases is not shown twice ("bleaching" under "coral bleaching")
         assert not any(w != x and f" {w} " in f" {x} " for w in words for x in words)
+
+
+def test_a_cloud_keeps_room_for_telling_words():
+    # 40 frequent words everyone uses, and 2 rarer ones only this group uses: both rare ones make the cloud
+    df = Counter()
+    cands, surfaces = {}, {}
+    for i in range(40):
+        key = f"common{i}"
+        cands[key], df[key], surfaces[key] = (0.9 - i * 0.01, 0.9 - i * 0.01), 90, Counter({key: 1})
+    for key in ("rare one", "rare two"):
+        cands[key], df[key], surfaces[key] = (0.1, 0.002), 10, Counter({key: 1})
+    out = T._cloud(cands, df, surfaces, 30)
+    names = [w["t"] for w in out]
+    assert len(out) == 30 and "rare one" in names and "rare two" in names
+    assert names[0] == "common0" and names[-2:] == ["rare one", "rare two"]      # sized by frequency
+    assert out[-1]["lift"] == 50 and out[0]["lift"] == 1
 
 
 def test_the_whole_topic_cloud_is_against_all_of_science():
@@ -497,3 +517,29 @@ def test_the_whole_topic_reads_as_group_zero(tmp_path):
         svc.read(old, 0, "lists")
     assert e.value.status_code == 404
     assert "Reading lists of the whole topic" not in as_text(old, "https://api.example")
+
+
+def test_a_map_carries_its_groups_subgroups_the_same_as_splitting_them(tmp_path, monkeypatch):
+    import srl_search.topic_service as S
+    seed, cit = literature(per=80)
+    svc = TopicService(FakeApi(), tmp_path, cit)
+    monkeypatch.setattr(svc, "seed_semantic", lambda q, n, f: (seed, {"matches": None}))
+    out = svc.get("coral reefs")
+    assert out["cached"] is False and "subgroups_ms" in out["timing"]
+    P = out["papers"]
+    assert len(P["sub"]) == len(P["id"])
+    for g in out["groups"]:
+        assert g["size"] >= S.SPLIT_FROM and "subgroups" in g
+        inside = [s for s, gg in zip(P["sub"], P["group"]) if gg == g["id"]]
+        for sg in g["subgroups"]:
+            assert set(sg) == set(S.SUB_KEYS) and sg["lenses"] and sg["cloud"] is not None
+            assert inside.count(sg["id"]) == sg["size"]            # each paper knows its subgroup
+        assert sum(sg["size"] for sg in g["subgroups"]) + g["subgroups_other"] == g["size"]
+    assert all(s == 0 for s, gg in zip(P["sub"], P["group"]) if gg == 0)
+    # splitting a group gives the very same subgroups, from the cache (no new work)
+    monkeypatch.setattr(svc, "compute_group", lambda *a, **k: (_ for _ in ()).throw(AssertionError("computed again")))
+    g = next(g for g in out["groups"] if g["subgroups"])
+    split = svc.get("coral reefs", group=g["id"])
+    assert split["cached"] is True and split["parent"]["group"] == g["id"]
+    assert [x["name"] for x in split["groups"]] == [x["name"] for x in g["subgroups"]]
+    assert "divides into:" in as_text(out, "https://api.example")
