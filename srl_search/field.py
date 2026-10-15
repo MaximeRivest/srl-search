@@ -34,6 +34,7 @@ ROOT/spend.json (Kimi and Jev dollars per day); ROOT/PAUSED (new fields refused,
 """
 from __future__ import annotations
 
+import contextvars
 import fcntl
 import hashlib
 import json
@@ -47,7 +48,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 import numpy as np
@@ -66,9 +67,11 @@ CHECK_CITES = 20                         #   the classics just below the cut-off
 CHECK_USD = float(os.environ.get("SRL_FIELD_CHECK_USD", "0.60"))   # Jev per field (~$0.027 per 1,000 papers);
                                          #   most cited first when a field has more
 DECIDER_N = 10_000                       # papers the decider labels for the students
-BUDGET_USD = float(os.environ.get("SRL_FIELD_BUDGET_USD", "10"))    # teacher spend a day, all jobs together
-EST_USD = TEACHER_USD                    # what a new field is assumed to cost when deciding to accept it
-MAX_QUEUED = 3
+BUDGET_USD = float(os.environ.get("SRL_FIELD_BUDGET_USD", "60"))    # AI spend a day, all jobs: a safety cap
+FREE_USD = float(os.environ.get("SRL_FIELD_FREE_USD", "10"))        # AI spend a day for the free line
+EST_USD = 1.0                            # a new field's AI cost (v5: Kimi ~$0.50 + Jev $0.04-0.60), for planning
+FREE_MAX_QUEUED = 60                     # maps waiting in the free line
+PER_ASKER = 2                            # free maps one reader (the door's per-address code) may have waiting
 POOL = 300_000
 MIN_ON_TOPIC = 15                        # teacher's on-topic answers needed to go on
 CITED_K = 3
@@ -123,27 +126,112 @@ class Pending(Exception):
 
 
 # ------------------------------------------------------------------------------------------------ the store
+# Who asked (the door's anonymous per-address code, X-SRL-Asker): set per request by the API, read by FieldStore.get
+ASKER: contextvars.ContextVar[str | None] = contextvars.ContextVar("srl_field_asker", default=None)
+RESERVED = Path("/run/gpu1-reserved")          # Figurer training has the GPU (srl_search/judges.py waits for it)
+
+
+def _ts(iso: str | None) -> float:
+    try:
+        return datetime.fromisoformat(iso).timestamp() if iso else 0.0
+    except ValueError:
+        return 0.0
+
+
+def _next_midnight(t: float) -> float:
+    """The next local midnight after t (the free line's budget is per local day)."""
+    return datetime.combine(datetime.fromtimestamp(t).date() + timedelta(days=1), datetime.min.time()).timestamp()
+
+
 class FieldStore:
-    """What the search API does with whole-field maps: read finished ones, report progress, queue new jobs."""
+    """What the search API does with whole-field maps: read finished ones, report progress, queue new jobs; and the
+    plan the worker follows. Two lines: maps paid for (ROOT/paid/<key>.json, written by the site's door once Stripe
+    says the payment went through) go first, in the order they were paid; the free line follows in the order asked,
+    as long as today's free budget (FREE_USD of AI) lasts, then tomorrow's. Map rebuilds (no AI) go with the free
+    line but need no budget."""
 
     def __init__(self, root: Path = ROOT):
         self.root = Path(root)
         (self.root / "queue").mkdir(parents=True, exist_ok=True)
 
-    def spent_today(self) -> float:
-        return float((_read(self.root / "spend.json") or {}).get(date.today().isoformat(), 0.0))
+    def spent_today(self, lane: str | None = None) -> float:
+        today = date.today().isoformat()
+        if lane is None:
+            return float((_read(self.root / "spend.json") or {}).get(today, 0.0))
+        return float(((_read(self.root / "spend_lanes.json") or {}).get(today) or {}).get(lane, 0.0))
 
     def queued(self) -> list[str]:
         return [p.stem for p in sorted((self.root / "queue").glob("*.job"), key=lambda p: p.stat().st_mtime)]
 
+    def paid(self, key: str) -> dict | None:
+        """The payment that moved this map to the paid line (accepted: the map was waiting when it was paid)."""
+        m = _read(self.root / "paid" / f"{key}.json")
+        return m if m and m.get("accepted") else None
+
+    def credit(self, key: str) -> str | None:
+        m = self.paid(key)
+        return (m.get("name") or None) if m and m.get("name_ok") else None
+
+    def lane(self, key: str, st: dict) -> str:
+        if self.paid(key):
+            return "paid"
+        return "rebuild" if st.get("kind") == "map" else "free"
+
+    def plan(self, now: float | None = None) -> dict:
+        """When each waiting map should start and be ready, by simulating the worker: the running map finishes;
+        then paid maps, then rebuilds and the free line while today's free budget lasts (an estimate: maps paid for
+        later go ahead of the free line)."""
+        now = now or time.time()
+        running, waiting = None, []
+        for k in self.queued():
+            st = _read(self.root / k / "job.json") or {}
+            if st.get("status") == "running":
+                left = max(60.0, float(st.get("eta_s") or 0) - (now - _ts(st.get("updated"))))
+                running = {"key": k, "st": st, "left": left, "lane": st.get("lane") or self.lane(k, st)}
+            elif st.get("status") == "queued":
+                waiting.append({"key": k, "st": st, "lane": self.lane(k, st)})
+        prio = {"paid": 0, "rebuild": 1, "free": 1}
+        waiting.sort(key=lambda j: (prio[j["lane"]], _ts((self.paid(j["key"]) or {}).get("paid_at"))
+                                    if j["lane"] == "paid" else _ts(j["st"].get("created"))))
+        t = now + (running["left"] if running else 60)       # a worker starting loads ~15 GB first (~1 min)
+        free_left = FREE_USD - self.spent_today("free") - (0.5 * EST_USD if running and running["lane"] == "free" else 0)
+        todo, out = list(waiting), []
+        while todo:
+            pick = next((j for j in todo if j["lane"] != "free" or free_left >= 0.5 * EST_USD), None)
+            if pick is None:                                 # only free maps left and today's budget is spent
+                t, free_left = _next_midnight(t), FREE_USD
+                continue
+            todo.remove(pick)
+            if pick["lane"] == "free":
+                free_left -= EST_USD
+            dur = job_seconds(pick["st"].get("kind"))
+            out.append({**pick, "start": t, "ready": t + dur})
+            t += dur
+        paid_ahead = sum(job_seconds(j["st"].get("kind")) for j in out if j["lane"] == "paid")
+        return {"now": now, "running": running, "waiting": out,
+                "paid_ready_s": (running["left"] if running else 60) + paid_ahead + job_seconds("full"),
+                "gpu_reserved": RESERVED.exists()}
+
     def status(self, key: str) -> dict | None:
         st = _read(self.root / key / "job.json")
-        if st and st.get("status") == "queued":
-            q = self.queued()
-            st["position"] = q.index(key) + 1 if key in q else None
-            ahead = q[:q.index(key)] if key in q else []
-            st["eta_s"] = sum(job_seconds((_read(self.root / k / "job.json") or {}).get("kind")) for k in ahead) \
-                + job_seconds(st.get("kind")) + (60 if not ahead else 0)    # + the worker starting
+        if not st:
+            return None
+        st = {k: v for k, v in st.items() if k != "asker"}
+        if st.get("status") in ("queued", "running"):
+            pl = self.plan()
+            mine = next((j for j in pl["waiting"] if j["key"] == key), None)
+            st["lane"] = st.get("lane") or self.lane(key, st)
+            if mine:
+                same = [j for j in pl["waiting"] if j["lane"] == mine["lane"] or {j["lane"], mine["lane"]} == {"free", "rebuild"}]
+                st["position"] = [j["key"] for j in same].index(key) + 1
+                st["start_s"] = round(mine["start"] - pl["now"])
+                st["eta_s"] = round(mine["ready"] - pl["now"])
+                if mine["lane"] != "paid":
+                    st["paid_eta_s"] = round(pl["paid_ready_s"])
+            st["gpu_reserved"] = pl["gpu_reserved"]
+            st["free_per_day"] = round(FREE_USD / EST_USD)
+        if self.credit(key):
+            st["credit"] = self.credit(key)
         return st
 
     def get(self, q: str, definition: str | None, keywords: str | None, version: str, group: int | None,
@@ -153,7 +241,10 @@ class FieldStore:
         main = d / "maps" / version / "main.json"
         if main.exists():
             if group is None:
-                return _read(main)
+                out = _read(main)
+                if self.credit(key):
+                    out["field"] = {**out.get("field", {}), "credit": self.credit(key)}
+                return out
             sub = d / "maps" / version / f"group-{group}.json"
             if sub.exists():
                 return _read(sub)
@@ -169,26 +260,74 @@ class FieldStore:
         if st and st.get("status") == "failed" and st.get("final"):
             raise HTTPException(422, st.get("error") or "this topic cannot be mapped as a whole field")
         if not start:
-            raise HTTPException(409, "No whole-field map of this topic yet: ask for it without read= to start one "
-                                     "(it takes about half an hour).")
+            raise HTTPException(409, "No whole-field map of this topic yet: ask for it without read= to start one.")
         kind = "map" if (d / "field.json").exists() else "full"
+        asker = ASKER.get()
         if kind == "full" and paused(self.root):
             raise HTTPException(503, paused(self.root) + " Whole-field maps already made still open; the 1,000-paper "
                                      "map works for any topic.", headers={"Retry-After": "86400"})
         if kind == "full":
-            queued_full = sum(1 for k in self.queued() if (_read(self.root / k / "job.json") or {}).get("kind") == "full")
-            if len(self.queued()) >= MAX_QUEUED:
-                raise HTTPException(503, f"{MAX_QUEUED} whole-field maps are already waiting. Try again later; the "
-                                         "1,000-paper map of the topic works right away.", headers={"Retry-After": "1800"})
-            if self.spent_today() + EST_USD * (queued_full + 1) > BUDGET_USD:
-                raise HTTPException(503, "Today's budget for whole-field maps is used up (each costs a few dollars of "
-                                         "AI judgments). Try again tomorrow; the 1,000-paper map works right away.",
-                                    headers={"Retry-After": "21600"})
+            waiting = [(_read(self.root / k / "job.json") or {}) for k in self.queued()]
+            free = [w for w in waiting if w.get("status") == "queued" and w.get("kind") == "full"
+                    and not self.paid(w.get("key", ""))]
+            if len(free) >= FREE_MAX_QUEUED:
+                raise HTTPException(503, f"The free line is full ({FREE_MAX_QUEUED} whole-field maps waiting). Try again "
+                                         "in a few hours; the 1,000-paper map of the topic works right away.",
+                                    headers={"Retry-After": "7200"})
+            if asker and sum(1 for w in free if w.get("asker") == asker) >= PER_ASKER:
+                raise HTTPException(429, f"You already have {PER_ASKER} whole-field maps waiting in the free line: ask "
+                                         "for another once one of them is made.", headers={"Retry-After": "3600"})
         st = {"status": "queued", "kind": kind, "key": key, "created": _now(), "version": version,
               "request": {"q": q, "definition": definition, "keywords": keywords}}
+        if asker:
+            st["asker"] = asker
         _write(d / "job.json", st)
         (self.root / "queue" / f"{key}.job").write_text(key)
         raise Pending(self.status(key) or st)
+
+    def queue_view(self) -> dict:
+        """The public line: what is being made, what waits (topics are public, as the maps will be), today's count."""
+        pl = self.plan()
+
+        def row(j: dict, pos: int | None = None) -> dict:
+            st, req = j["st"], j["st"].get("request") or {}
+            r = {"key": j["key"], "topic": req.get("q"), "definition": req.get("definition"), "line": j["lane"],
+                 "kind": st.get("kind"), "asked": st.get("created")}
+            if pos is not None:
+                r.update({"position": pos, "start_s": round(j["start"] - pl["now"]), "ready_s": round(j["ready"] - pl["now"])})
+            if self.credit(j["key"]):
+                r["credit"] = self.credit(j["key"])
+            return r
+        run = pl["running"]
+        today = date.today().isoformat()
+        made_today = sum(1 for p in self.root.glob("*/job.json")
+                         if ((_read(p) or {}).get("status") == "done"
+                             and str((_read(p) or {}).get("finished", "")).startswith(today)))
+        return {"running": {**row(run), "stage": run["st"].get("stage"), "stage_index": run["st"].get("stage_index"),
+                            "stages": len(STAGES), "ready_s": round(run["left"])} if run else None,
+                "waiting": [row(j, i + 1) for i, j in enumerate(pl["waiting"])],
+                "paid_ready_s": round(pl["paid_ready_s"]), "gpu_reserved": pl["gpu_reserved"],
+                "free_per_day": round(FREE_USD / EST_USD), "made_today": made_today}
+
+    def made(self) -> list[dict]:
+        """Every whole-field map made, newest first (the public library)."""
+        out = []
+        for p in self.root.glob("*/job.json"):
+            st = _read(p) or {}
+            if st.get("status") != "done" or not (p.parent / "field.json").exists():
+                continue
+            req, summ = st.get("request") or {}, st.get("summary") or {}
+            out.append({"key": p.parent.name, "topic": req.get("q"), "definition": req.get("definition"),
+                        "papers": summ.get("papers"), "groups": summ.get("groups"), "made": st.get("finished"),
+                        "credit": self.credit(p.parent.name)})
+        return sorted(out, key=lambda r: r.get("made") or "", reverse=True)
+
+    def remove(self, key: str, reason: str) -> None:
+        """Moderation: take a waiting topic out of the line (its text is public)."""
+        (self.root / "queue" / f"{key}.job").unlink(missing_ok=True)
+        st = _read(self.root / key / "job.json") or {}
+        st.update({"status": "failed", "final": True, "error": reason, "finished": _now()})
+        _write(self.root / key / "job.json", st)
 
 
 STAGES_TOTAL = sum(s for _, s in STAGES)
@@ -202,10 +341,12 @@ def job_seconds(kind: str | None) -> int:
 def pending_text(st: dict, q: str, base: str) -> str:
     """What an AI or a person reads while a whole-field map is being made."""
     eta = int(st.get("eta_s") or job_seconds(st.get("kind")))
-    where = (f"{st['position']} in line" if st.get("status") == "queued" and st.get("position")
+    line = "the paid line" if st.get("lane") == "paid" else "the free line"
+    where = (f"{st['position']} in {line}" if st.get("status") == "queued" and st.get("position")
              else f"step {st.get('stage_index', 0) + 1} of {len(STAGES)} ({st.get('stage', 'starting')})")
+    when = f"about {max(1, round(eta / 60))} more minutes" if eta < 5400 else f"about {round(eta / 3600)} hours"
     return (f"# Whole-field map of “{q}”: being made\n\n"
-            f"Status: {st.get('status')}, {where}. About {max(1, round(eta / 60))} more minutes. "
+            f"Status: {st.get('status')}, {where}; ready in {when}. "
             + (f"{st['detail']}. " if st.get("detail") else "") +
             "It finds every paper of the field (not just the 1,000 closest): papers close in meaning, judged one by "
             "one by an AI classifier, the topic's exact phrases, and the studies the field cites (which reach papers "
@@ -215,15 +356,19 @@ def pending_text(st: dict, q: str, base: str) -> str:
             f"{base}/topics/{urllib.parse.quote(q)}\n")
 
 
-def _spend(root: Path, usd: float) -> None:
-    """Add to today's teacher spend (all jobs, for the daily budget)."""
-    path = root / "spend.json"
+def _spend(root: Path, usd: float, lane: str = "free") -> None:
+    """Add to today's AI spend: spend.json (all jobs, for the safety cap) and spend_lanes.json (by line: the free
+    line has its own daily budget; paid maps pay for themselves)."""
     with open(root / "spend.lock", "w") as lk:
         fcntl.flock(lk, fcntl.LOCK_EX)
-        led = _read(path) or {}
         today = date.today().isoformat()
+        led = _read(root / "spend.json") or {}
         led[today] = round(led.get(today, 0.0) + usd, 4)
-        _write(path, led)
+        _write(root / "spend.json", led)
+        lanes = _read(root / "spend_lanes.json") or {}
+        day = lanes.setdefault(today, {})
+        day[lane] = round(day.get(lane, 0.0) + usd, 4)
+        _write(root / "spend_lanes.json", lanes)
 
 
 # ------------------------------------------------------------------------------------------------ the worker
@@ -460,7 +605,7 @@ def select_field(ctx: Ctx, job: Job, q: str, definition: str | None, keywords: s
     lab = teacher.label(texts_sw, q, definition)
     secs = [round(time.time() - t_label, 1)]
     spent = teacher.usd
-    _spend(job.dir.parent, spent)
+    _spend(job.dir.parent, spent, job.st.get("lane", "free"))
     labels = {int(w): float(x) for w, x in zip(sw, lab) if not math.isnan(x)}
     on_pool = np.nan_to_num(lab[:len(sw_pool)]) >= 0.5
     last = bucket == bucket.max()
@@ -520,7 +665,7 @@ def select_field(ctx: Ctx, job: Job, q: str, definition: str | None, keywords: s
     t_label = time.time()
     lab2 = teacher.label(texts_r2, q, definition)
     secs.append(round(time.time() - t_label, 1))
-    _spend(job.dir.parent, teacher.usd - spent)
+    _spend(job.dir.parent, teacher.usd - spent, job.st.get("lane", "free"))
     labels.update({int(w): float(x) for w, x in zip(r2, lab2) if not math.isnan(x)})
     report["teacher_labels"] = {"papers": len(labels), "on_topic": int(sum(v >= 0.5 for v in labels.values())),
                                 "first_round": int(len(sw)), "cited": int(len(sw_cit)),
@@ -620,7 +765,7 @@ def select_field(ctx: Ctx, job: Job, q: str, definition: str | None, keywords: s
     jev = J.Jev(min(CHECK_USD, max(0.0, BUDGET_USD - FieldStore(job.dir.parent).spent_today())))
     t_jev = time.time()
     jl = jev.label(pairs_of(univ[chk]), q, definition) if len(chk) else np.zeros(0)
-    _spend(job.dir.parent, jev.usd)
+    _spend(job.dir.parent, jev.usd, job.st.get("lane", "free"))
     checked = {}
     for i, v in zip(chk, jl):
         if v == v:
@@ -768,7 +913,11 @@ def run_job(ctx: Ctx, store: Path, key: str) -> None:
 
 
 def worker(store: Path = ROOT) -> None:
-    """Run queued jobs one at a time until the queue is empty (started by the srl-fields path unit)."""
+    """Run waiting maps one at a time in the plan's order (FieldStore.plan: paid first, then the free line while
+    today's free budget lasts) until none is waiting. When only free maps wait and today's budget is spent, it
+    frees its memory and waits for the budget (it stays running, so the path unit does not restart it in a loop).
+    A paid map that fails for a reason other than the topic itself is tried once more."""
+    import gc
     store.mkdir(parents=True, exist_ok=True)
     lock = open(store / "worker.lock", "w")
     try:
@@ -776,18 +925,39 @@ def worker(store: Path = ROOT) -> None:
     except BlockingIOError:
         print("another worker is running", flush=True)
         return
+    fs = FieldStore(store)
     ctx = None
     while True:
-        jobs = sorted((store / "queue").glob("*.job"), key=lambda p: p.stat().st_mtime)
-        if not jobs:
+        for k in fs.queued():                          # a queue file whose job is no longer waiting: stale
+            if (_read(store / k / "job.json") or {}).get("status") not in ("queued", "running"):
+                (store / "queue" / f"{k}.job").unlink(missing_ok=True)
+        pl = fs.plan()
+        if not pl["waiting"]:
             return
-        key = jobs[0].stem
+        nxt = pl["waiting"][0]
+        if nxt["start"] - pl["now"] > 120:             # only free maps wait, for tomorrow's budget
+            if ctx is not None:
+                ctx = None
+                gc.collect()
+            print(f"free budget spent for today; next map in {round((nxt['start'] - pl['now']) / 60)} min", flush=True)
+            time.sleep(30)                             # a map paid for meanwhile starts at once
+            continue
+        key, lane = nxt["key"], nxt["lane"]
+        st = _read(store / key / "job.json") or {}
+        st["lane"] = lane
+        _write(store / key / "job.json", st)
         ctx = ctx or Ctx()
-        print(f"job {key}: {(_read(store / key / 'job.json') or {}).get('request')}", flush=True)
+        print(f"job {key} ({lane}): {st.get('request')}", flush=True)
         try:
             run_job(ctx, store, key)
         finally:
-            jobs[0].unlink(missing_ok=True)
+            st = _read(store / key / "job.json") or {}
+            if lane == "paid" and st.get("status") == "failed" and not st.get("final") and not st.get("retried"):
+                print(f"job {key}: paid, failed ({st.get('error')}); once more", flush=True)
+                st.update({"status": "queued", "retried": True, "error": None})
+                _write(store / key / "job.json", st)
+            else:
+                (store / "queue" / f"{key}.job").unlink(missing_ok=True)
 
 
 def main(argv: list[str]) -> None:

@@ -98,6 +98,18 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["GET", "P
 PAGE = Path(__file__).resolve().parent.parent / "web" / "index.html"
 GUIDE = Path(__file__).resolve().parent.parent / "web" / "llms.txt"
 
+
+@app.middleware("http")
+async def field_asker(request, call_next):
+    """The site's door sends an anonymous per-address code (X-SRL-Asker) so one reader can't fill the free line of
+    whole-field maps; direct callers (tailnet) have none and no such limit."""
+    from srl_search.field import ASKER
+    tok = ASKER.set(request.headers.get("x-srl-asker") or None)
+    try:
+        return await call_next(request)
+    finally:
+        ASKER.reset(tok)
+
 # Parameter documentation, shared by /search and /similar
 D_K = "Number of results, 1-100. No paging: ask for up to 100 at once."
 D_COLLECTION = "all (default) or smr: only papers ScienceMadeReadable can open (PubMed Central, CC BY, research articles)."
@@ -613,6 +625,36 @@ def topics(q: str = Query(..., min_length=2, max_length=2000, description=D_TOPI
                              "message": "The whole-field map is being made; ask again later (the same request)."},
                             status_code=202, headers={"Retry-After": "60"})
     return svc.read(out, read, part, page, abstracts) if read else out
+
+
+@app.get("/fields/queue")
+def fields_queue():
+    """Whole-field maps being made and waiting, in order, with when each should be ready. Two lines: maps paid for
+    on sciencemadereadable.com go first; the free line follows (about `free_per_day` maps a day). Topics in the
+    line are public, as their maps will be."""
+    return JSONResponse(topics_service().field_store().queue_view(), headers={"Cache-Control": "no-store"})
+
+
+_FIELD_VECS: dict[str, np.ndarray] = {}
+
+
+@app.get("/fields")
+def fields_made(q: str | None = Query(None, max_length=500, description="Words or a question: the maps closest in "
+                                      "meaning first (score: 0-1 similarity of the topics)."),
+                limit: int = Query(50, ge=1, le=500)):
+    """Every whole-field map made so far (public: anyone can open them with /topics?scope=field and the same topic
+    and definition), newest first, or closest to q."""
+    rows = topics_service().field_store().made()
+    if q and rows:
+        for r in rows:
+            if r["key"] not in _FIELD_VECS:
+                text = r["topic"] + (f": {r['definition']}" if r.get("definition") else "")
+                _FIELD_VECS[r["key"]] = engine.encoder.encode(text)[0]
+        qv = engine.encoder.encode(q)[0]
+        for r in rows:
+            r["score"] = round(float(np.dot(qv, _FIELD_VECS[r["key"]])), 3)
+        rows.sort(key=lambda r: -r["score"])
+    return JSONResponse({"maps": rows[:limit], "total": len(rows)}, headers={"Cache-Control": "no-store"})
 
 
 @app.get("/topics/{q:path}", response_class=PlainTextResponse)
