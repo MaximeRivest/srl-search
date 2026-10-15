@@ -158,3 +158,8 @@ agreement). Opus is lenient on fragmentation (island invasions, sea-cucumber fis
 and Astra (99.8% the same answers as each other) on LLM post-training (an LLM-based malware detector counted as
 post-training). Unreadable answers (not one of the labels): Haiku 20, Sonnet 12, Opus 4, others 0. Caveats: two topics;
 the majority favours whoever thinks like most judges (Sol and Astra vote alike, as two votes).
+
+Our models on the same papers, scored against the majority of all eight (they do not vote): per-topic decider
+F1 0.83 (fragmentation) / 0.63 (LLM post-training), landmarks 89%; general 0.8B 0.71 / 0.67, 82%; general 2B
+0.86 / 0.68, 91%. The 2B sits mid-pack: about Jev's level on fragmentation, above Haiku, Sol and Astra on LLM
+post-training, below Kimi, Jev, Opus, Sonnet and Luna there.
