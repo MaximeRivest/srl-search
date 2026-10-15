@@ -208,9 +208,12 @@ class FieldStore:
             out.append({**pick, "start": t, "ready": t + dur})
             t += dur
         paid_ahead = sum(job_seconds(j["st"].get("kind")) for j in out if j["lane"] == "paid")
+        # the GPU is taken (Figurer's training reservation, or the running map waits for memory other work holds):
+        # no one can say when it frees, so no promise of a time, and no offer to pay for one
+        gpu_busy = RESERVED.exists() or bool(running and str(running["st"].get("detail", "")).startswith("waiting for"))
         return {"now": now, "running": running, "waiting": out,
                 "paid_ready_s": (running["left"] if running else 60) + paid_ahead + job_seconds("full"),
-                "gpu_reserved": RESERVED.exists()}
+                "gpu_reserved": gpu_busy}
 
     def status(self, key: str) -> dict | None:
         st = _read(self.root / key / "job.json")
