@@ -133,3 +133,28 @@ on these two topics: a little worse on fragmentation (lists 77% vs 80%, "start h
 0.84 vs 0.93), better where today's map fails (LLM post-training lists 55% vs 48%, 1 off-topic group vs 4), worse in
 map-wide precision there (0.48 vs 0.55). It costs GPU time instead: ~17 min of selection in the replay vs ~8 min for a
 real run today (two extra vLLM passes: the teacher's 400 and ~19k checked papers), so a map takes ~25 min.
+
+## Eight judges compared (`subs.py`, `compare.py`, `compare.json`, 2026-10-15)
+
+Same question for all (the pipeline's instruction, one label). 300 papers per held-out topic drawn in proportion from
+the stratified population samples (weights kept) + the 44 landmarks. Claude Opus/Sonnet/Haiku 5.5 through the Claude
+Code login (reasoning off), GPT-6.1 Sol / GPT-6 Astra / Luna through the ChatGPT/Codex login (reasoning low; that
+backend refuses an output cap). 3,870 subscription answers, ~40 min; Claude 5-hour window 8% -> 13%, ChatGPT 1% -> 2%.
+No judge is the truth: each is scored against the majority of the other seven, weighted to the population.
+
+| Judge | Fragmentation agree / P / R / F1 | LLM post-training agree / P / R / F1 | Landmarks | s/answer | Cost |
+|---|---:|---:|---:|---:|---|
+| Kimi K3 | 98.2% / 0.81 / 0.98 / 0.89 | 99.0% / 0.93 / 0.88 / 0.91 | 100% | 1-4 | ~$1.20 / 1,000 |
+| Jev | 97.8% / 0.88 / 0.82 / 0.85 | 98.5% / 0.93 / 0.76 / 0.84 | 95% | <0.1 | ~$0.03 / 1,000 |
+| Opus 5.5 | 94.6% / 0.57 / 0.95 / 0.71 | 97.9% / 0.76 / 0.89 / 0.82 | 98% | 1.7 | subscription |
+| Sonnet 5.5 | 98.4% / 0.99 / 0.80 / 0.88 | 98.0% / 0.97 / 0.64 / 0.77 | 98% | 1.3 | subscription |
+| Haiku 5.5 | 97.1% / 0.80 / 0.79 / 0.80 | 95.8% / 0.50 / 0.73 / 0.59 | 98% | 1.1 | subscription |
+| GPT-6.1 Sol | 98.7% / 0.86 / 0.97 / 0.91 | 92.8% / 0.41 / 1.00 / 0.58 | 98% | 2.1 | subscription |
+| GPT-6 Astra | 98.7% / 0.85 / 0.97 / 0.91 | 92.7% / 0.40 / 1.00 / 0.58 | 95% | 2.4 | subscription |
+| GPT-6 Luna | 97.3% / 0.94 / 0.69 / 0.79 | 97.3% / 0.74 / 0.75 / 0.75 | 93% | 1.5 | subscription |
+
+Kimi is the most consistent with the others on both topics. Sonnet is strict and nearly a copy of Jev (98.1%
+agreement). Opus is lenient on fragmentation (island invasions, sea-cucumber fishing counted as fragmentation); Sol
+and Astra (99.8% the same answers as each other) on LLM post-training (an LLM-based malware detector counted as
+post-training). Unreadable answers (not one of the labels): Haiku 20, Sonnet 12, Opus 4, others 0. Caveats: two topics;
+the majority favours whoever thinks like most judges (Sol and Astra vote alike, as two votes).

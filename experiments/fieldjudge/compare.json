@@ -1,0 +1,178 @@
+{
+ "judges": {
+  "kimi-k3": {
+   "seconds_median": null,
+   "frag": {
+    "agree_with_others": 0.982,
+    "precision": 0.809,
+    "recall": 0.977,
+    "f1": 0.885,
+    "unreadable": 0
+   },
+   "llm": {
+    "agree_with_others": 0.99,
+    "precision": 0.934,
+    "recall": 0.884,
+    "f1": 0.908,
+    "unreadable": 0
+   },
+   "landmarks": 1.0
+  },
+  "jev": {
+   "seconds_median": null,
+   "frag": {
+    "agree_with_others": 0.978,
+    "precision": 0.88,
+    "recall": 0.823,
+    "f1": 0.851,
+    "unreadable": 0
+   },
+   "llm": {
+    "agree_with_others": 0.985,
+    "precision": 0.933,
+    "recall": 0.76,
+    "f1": 0.838,
+    "unreadable": 0
+   },
+   "landmarks": 0.955
+  },
+  "opus-5.5": {
+   "seconds_median": 1.7,
+   "frag": {
+    "agree_with_others": 0.946,
+    "precision": 0.57,
+    "recall": 0.953,
+    "f1": 0.714,
+    "unreadable": 0
+   },
+   "llm": {
+    "agree_with_others": 0.979,
+    "precision": 0.758,
+    "recall": 0.889,
+    "f1": 0.818,
+    "unreadable": 4
+   },
+   "landmarks": 0.977
+  },
+  "sonnet-5.5": {
+   "seconds_median": 1.26,
+   "frag": {
+    "agree_with_others": 0.984,
+    "precision": 0.991,
+    "recall": 0.796,
+    "f1": 0.883,
+    "unreadable": 3
+   },
+   "llm": {
+    "agree_with_others": 0.98,
+    "precision": 0.97,
+    "recall": 0.642,
+    "f1": 0.772,
+    "unreadable": 9
+   },
+   "landmarks": 0.977
+  },
+  "haiku-5.5": {
+   "seconds_median": 1.13,
+   "frag": {
+    "agree_with_others": 0.971,
+    "precision": 0.799,
+    "recall": 0.794,
+    "f1": 0.796,
+    "unreadable": 9
+   },
+   "llm": {
+    "agree_with_others": 0.958,
+    "precision": 0.497,
+    "recall": 0.729,
+    "f1": 0.591,
+    "unreadable": 11
+   },
+   "landmarks": 0.977
+  },
+  "sol-6.1": {
+   "seconds_median": 2.09,
+   "frag": {
+    "agree_with_others": 0.987,
+    "precision": 0.859,
+    "recall": 0.974,
+    "f1": 0.913,
+    "unreadable": 0
+   },
+   "llm": {
+    "agree_with_others": 0.928,
+    "precision": 0.406,
+    "recall": 1.0,
+    "f1": 0.577,
+    "unreadable": 0
+   },
+   "landmarks": 0.977
+  },
+  "astra-6": {
+   "seconds_median": 2.36,
+   "frag": {
+    "agree_with_others": 0.987,
+    "precision": 0.854,
+    "recall": 0.974,
+    "f1": 0.91,
+    "unreadable": 0
+   },
+   "llm": {
+    "agree_with_others": 0.927,
+    "precision": 0.404,
+    "recall": 1.0,
+    "f1": 0.576,
+    "unreadable": 0
+   },
+   "landmarks": 0.955
+  },
+  "luna-6": {
+   "seconds_median": 1.48,
+   "frag": {
+    "agree_with_others": 0.973,
+    "precision": 0.935,
+    "recall": 0.687,
+    "f1": 0.792,
+    "unreadable": 0
+   },
+   "llm": {
+    "agree_with_others": 0.973,
+    "precision": 0.744,
+    "recall": 0.751,
+    "f1": 0.748,
+    "unreadable": 0
+   },
+   "landmarks": 0.932
+  }
+ },
+ "pairs": {
+  "kimi-k3 ~ opus-5.5": 0.96,
+  "kimi-k3 ~ sonnet-5.5": 0.977,
+  "kimi-k3 ~ sol-6.1": 0.96,
+  "kimi-k3 ~ luna-6": 0.967,
+  "jev ~ kimi-k3": 0.978,
+  "jev ~ opus-5.5": 0.951,
+  "jev ~ sonnet-5.5": 0.981,
+  "jev ~ sol-6.1": 0.952,
+  "jev ~ luna-6": 0.969,
+  "opus-5.5 ~ sonnet-5.5": 0.953,
+  "opus-5.5 ~ sol-6.1": 0.939,
+  "haiku-5.5 ~ kimi-k3": 0.962,
+  "haiku-5.5 ~ jev": 0.962,
+  "haiku-5.5 ~ opus-5.5": 0.937,
+  "haiku-5.5 ~ sonnet-5.5": 0.968,
+  "haiku-5.5 ~ sol-6.1": 0.946,
+  "haiku-5.5 ~ luna-6": 0.961,
+  "sol-6.1 ~ sonnet-5.5": 0.956,
+  "astra-6 ~ kimi-k3": 0.959,
+  "astra-6 ~ jev": 0.952,
+  "astra-6 ~ opus-5.5": 0.939,
+  "astra-6 ~ sonnet-5.5": 0.956,
+  "astra-6 ~ haiku-5.5": 0.945,
+  "astra-6 ~ sol-6.1": 0.998,
+  "astra-6 ~ luna-6": 0.95,
+  "luna-6 ~ opus-5.5": 0.939,
+  "luna-6 ~ sonnet-5.5": 0.971,
+  "luna-6 ~ sol-6.1": 0.951
+ }
+}
