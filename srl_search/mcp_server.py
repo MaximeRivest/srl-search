@@ -162,7 +162,7 @@ How to search well:
 - Rewrite casual questions in the language of a paper before searching ("how to lose weight" -> "effectiveness of dietary and exercise interventions for weight loss in adults"). This is the biggest quality gain.
 - Questions and descriptions: search by meaning (the default). Exact names, genes, drugs, acronyms, phrases: quotes or AND / OR / NOT, which search exact words. For a review, do both.
 - Screen with abstracts="short" or "none", then get_papers for the ones you keep. Snowball from the best 2-3 with find_similar_papers and citation_walk.
-- Start with the landscape, not a flat list. For any question about a field, a topic, "what does research say", a review or a reading list, call map_topic first: it groups the ~1,000 papers closest to the topic into research groups (by what they cite and what they say) and gives every group's reading lists (start here, core, rising, only here, bridges, newest) and experts. Then go deep: read_topic_group on every group that bears on the question, part="lists" (the lists with full abstracts) and part="papers" page by page (all of the group's papers with full abstracts, most central first) until you have read the group. Split a large or mixed group with map_topic group=N. Then search_papers with each group's own phrases, citation_walk from its key papers, get_papers for full records. You have the context to read hundreds of abstracts: do it, and answer from what you read, organised by group (how the field divides, what each group found, where they disagree, who the experts are), citing every claim.
+- Start with the landscape, not a flat list. For any question about a field, a topic, "what does research say", a review or a reading list, call map_topic first: it groups the ~1,000 papers closest to the topic into research groups (by what they cite and what they say) and gives every group's reading lists (start here, core, rising, only here, bridges, newest) and experts, the same lists for the whole topic, and the words that set each group apart. Then go deep: read_topic_group with group=0 (the whole topic's lists, with abstracts), then on every group that bears on the question, part="lists" (the lists with full abstracts) and part="papers" page by page (all of the group's papers with full abstracts, most central first) until you have read the group. Split a large or mixed group with map_topic group=N. Then search_papers with each group's own phrases, citation_walk from its key papers, get_papers for full records. You have the context to read hundreds of abstracts: do it, and answer from what you read, organised by group (how the field divides, what each group found, where they disagree, who the experts are), citing every claim.
 - For a thorough review of a whole field (all its papers, not the ~1,000 closest), map_topic with scope="whole_field": it is made once in the background (~15-40 minutes; the answer says so: tell the user, work from the quick map meanwhile, and ask again later), then opens instantly. Its groups are split into subgroups: read the subgroups (map_topic with group=N and the same scope) and read_topic_group with the same scope.
 - Judge papers from the record: reviews vs single studies, citations relative to age, venue. A record flagged as junk is probably not scholarship. Citation counts are not proof that a paper is right.
 - Cite the DOI link when there is one, else the OpenAlex link, copied from these results. Never invent details a record lacks.
@@ -334,8 +334,9 @@ How to search well:
         which groups it builds on, and its full reading lists computed from its own papers' citations — start here
         (recent papers citing most of the group's key works, often reviews), core (its foundations), rising,
         only here (what sets it apart), bridges (to other groups), newest — and its experts (authors with the
-        highest position-weighted h-index inside the group). Use it first for any question about a field, then
-        read the relevant groups in depth with read_topic_group. Long maps come in pages (page 1 lists every group
+        highest position-weighted h-index inside the group). The same lists for the whole topic come first, with
+        the words that set it apart from the rest of science. Use it first for any question about a field, then
+        read the relevant groups in depth with read_topic_group (group=0: the whole topic's lists). Long maps come in pages (page 1 lists every group
         at a glance): read every page. 3-30 s the first time (then cached); counts as 5 calls."""
         from srl_search.field import Pending, pending_text
         field = scope == "whole_field"
@@ -349,7 +350,8 @@ How to search well:
     @server.tool(title="Read one research group in depth", annotations=READ_ONLY, structured_output=False)
     async def read_topic_group(
         topic: Annotated[str, Field(min_length=2, max_length=2000, description="The same topic as in map_topic.")],
-        group: Annotated[int, Field(ge=1, le=50, description="The group to read (its number in the map).")],
+        group: Annotated[int, Field(ge=0, le=50, description=(
+            "The group to read (its number in the map); 0: the whole topic's reading lists (part=lists only)."))],
         part: Annotated[Literal["lists", "papers"], Field(description=(
             "lists: the group's reading lists, each paper with its abstract (read this first). papers: all of the "
             "group's papers with abstracts, most central first."))] = "lists",

@@ -140,7 +140,9 @@ cache, load limits, titles and map positions) `srl_search/topic_service.py`, cit
   preprint/journal versions merged) → links: shared references (idf-weighted cosine) + text neighbours (UMAP's
   fuzzy kNN), half the weight each → Leiden, the resolution giving ~7 groups, consensus of 20 runs → names
   (phrases over-represented in each group) → lenses from the group's own citations: core, distinctive, rising,
-  start_here, bridges, newest, experts (position-weighted local h-index over OpenAlex's disambiguated authors).
+  start_here, bridges, newest, experts (position-weighted local h-index over OpenAlex's disambiguated authors);
+  the same lists for the whole map ("overall", read=0); word clouds (topics.py: each group's phrases against the
+  other groups, the whole map's against all of science counted in the keyword index; LDAvis relevance, lambda 0.4).
 - Reads the release's citation index (`paths.citations`, memory-mapped, shared with citewalk through the page cache)
   and its authorship index (`<citations>/authors/`, built by `citewalk/build_authors.py`, ~20 min). Without the
   authorship index the experts lens is empty; without the citation index /topics answers 503.

@@ -576,7 +576,7 @@ D_PAPERS = "How many papers to map: the closest in meaning, or the best exact-wo
 D_GROUP = "Split this group of the map (its id, from a previous answer) into its own groups."
 D_READ = ("Read this group of the map in depth, with abstracts: its reading lists (part=lists) or all of its papers, "
           "most central first (part=papers), in pages of ~64k characters (page=N). The map must exist (409 if not: "
-          "call /topics first). Counts as 1 request, not 5.")
+          "call /topics first). read=0: the whole topic's reading lists (lists only). Counts as 1 request, not 5.")
 D_PART = "With read: lists (its reading lists) or papers (all its papers, page by page)."
 D_SCOPE = ("closest (default): the papers closest to the question, mapped in seconds. field: the whole research field "
            "(every paper on topic: by meaning, an AI judge, the exact phrase and the studies the field cites), mapped "
@@ -600,7 +600,7 @@ def topics(q: str = Query(..., min_length=2, max_length=2000, description=D_TOPI
            year_from: int | None = Query(None, description=D_YEAR_FROM),
            year_to: int | None = Query(None, description=D_YEAR_TO),
            group: int | None = Query(None, ge=1, le=50, description=D_GROUP),
-           read: int | None = Query(None, ge=1, le=50, description=D_READ),
+           read: int | None = Query(None, ge=0, le=50, description=D_READ),
            part: str = Query("lists", pattern="^(lists|papers)$", description=D_PART),
            page: int = Query(1, ge=1, le=100, description=D_PAGE),
            abstracts: str = Query("full", pattern="^(full|short|none)$",
@@ -612,19 +612,22 @@ def topics(q: str = Query(..., min_length=2, max_length=2000, description=D_TOPI
     over-represented in it) and reading lists computed from its own papers' citations: core (most cited by the
     group), distinctive (cited mostly by this group), rising (recent works gathering citations fast), start_here
     (recent papers citing most of the group's key works, often reviews), bridges (papers linking to another group),
-    newest, and experts (authors with the highest position-weighted h-index inside the group). Every paper comes
+    newest, and experts (authors with the highest position-weighted h-index inside the group); "overall" has the
+    same lists for the whole topic. Word clouds: each group's "cloud" holds the phrases it uses more than the other
+    groups, and overall's the phrases the topic uses more than the rest of science (share = of its papers, lift = how
+    many times more often, score = LDAvis relevance with lambda 0.6, what the order follows). Every paper comes
     with its group and map position. 2-6 s the first time (up to ~30 s when the disk cache is cold), then instant
     (cached for the data release). Counts as 5 requests at the public door. With read=N: one group in depth, with
     abstracts (part=lists: its reading lists; part=papers&page=N: all of its papers, most central first)."""
     svc = topics_service()
     try:
-        out = svc.get(q, papers, mode, year_from, year_to, group, cached_only=bool(read), scope=scope,
+        out = svc.get(q, papers, mode, year_from, year_to, group, cached_only=read is not None, scope=scope,
                       definition=definition)
     except Pending as e:
         return JSONResponse({"status": e.status.get("status"), "progress": e.status, "question": q, "scope": "field",
                              "message": "The whole-field map is being made; ask again later (the same request)."},
                             status_code=202, headers={"Retry-After": "60"})
-    return svc.read(out, read, part, page, abstracts) if read else out
+    return svc.read(out, read, part, page, abstracts) if read is not None else out
 
 
 @app.get("/fields/queue")
@@ -672,7 +675,7 @@ def topics_text(q: str,
                 year_from: int | None = Query(None, description=D_YEAR_FROM),
                 year_to: int | None = Query(None, description=D_YEAR_TO),
                 group: int | None = Query(None, ge=1, le=50, description=D_GROUP),
-                read: int | None = Query(None, ge=1, le=50, description=D_READ),
+                read: int | None = Query(None, ge=0, le=50, description=D_READ),
                 part: str = Query("lists", pattern="^(lists|papers)$", description=D_PART),
                 page: int = Query(1, ge=1, le=100, description=D_PAGE),
                 abstracts: str = Query("full", pattern="^(full|short|none)$",
@@ -689,12 +692,12 @@ def topics_text(q: str,
         raise HTTPException(422, "the question must be 2-2000 characters: /topics/intermittent fasting")
     svc = topics_service()
     try:
-        out = svc.get(q, papers, mode, year_from, year_to, group, cached_only=bool(read), scope=scope,
+        out = svc.get(q, papers, mode, year_from, year_to, group, cached_only=read is not None, scope=scope,
                       definition=definition)
     except Pending as e:
         return PlainTextResponse(pending_text(e.status, q, PUBLIC_BASE), status_code=202,
                                  headers={"Cache-Control": "no-store", "Retry-After": "60"})
-    text = topic_read_text(svc.read(out, read, part, page, abstracts), PUBLIC_BASE) if read else topic_text(out, PUBLIC_BASE, page)
+    text = topic_read_text(svc.read(out, read, part, page, abstracts), PUBLIC_BASE) if read is not None else topic_text(out, PUBLIC_BASE, page)
     return PlainTextResponse(text, headers={"Cache-Control": "no-store"})
 
 

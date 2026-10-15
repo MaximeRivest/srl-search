@@ -32,8 +32,8 @@ curl -s  "$B/topics/intermittent fasting for weight loss"   # research groups + 
 
 **Start with the landscape.** `/topics/{question}` maps the 1,000 closest papers into named research groups and
 gives every group's full reading lists (`start_here`, `core`, `rising`, `distinctive`, `bridges`, `newest`) and
-experts; `?group=N` splits a group (5 requests; 3-30 s the first time, then cached). Then read each group that
-bears on the question in depth (1 request each): `?read=N&part=lists` (the lists with full abstracts), then
+experts, the same lists for the whole topic, and the words that set each group apart; `?group=N` splits a group (5 requests; 3-30 s the first time, then cached). Then read each group that
+bears on the question in depth (1 request each; `?read=0` is the whole topic's lists): `?read=N&part=lists` (the lists with full abstracts), then
 `?read=N&part=papers&page=1, 2, ...` (all its papers with abstracts, most central first). Everything comes in pages of
 ~16-20k tokens, never cut: each answer says what to call next (the map too: `?page=2`). You can hold
 hundreds of abstracts: read them, and answer organised by group, citing what you read.

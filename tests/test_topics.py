@@ -413,3 +413,87 @@ def test_a_book_and_its_chapters_count_once():
     for g in out["groups"]:
         chapters = [it for it in g["lenses"]["start_here"] if seed.details[it["w"] - 1]["type"] == "book-chapter"]
         assert len(chapters) <= 1
+
+
+def test_the_whole_topic_has_its_own_reading_lists():
+    seed, cit = literature()
+    out = T.build(seed, cit, "coral reefs")
+    o = out["overall"]
+    assert o["size"] == 180 and set(o["lenses"]) == {"core", "rising", "start_here", "newest", "experts"}
+    core = [it["w"] for it in o["lenses"]["core"]]
+    assert core[0] == 1121                                  # the textbook every paper cites leads the whole topic
+    assert 1122 not in core                                 # software is still not reading material
+    assert "180 papers in this topic" in o["lenses"]["core"][0]["why"]
+    # every group's best-known first author is an expert of the whole topic
+    assert {"Ana", "Ben", "Cleo"} <= {e["name"] for e in o["lenses"]["experts"]}
+    assert all("of this topic" in e["why"] for e in o["lenses"]["experts"])
+    assert o["cloud"] == []                                 # no background corpus: no cloud for the whole topic
+
+
+def test_each_group_has_a_cloud_of_its_own_words():
+    seed, cit = literature()
+    out = T.build(seed, cit, "coral reefs")
+    group, truth = planted(out)
+    for g in out["groups"]:
+        planted_g = np.bincount(truth[group == g["id"]]).argmax()
+        words = [w["t"].lower() for w in g["cloud"]]
+        assert any(w in words for w in WORDS[planted_g]), (words, WORDS[planted_g])
+        assert all(w["lift"] >= T.CLOUD_MIN_LIFT and 0 < w["share"] <= 1 for w in g["cloud"])
+        assert [w["score"] for w in g["cloud"]] == sorted((w["score"] for w in g["cloud"]), reverse=True)
+        assert "coral reefs" not in words and "reef" not in words            # the question's words
+        others = {w for k, v in WORDS.items() if k != planted_g for w in v}
+        assert not others & set(words)                                         # nothing of the other groups
+        # a word standing inside one of its phrases is not shown twice ("bleaching" under "coral bleaching")
+        assert not any(w != x and f" {w} " in f" {x} " for w in words for x in words)
+
+
+def test_the_whole_topic_cloud_is_against_all_of_science():
+    seed, cit = literature()
+    asked = []
+
+    def background(phrases):
+        asked.append(phrases)
+        # everyday science words are common everywhere; the topic's own phrases are rare outside it
+        return {p: (5_000_000 if p.lower() in ("coral", "matter", "studied") else 300) for p in phrases}, 200_000_000
+    out = T.build(seed, cit, "coral reefs", background=background)
+    words = [w["t"].lower() for w in out["overall"]["cloud"]]
+    assert asked and len(asked[0]) <= T.CLOUD_CANDIDATES
+    assert words and "matter" not in words and "coral" not in words
+    assert any(w in words for v in WORDS.values() for w in v)
+    # a failing background costs the cloud, not the map
+    out = T.build(seed, cit, "coral reefs", background=lambda p: (_ for _ in ()).throw(OSError("index gone")))
+    assert out["overall"]["cloud"] == [] and len(out["groups"]) == 3
+
+
+def test_relevance_weighs_frequency_and_lift():
+    assert T.relevance(0.5, 0.05) > T.relevance(0.05, 0.005)    # same lift, more papers
+    assert T.relevance(0.2, 0.01) > T.relevance(0.2, 0.1)        # same share, more distinctive
+    assert T.relevance(0.3, 0.3, lam=0) == 0
+
+
+def test_the_whole_topic_reads_as_group_zero(tmp_path):
+    seed, cit = literature()
+    svc = TopicService(FakeApi(), tmp_path, cit)
+    out = svc.finish(T.build(seed, cit, "coral reefs"), seed)
+    out.update({"question": "coral reefs", "mode": "semantic", "filters": {}, "asked_papers": 1000})
+    it = out["overall"]["lenses"]["core"][0]
+    assert it["id"] == "W1121" and it["title"] == "T1121" and "w" not in it
+    assert out["overall"]["lenses"]["experts"][0]["top"]["id"].startswith("W")
+    text = as_text(out, "https://api.example")
+    assert "## Reading lists of the whole topic (all 180 papers" in text
+    assert text.index("Reading lists of the whole topic") < text.index("## Group 1:")
+    assert "group=0" in text and "?read=0" in text and "its words, against the other groups:" in text
+    r = svc.read(out, 0, "lists")
+    assert r["group"]["id"] == 0 and r["lenses"]["core"][0]["abstract"].startswith("Abstract of")
+    t = read_text(r, "https://api.example")
+    assert t.startswith("# Reading lists of the whole topic of “coral reefs” (180 papers") and "Start here: recent papers of the topic" in t
+    assert "part=papers" not in t and "?read=1" in t
+    with pytest.raises(HTTPException) as e:
+        svc.read(out, 0, "papers")
+    assert e.value.status_code == 400
+    # maps made before the whole topic had lists: group 0 does not exist, the text is as before
+    old = {k: v for k, v in out.items() if k != "overall"}
+    with pytest.raises(HTTPException) as e:
+        svc.read(old, 0, "lists")
+    assert e.value.status_code == 404
+    assert "Reading lists of the whole topic" not in as_text(old, "https://api.example")

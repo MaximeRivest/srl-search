@@ -47,11 +47,27 @@ def test_serves_finished_maps_and_says_why_a_group_has_no_split(tmp_path):
     assert "read it in full" in e.value.detail
     with pytest.raises(HTTPException):
         st.get("x y", None, None, "v1", 9)
-    # the map code changed: the selected field is kept, only the maps are made again
+    # the map code changed: the selected field is kept, only the maps are made again; meanwhile the map made by the
+    # older code opens as it is (groups too), and the remake is queued once
     (tmp_path / key / "field.json").write_text("{}")
-    with pytest.raises(F.Pending) as e:
-        st.get("x y", None, None, "v2", None)
-    assert e.value.status["kind"] == "map"
+    (tmp_path / key / "job.json").write_text(json.dumps({"status": "done", "summary": {"papers": 9}}))
+    old = st.get("x y", None, None, "v2", None)
+    assert old["groups"] == [{"id": 1}, {"id": 2}] and old["field"]["rebuilding"] is True
+    assert st.get("x y", None, None, "v2", 1)["parent"]["group"] == 1
+    job = json.loads((tmp_path / key / "job.json").read_text())
+    assert job["kind"] == "map" and job["status"] == "queued" and job["summary"] == {"papers": 9}
+    assert st.queued() == [key]
+    st.get("x y", None, None, "v2", None)
+    assert st.queued() == [key]
+    # a remake that failed is not asked again on every visit
+    (tmp_path / "queue" / f"{key}.job").unlink()
+    (tmp_path / key / "job.json").write_text(json.dumps({**job, "status": "failed", "version": "v2"}))
+    st.get("x y", None, None, "v2", None)
+    assert st.queued() == []
+    # once the new code's map is complete, it is the one served
+    (tmp_path / key / "maps" / "v2").mkdir()
+    (tmp_path / key / "maps" / "v2" / "main.json").write_text(json.dumps({"groups": [{"id": 1}]}))
+    assert st.get("x y", None, None, "v2", None) == {"groups": [{"id": 1}]}
 
 
 def _ask(st, q, asker=None):

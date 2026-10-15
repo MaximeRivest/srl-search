@@ -369,7 +369,8 @@ conclusion conclusions background purpose introduction discussion here herein re
 whereas respectively mainly overall i.e e.g et al vs versus remain remains remained suggest suggests suggested
 indicate indicates indicated reveal reveals revealed become becomes became need needs needed help helps seem seems
 appear appears lead leads allow allows require requires required affect affected affecting include involve involves
-regarding according particularly especially""".split())
+regarding according particularly especially
+abstract highlight highlights graphical copyright elsevier springer wiley ltd inc rights reserved""".split())
 TOKEN = re.compile(r"[A-Za-z0-9]+(?:[-'][A-Za-z0-9]+)*")
 TAG = re.compile(r"<[^>]+>")
 
@@ -426,18 +427,25 @@ def display(surfaces: Counter) -> str:
     return " ".join(w if sum(ch.isupper() for ch in w) >= 2 else w.lower() for w in words)
 
 
-def name_groups(terms: list[set], group: np.ndarray, G: int, query: str, surfaces: dict) -> list[list[str]]:
+def group_counts(terms: list[set], group: np.ndarray, G: int) -> tuple[Counter, list[Counter]]:
+    """How many papers carry each phrase: in the whole map, and in each group."""
+    return Counter(k for s in terms for k in s), [Counter(k for i in np.flatnonzero(group == c) for k in terms[i])
+                                                  for c in range(G)]
+
+
+def name_groups(terms: list[set], group: np.ndarray, G: int, query: str, surfaces: dict,
+                counts: tuple[Counter, list[Counter]] | None = None) -> list[list[str]]:
     """Per group, up to 4 phrases over-represented in it compared with the other papers (the KL divergence term
     p log(p/q), Scimeetr's relative frequency in a form that also weighs how common the phrase is). A phrase is
     skipped when it repeats a word of a chosen one, or mostly names the same papers (Jaccard >= 0.6)."""
     qstems = {stem(w) for w in TOKEN.findall(query or "")}
     n = len(terms)
-    df_all = Counter(k for s in terms for k in s)
+    df_all, dfs = counts or group_counts(terms, group, G)
     names = []
     for c in range(G):
         idx = np.flatnonzero(group == c)
         ng = len(idx)
-        df = Counter(k for i in idx for k in terms[i])
+        df = dfs[c]
         need = max(3, math.ceil(0.05 * ng))
         score = {}
         for k, f in df.items():
@@ -476,6 +484,93 @@ def name_groups(terms: list[set], group: np.ndarray, G: int, query: str, surface
     return names
 
 
+# -------------------------------------------------------------------------------------------------- word clouds
+# Scimeetr (2016) showed each group's words by relative frequency: how much more often a group's papers use a word
+# than its parent's. Here each word gets LDAvis's relevance, lambda * log p + (1 - lambda) * log(p / q), p the share of
+# the group's papers that use it and q the share elsewhere (Sievert & Shirley 2014, doi:10.3115/v1/w14-3110).
+# lambda = 1 is plain frequency, 0 pure lift (rare words win). A group is compared with the rest of the map; the
+# whole map with all of science (the keyword index). lambda = 0.4, Scimeetr's: LDAvis's readers did best near 0.6
+# against a whole corpus, but groups of one topic share most of their words, and at 0.6 everyday words used a
+# little more often ("changes" x1.4) outranked the group's own ("beetles" x13) on habitat fragmentation's map.
+CLOUD_LAMBDA = 0.4
+CLOUD_SIZE = 30
+CLOUD_CANDIDATES = 160         # the whole map: its most common phrases, counted in all of science (cached)
+CLOUD_MIN_LIFT = 1.5           # a word used about as often elsewhere says nothing about the group
+
+
+def relevance(p: float, q: float, lam: float = CLOUD_LAMBDA) -> float:
+    return lam * math.log(p) + (1 - lam) * math.log(p / q)
+
+
+def _cloud(cands: dict[str, tuple[float, float]], df: Counter, surfaces: dict, k: int) -> list[dict]:
+    """cands: phrase key -> (p, q). The k most relevant, a phrase standing for its words: a word whose papers are
+    mostly those of a longer phrase holding it ("fragmentation" under "habitat fragmentation") is left out."""
+    ranked = sorted(cands, key=lambda x: (-relevance(*cands[x]), x))[:6 * k]
+    keys = set(ranked)
+    out = []
+    for key in ranked:
+        if any(len(x) > len(key) and f" {key} " in f" {x} " and df[x] >= 0.7 * df[key] for x in keys):
+            continue
+        p, q = cands[key]
+        out.append({"t": display(surfaces[key]), "share": round(p, 4), "lift": round(p / q, 1),
+                    "score": round(relevance(p, q), 3)})
+        if len(out) == k:
+            break
+    return out
+
+
+def group_clouds(terms: list[set], group: np.ndarray, G: int, query: str, surfaces: dict,
+                 counts: tuple[Counter, list[Counter]], k: int = CLOUD_SIZE) -> list[list[dict]]:
+    """Each group's words, by relevance against the rest of the map (only words it uses more than the others).
+    The question's own words are left out: every group uses them."""
+    qstems = {stem(w) for w in TOKEN.findall(query or "")}
+    n = len(terms)
+    df_all, dfs = counts
+    out = []
+    for c in range(G):
+        df = dfs[c]
+        ng = int((group == c).sum())
+        need = max(5, math.ceil(0.03 * ng))      # fewer: often copies of one text (a book's chapters)
+        cands = {}
+        for key, f in df.items():
+            if f < need or all(t in qstems for t in key.split()):
+                continue
+            p, q = f / ng, (df_all[key] - f + 0.5) / (n - ng + 1)
+            if p > CLOUD_MIN_LIFT * q:
+                cands[key] = (p, q)
+        out.append(_cloud(cands, df, surfaces, k))
+    return out
+
+
+def topic_cloud(terms: list[set], query: str, surfaces: dict, df_all: Counter, background,
+                k: int = CLOUD_SIZE) -> list[dict]:
+    """The whole map's words, by relevance against all of science. background(phrases) -> ({phrase: papers in
+    the corpus that use it}, corpus size), or None (no cloud: against itself, every word has lift 1)."""
+    if background is None or not terms:
+        return []
+    qstems = {stem(w) for w in TOKEN.findall(query or "")}
+    n = len(terms)
+    need = max(3, math.ceil(0.01 * n))
+    common = [key for key, f in sorted(df_all.items(), key=lambda x: (-x[1], x[0]))
+              if f >= need and not all(t in qstems for t in key.split())][:CLOUD_CANDIDATES]
+    shown = {key: display(surfaces[key]) for key in common}
+    try:
+        counts, N = background(sorted(set(shown.values())))
+    except Exception as e:  # noqa: BLE001 (the cloud is a nicety: a map without it beats no map)
+        print(f"topic cloud: no background ({type(e).__name__}: {e})", flush=True)
+        return []
+    cands = {}
+    for key in common:
+        c = counts.get(shown[key])
+        if c is None or not N:
+            continue
+        p = df_all[key] / n
+        q = max(c, df_all[key]) / N           # the corpus holds the map's papers (and stems more, so may count more)
+        if p > CLOUD_MIN_LIFT * q:
+            cands[key] = (p, q)
+    return _cloud(cands, df_all, surfaces, k)
+
+
 # -------------------------------------------------------------------------------------------------- lenses
 def credit(pos: np.ndarray, nauth: int) -> np.ndarray:
     """Harmonic credit relative to the first author: first 1, last 1/2, the k-th of the others 1/(k+1).
@@ -511,8 +606,9 @@ def h_index(values) -> int:
 
 
 def lenses_for(c: int, idx: np.ndarray, gr: Graph, seed: Seed, group: np.ndarray, cit, opt: Options,
-               ref_year: np.ndarray, ref_ok: np.ndarray, total_local: np.ndarray) -> dict:
-    """Reading lists of one group. Items: {"w": work number, "why": sentence, ...numbers}."""
+               ref_year: np.ndarray, ref_ok: np.ndarray, total_local: np.ndarray | None, unit: str = "group") -> dict:
+    """Reading lists of one group, or of the whole map (unit="topic", idx = every paper, total_local None: no
+    "only here" list, which compares a group with the others). Items: {"w": work number, "why": sentence, ...}."""
     k = opt.lens_size
     ng = len(idx)
     A = gr.A
@@ -522,19 +618,21 @@ def lenses_for(c: int, idx: np.ndarray, gr: Graph, seed: Seed, group: np.ndarray
     order = [j for j in np.argsort(-local, kind="stable") if local[j] >= 2 and ref_ok[j]]
     core = order[:k]
     out["core"] = [{"w": cit.work(gr.refs[j]), "cited_here": int(local[j]),
-                    "why": f"cited by {int(local[j])} of the {ng} papers in this group"} for j in core]
+                    "why": f"cited by {int(local[j])} of the {ng:,} papers in this {unit}"} for j in core]
 
-    lift = np.where(total_local > 0, local / np.maximum(total_local, 1), 0)
-    dist = [j for j in np.argsort(-(local * lift), kind="stable")
-            if local[j] >= 3 and ref_ok[j] and j not in set(core) and lift[j] >= 0.5][:k]
-    out["distinctive"] = [{"w": cit.work(gr.refs[j]), "cited_here": int(local[j]), "cited_in_map": int(total_local[j]),
-                           "why": f"{int(local[j])} of its {int(total_local[j])} citations in this map come from this group"}
-                          for j in dist]
+    if total_local is not None:
+        lift = np.where(total_local > 0, local / np.maximum(total_local, 1), 0)
+        core_set = set(core)
+        dist = [j for j in np.argsort(-(local * lift), kind="stable")
+                if local[j] >= 3 and ref_ok[j] and j not in core_set and lift[j] >= 0.5][:k]
+        out["distinctive"] = [{"w": cit.work(gr.refs[j]), "cited_here": int(local[j]), "cited_in_map": int(total_local[j]),
+                               "why": f"{int(local[j])} of its {int(total_local[j])} citations in this map come from this group"}
+                              for j in dist]
 
     recent = (ref_year >= YEAR_NOW - 5) & (local >= 3) & ref_ok
     rate = np.where(recent, local / np.maximum(YEAR_NOW - ref_year + 1, 1), 0)
     out["rising"] = [{"w": cit.work(gr.refs[j]), "cited_here": int(local[j]), "year": int(ref_year[j]),
-                      "why": f"from {int(ref_year[j])}, already cited by {int(local[j])} papers of this group"}
+                      "why": f"from {int(ref_year[j])}, already cited by {int(local[j])} papers of this {unit}"}
                      for j in np.argsort(-rate, kind="stable")[:k] if rate[j] > 0]
 
     top = [j for j in np.argsort(-local, kind="stable")[:30] if local[j] >= 2]
@@ -554,7 +652,7 @@ def lenses_for(c: int, idx: np.ndarray, gr: Graph, seed: Seed, group: np.ndarray
             if len(best) == k:
                 break
         out["start_here"] = [{"w": int(seed.wids[idx[p]]), "covers": int(cov[p]),
-                              "why": f"cites {int(cov[p])} of the group's {len(top)} most-cited works"
+                              "why": f"cites {int(cov[p])} of the {unit}'s {len(top)} most-cited works"
                                      + (" · a review" if seed.details[idx[p]].get("type") == "review" else "")}
                              for p in best]
     else:
@@ -588,7 +686,7 @@ def bridges_for(c: int, idx: np.ndarray, WG: np.ndarray, G: int, k: int, seed: S
     return out
 
 
-def experts_for(idx: np.ndarray, local: np.ndarray, gr: Graph, seed: Seed, cit, k: int) -> list[dict]:
+def experts_for(idx: np.ndarray, local: np.ndarray, gr: Graph, seed: Seed, cit, k: int, unit: str = "group") -> list[dict]:
     """Authors ranked by a harmonic local h-index: h of their papers are each cited by at least h papers of this
     group, after position credit. Only papers cited by >= 2 group papers can count toward h >= 2."""
     au = cit.authors
@@ -640,7 +738,7 @@ def experts_for(idx: np.ndarray, local: np.ndarray, gr: Graph, seed: Seed, cit, 
         out.append({"author": au.openalex_id(r), "name": au.name(r), "h": h,
                     "cited_works": len(papers[r]), "papers_in_group": len(mine[r]),
                     "top": top[2], "top_cited_here": top[0], "latest": latest[1] if latest else None,
-                    "why": f"{h} of their papers are each cited by at least {h} papers of this group "
+                    "why": f"{h} of their papers are each cited by at least {h} papers of this {unit} "
                            f"(first author full credit, last author half, others less)"})
     return out
 
@@ -655,9 +753,10 @@ def centrality(WG: np.ndarray, group: np.ndarray) -> list[float]:
 
 
 # -------------------------------------------------------------------------------------------------- the map
-def build(seed: Seed, cit, query: str = "", opt: Options | None = None) -> dict:
-    """The topic map of these papers: groups, names, lenses, links between groups. Works are given as OpenAlex
-    work numbers ("w"); the caller adds titles, links and positions."""
+def build(seed: Seed, cit, query: str = "", opt: Options | None = None, background=None) -> dict:
+    """The topic map of these papers: groups, names, lenses, links between groups, and the same reading lists for
+    the whole map ("overall"). Works are given as OpenAlex work numbers ("w"); the caller adds titles, links and
+    positions. background: counts phrases in all of science, for the whole map's word cloud (topic_cloud)."""
     opt = opt or Options()
     t0 = time.perf_counter()
     n = len(seed.wids)
@@ -678,8 +777,13 @@ def build(seed: Seed, cit, query: str = "", opt: Options | None = None) -> dict:
     t = time.perf_counter()
     surfaces: dict = {}
     terms = [doc_terms(d.get("title"), d.get("abstract"), surfaces) for d in seed.details]
-    names = name_groups(terms, group, G, query, surfaces)
+    counts = group_counts(terms, group, G)
+    names = name_groups(terms, group, G, query, surfaces, counts)
+    clouds = group_clouds(terms, group, G, query, surfaces, counts)
     timing["names_ms"] = round((time.perf_counter() - t) * 1000)
+    t = time.perf_counter()
+    cloud = topic_cloud(terms, query, surfaces, counts[0], background)
+    timing["cloud_ms"] = round((time.perf_counter() - t) * 1000)
 
     t = time.perf_counter()
     A = gr.A
@@ -724,14 +828,25 @@ def build(seed: Seed, cit, query: str = "", opt: Options | None = None) -> dict:
             "between": int((agree[idx] < 0.6).sum()),
             "cites_groups": dict(list(uses.items())[:4]),
             "cites_inside": int(flows[c, c]),
+            "cloud": clouds[c],
             "lenses": lens,
         })
+    # the whole map read as one group: its own reading lists, from every mapped paper's citations
+    every = np.arange(n)
+    lens = {}
+    if n:
+        lens, local = lenses_for(-1, every, gr, seed, group, cit, opt, ref_year, ref_ok, None, unit="topic")
+        lens["experts"] = experts_for(every, local, gr, seed, cit, opt.lens_size, unit="topic")
+    years = [d.get("year") for d in seed.details if d.get("year")]
+    overall = {"id": 0, "size": int(n), "years": [int(np.percentile(years, p)) for p in (10, 50, 90)] if years else None,
+               "cloud": cloud, "lenses": lens}
     timing["lenses_ms"] = round((time.perf_counter() - t) * 1000)
 
     nrefs = np.asarray(A.sum(1)).ravel() if A.shape[1] else np.zeros(n)
     timing["total_ms"] = round((time.perf_counter() - t0) * 1000)
     return {
         "groups": groups,
+        "overall": overall,
         "papers": {"w": [int(w) for w in seed.wids], "group": [int(g) + 1 if g >= 0 else 0 for g in group],
                    "between": [bool(group[i] >= 0 and agree[i] < 0.6) for i in range(n)],
                    # how central each paper is in its group: its link weight into the group / the group's highest

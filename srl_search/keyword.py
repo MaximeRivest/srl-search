@@ -41,6 +41,7 @@ def schema() -> tantivy.Schema:
 
 TOKEN = re.compile(r'\s*("(?:[^"\\]|\\.)*"(?:~\d+)?\*?|\(|\)|[^\s()"]+)')
 OPS = {"AND", "OR", "NOT"}
+TOKEN_WORD = re.compile(r"[A-Za-z0-9]+")
 BOOLEAN_HINT = re.compile(r'"|\b(AND|OR|NOT)\b|[()*]|(^|\s)[-+]\w|\b(title|abstract|keywords):')
 
 
@@ -142,3 +143,27 @@ class KeywordIndex:
             count += int(res.count or 0)
         hits.sort(key=lambda h: -h[1])
         return hits[:k], count, text
+
+    def phrase_counts(self, phrases: list[str], workers: int = 8) -> tuple[dict[str, int], int]:
+        """How many papers use each phrase in their title or abstract (stemmed, as searches match), and how many
+        papers there are: the background for a topic map's word cloud. 50-300 ms a phrase, so they run side by side
+        (tantivy releases the GIL) and are remembered for the life of the process (the same words recur across maps)."""
+        from concurrent.futures import ThreadPoolExecutor
+        cache = self.__dict__.setdefault("_phrase_counts", {})
+        todo = [ph for ph in dict.fromkeys(phrases) if ph.lower() not in cache]
+
+        def one(ph: str) -> int:
+            n = 0
+            words = TOKEN_WORD.findall(ph)
+            if not words:
+                return 0
+            text = '"' + " ".join(words) + '"' if len(words) > 1 else words[0]
+            for index, searcher in zip(self.indexes, self.searchers):
+                query, _ = index.parse_query_lenient(text, ["title", "abstract"])
+                n += int(searcher.search(query, 1, count=True).count or 0)
+            return n
+        if todo:
+            with ThreadPoolExecutor(min(workers, len(todo))) as ex:
+                for ph, n in zip(todo, ex.map(one, todo)):
+                    cache[ph.lower()] = n
+        return {ph: cache[ph.lower()] for ph in phrases}, self.num_docs

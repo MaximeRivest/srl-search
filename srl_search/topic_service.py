@@ -238,7 +238,7 @@ class TopicService:
         if len(seed.wids) < 30:
             raise HTTPException(404, f"Only {len(seed.wids)} papers found for this; a map needs at least 30. "
                                      "Try other or fewer words, or search by meaning.")
-        raw = T.build(seed, self.cit, q)
+        raw = T.build(seed, self.cit, q, background=self.background())
         raw["timing"]["papers_ms"] = t_seed
         out = self.finish(raw, seed)
         out.update({"question": q, "mode": mode, "filters": f, "asked_papers": papers, **how})
@@ -253,13 +253,18 @@ class TopicService:
         seed = self.seed_of(ws)
         t_seed = round((time.perf_counter() - t) * 1000)
         opt = T.Options(min_size=max(8, len(ws) // 25), min_groups=2, max_groups=8)
-        raw = T.build(seed, self.cit, q, opt)
+        raw = T.build(seed, self.cit, q, opt, background=self.background())
         raw["timing"]["papers_ms"] = t_seed
         out = self.finish(raw, seed)
         out.update({"question": q, "mode": parent["mode"], "filters": parent["filters"],
                     "asked_papers": parent["asked_papers"],
                     "parent": {"group": group, "name": g["name"], "size": g["size"]}})
         return out
+
+    def background(self):
+        """Phrase counts in all of science, for the whole map's word cloud (None without a keyword index)."""
+        kw = getattr(self.api, "KEYWORDS", None)
+        return kw.phrase_counts if kw is not None else None
 
     def finish(self, raw: dict, seed: T.Seed) -> dict:
         return finish(self.api, self.cit, raw, seed, self.release)
@@ -274,10 +279,15 @@ class TopicService:
         """One group of a map in depth, with abstracts: its reading lists ("lists"), or all of its papers, most
         central first ("papers"). Pages are filled up to PAGE_CHARS of text (abstracts vary 10x in length), so
         every answer fits what AI apps accept from one tool call, and nothing is cut: the rest is on the next page.
-        A paper on several lists is given in full once."""
-        g = next((x for x in out["groups"] if x["id"] == group), None)
+        A paper on several lists is given in full once. Group 0 is the whole topic (its reading lists only: its
+        papers are those of every group)."""
+        g = overall_group(out) if group == 0 else next((x for x in out["groups"] if x["id"] == group), None)
         if g is None:
-            raise HTTPException(404, f"no group {group}; this map has groups 1-{len(out['groups'])}")
+            raise HTTPException(404, f"no group {group}; this map has groups 1-{len(out['groups'])}"
+                                     + (" (and 0, the whole topic)" if out.get("overall") else ""))
+        if group == 0 and part != "lists":
+            raise HTTPException(400, "group 0 (the whole topic) has reading lists only: read its groups' papers "
+                                     "(read=1, 2, ...)")
         eng = self.api.engine
         res = {"question": out["question"], "group": {k: g.get(k) for k in ("id", "name", "phrases", "size", "years",
                                                                          "cites_groups", "between", "openalex_topics")},
@@ -353,14 +363,25 @@ class TopicService:
             p.unlink(missing_ok=True)
 
 
+def overall_group(out: dict) -> dict | None:
+    """The whole map as a group (id 0) for reading: maps made before 2026-10-15 have none."""
+    o = out.get("overall")
+    if not o:
+        return None
+    name = f"the whole of group {out['parent']['group']}" if out.get("parent") else "the whole topic"
+    return {**o, "id": 0, "name": name, "phrases": [x["t"] for x in o.get("cloud", [])[:4]]}
+
+
 def finish(api, cit, raw: dict, seed: T.Seed, release: str) -> dict:
     """Work numbers -> papers a person can open: titles, years, venues, links, map positions. (Shared with the
     whole-field worker, srl_search/field.py, which is not this service.)"""
     t = time.perf_counter()
     inside = {int(w) for w in seed.wids}
     wanted = set()
-    for g in raw["groups"]:
-        wanted.add(g["typical"])
+    blocks = raw["groups"] + ([raw["overall"]] if raw.get("overall") else [])
+    for g in blocks:
+        if "typical" in g:
+            wanted.add(g["typical"])
         for name, items in g["lenses"].items():
             for it in items:
                 for k in ("w", "top", "latest"):
@@ -385,8 +406,9 @@ def finish(api, cit, raw: dict, seed: T.Seed, release: str) -> dict:
             out["readable"] = True
         return {k: v for k, v in out.items() if v not in (None, [], "")}
 
-    for g in raw["groups"]:
-        g["typical"] = paper(g["typical"])
+    for g in blocks:
+        if "typical" in g:
+            g["typical"] = paper(g["typical"])
         for name, items in g["lenses"].items():
             if name == "experts":
                 for it in items:
@@ -451,6 +473,10 @@ LENS_TITLES = [
 ]
 
 
+def _lens_title(title: str, gid: int) -> str:
+    return title.replace("the group", "the topic").replace("the others", "the rest") if gid == 0 else title
+
+
 def _ref(out: dict, enc) -> str:
     q = enc(out["question"])
     return q + (f", within group {out['parent']['group']}" if out.get("parent") else "")
@@ -463,7 +489,10 @@ def as_text(out: dict, base: str, page: int = 1) -> str:
     q = out["question"]
     cov = out["coverage"]
     names = {x["id"]: x["name"] for x in out["groups"]}
-    blocks = [_group_block(g, names) for g in out["groups"]]
+    whole = overall_group(out)
+    # the whole topic's lists come first (block 0 when there are any); then one block per group
+    blocks = ([_group_block(whole, names)] if whole else []) + [_group_block(g, names) for g in out["groups"]]
+    first = 1 if whole else 0
     pages = paginate([len(b) for b in blocks], PAGE_CHARS - 9000) if blocks else [[]]   # room for the glance + next
     if not 1 <= page <= len(pages):
         raise HTTPException(404, f"this map has {len(pages)} pages")
@@ -493,6 +522,9 @@ def as_text(out: dict, base: str, page: int = 1) -> str:
             if cov.get("without_text_vector"):
                 lines += [f"{cov['without_text_vector']:,} papers have no English abstract (older papers, books, "
                           "chapters): they are here because the field cites them; their titles are all there is.", ""]
+        if whole and whole.get("cloud"):
+            lines += ["Words that set the topic apart from the rest of science (most telling first; ×N = how many "
+                      "times more often its papers use it): " + _words(whole["cloud"]), ""]
         lines.append("## The groups at a glance")
         for g in out["groups"]:
             yrs = g.get("years")
@@ -500,7 +532,7 @@ def as_text(out: dict, base: str, page: int = 1) -> str:
             lines.append(f"- Group {g['id']}: {g['name']} · {g['size']} papers"
                          + (f" · mostly {yrs[0]}–{yrs[2]}" if yrs else "")
                          + (f" · builds most on groups {uses}" if uses else "")
-                         + f" (details on page {next(i for i, pg in enumerate(pages, 1) if g['id'] - 1 in pg)})")
+                         + f" (details on page {next(i for i, pg in enumerate(pages, 1) if g['id'] - 1 + first in pg)})")
         lines.append("")
     else:
         lines += [f"Page {page} of {len(pages)} of the map (page 1 has the groups at a glance).", ""]
@@ -510,6 +542,9 @@ def as_text(out: dict, base: str, page: int = 1) -> str:
     if page < len(pages):
         lines.append(f"- **The map continues: page {page + 1} of {len(pages)}** (map_topic with page={page + 1}, or "
                      f"{base}/topics/{enc(q)}?page={page + 1}). Read every page.")
+    if whole:
+        lines.append(f"- The whole topic's reading lists with full abstracts: read_topic_group with group=0, or "
+                     f"{base}/topics/{enc(q)}?read=0")
     lines += ["- Then read every group that bears on the question in depth, with full abstracts and authors: its "
               "reading lists (read_topic_group, part=lists), then all of its papers, most central first "
               "(part=papers), page by page until the last. Over HTTP: "
@@ -522,12 +557,21 @@ def as_text(out: dict, base: str, page: int = 1) -> str:
     return "\n".join(lines) + "\n"
 
 
+def _words(cloud: list[dict], k: int = 20) -> str:
+    return ", ".join(f"{w['t']} (×{w['lift']:g})" for w in cloud[:k])
+
+
 def _group_block(g: dict, names: dict) -> str:
     yrs = g.get("years")
     span = f", mostly {yrs[0]}–{yrs[2]} (median {yrs[1]})" if yrs else ""
-    lines = [f"## Group {g['id']}: {g['name']} ({g['size']} papers{span})"]
+    if g["id"] == 0:
+        lines = [f"## Reading lists of {g['name']} (all {g['size']:,} papers{span}; group=0)"]
+    else:
+        lines = [f"## Group {g['id']}: {g['name']} ({g['size']} papers{span})"]
     extra = []
-    if g.get("phrases") and len(g["phrases"]) > 3:
+    if g["id"] and g.get("cloud"):
+        extra.append("its words, against the other groups: " + _words(g["cloud"], 12))
+    if g["id"] and g.get("phrases") and len(g["phrases"]) > 3:
         extra.append("also: " + ", ".join(g["phrases"][3:]))
     uses = g.get("cites_groups") or {}
     if uses:
@@ -542,7 +586,7 @@ def _group_block(g: dict, names: dict) -> str:
     shown: set = set()
     for key, title in LENS_TITLES:
         if L.get(key):
-            lines.append(f"{title}:")
+            lines.append(f"{_lens_title(title, g['id'])}:")
             for p in L[key]:
                 if p["id"] in shown:                   # on an earlier list of this group: title and reason only
                     lines.append(f"- {p['title']} (above) · {p.get('why', '')}".rstrip(" ·"))
@@ -550,7 +594,8 @@ def _group_block(g: dict, names: dict) -> str:
                     shown.add(p["id"])
                     lines.append(_line(p, p.get("why", ""), full=False))
     if L.get("experts"):
-        lines.append("Experts here (h-index counted inside the group: h of their works each cited by ≥ h of the group's "
+        unit = "topic" if g["id"] == 0 else "group"
+        lines.append(f"Experts here (h-index counted inside the {unit}: h of their works each cited by ≥ h of the {unit}'s "
                      "papers; first author full credit, last author half, others less):")
         for e in L["experts"]:
             def ref(p):
@@ -568,11 +613,15 @@ def read_text(r: dict, base: str, abstracts: str | None = None) -> str:
     yrs = g.get("years")
     span = f", mostly {yrs[0]}–{yrs[2]}" if yrs else ""
     where = f" (within group {r['parent']['group']} of “{r['question']}”)" if r.get("parent") else f" of “{r['question']}”"
-    lines = [f"# Group {g['id']}{where}: {g['name']} ({g['size']} papers{span})", ""]
+    title = (f"Reading lists of {g['name']} of “{r['question']}”" if g["id"] == 0
+             else f"Group {g['id']}{where}: {g['name']}")
+    lines = [f"# {title} ({g['size']:,} papers{span})", ""]
     qs = enc(r["question"])
     more = r["page"] < r["pages"]
     if r["part"] == "lists":
         nxt = (f"Next: page={r['page'] + 1} (part=lists)." if more else
+               f"Next: each group in depth, its lists then its papers ({base}/topics/{qs}?read=1, then read=2, …)."
+               if g["id"] == 0 else
                f"Next: all of the group's papers, most central first: part=papers, page=1 "
                f"({base}/topics/{qs}?read={g['id']}&part=papers&page=1).")
         lines += [f"Its reading lists, each paper with its abstract (given once when it is on several lists). "
@@ -580,7 +629,7 @@ def read_text(r: dict, base: str, abstracts: str | None = None) -> str:
         for key, title in LENS_TITLES:
             items = r["lenses"].get(key) or []
             if items:
-                lines += [f"## {title}", ""]
+                lines += [f"## {_lens_title(title, g['id'])}", ""]
                 for p in items:
                     lines += [_line(p, p.get("why", ""))] + _abstract(p) + [""]
         ex = r["lenses"].get("experts") or []

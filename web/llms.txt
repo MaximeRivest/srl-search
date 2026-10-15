@@ -115,7 +115,11 @@ weighted by rarity + nearest neighbours in meaning, half each; Leiden, consensus
   `experts` (authors by a position-weighted h-index inside the group: h of their works each cited by ≥ h
   group papers, first author full credit, last author half; OpenAlex's disambiguated authors).
   Papers in lenses carry `in_map` (true: one of the mapped papers; false: a cited work outside them, e.g. a
-  classic without an English abstract).
+  classic without an English abstract). `cloud`: up to 30 words the group uses more than the other groups,
+  most telling first: `t`, `share` (of its papers), `lift` (how many times as often as elsewhere), `score`
+  (LDAvis relevance, lambda 0.4: frequency and lift together; Scimeetr's relative frequency).
+- `overall`: the whole topic as one group: `size`, `years`, its own `lenses` (core, rising, start_here, newest,
+  experts: from every mapped paper's citations) and `cloud` (the words its papers use more than all of science).
 - `papers`: every mapped paper's `id`, `group` (0 = in no group), `between`, `x`, `y`.
 - `coverage` (`with_references`: how many have references in OpenAlex; `references_thin` when under 65%,
   then the groups lean on wording), `method` (resolution, consensus agreement, ...), `timing`.
@@ -125,7 +129,8 @@ this group's papers, which is the point (what matters to this conversation), not
 
 **Reading a group in depth** (counts as 1 request): `read=N` with `part=lists` gives group N's reading lists,
 each paper with its abstract; `part=papers&page=1, 2, …` gives *all* of its papers with abstracts, most central
-first (most linked to the rest of the group). Add `group=M` to read a group of the split of group M.
+first (most linked to the rest of the group). `read=0` gives the whole topic's reading lists the same way (lists
+only). Add `group=M` to read a group of the split of group M.
 As text: `/topics/{question}?read=N&part=lists` (`abstracts=full|short|none`).
 
 **Pages, never cuts.** Text answers are pages of at most ~64k characters (~16-20k tokens: under what AI apps
