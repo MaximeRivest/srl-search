@@ -1,0 +1,102 @@
+{
+ "frag/per-topic": {
+  "papers": 38557,
+  "population": {
+   "precision": 0.823,
+   "recall": 0.686,
+   "f1": 0.748
+  },
+  "cited50": {
+   "precision": 0.928,
+   "recall": 0.813,
+   "f1": 0.867
+  },
+  "meta_refs": 0.819,
+  "meta_refs_title_only": 0.803,
+  "jev_usd": 0.432,
+  "jev_checked": 16169,
+  "cut": 0.342,
+  "seconds": 205
+ },
+ "frag/general-2B": {
+  "papers": 47122,
+  "population": {
+   "precision": 0.774,
+   "recall": 0.723,
+   "f1": 0.747
+  },
+  "cited50": {
+   "precision": 0.802,
+   "recall": 0.854,
+   "f1": 0.827
+  },
+  "meta_refs": 0.866,
+  "meta_refs_title_only": 0.878,
+  "jev_usd": 0.605,
+  "jev_checked": 28310,
+  "cut": 0.334,
+  "seconds": 498,
+  "judge_s": 270
+ },
+ "frag/general-0.8B": {
+  "papers": 61848,
+  "population": {
+   "precision": 0.619,
+   "recall": 0.735,
+   "f1": 0.672
+  },
+  "cited50": {
+   "precision": 0.674,
+   "recall": 0.885,
+   "f1": 0.765
+  },
+  "meta_refs": 0.895,
+  "meta_refs_title_only": 0.904,
+  "jev_usd": 0.605,
+  "jev_checked": 40586,
+  "cut": 0.328,
+  "seconds": 413,
+  "judge_s": 148
+ },
+ "llm/per-topic": {
+  "papers": 28099,
+  "population": {
+   "precision": 0.554,
+   "recall": 0.79,
+   "f1": 0.651
+  },
+  "landmarks": 0.841,
+  "jev_usd": 0.037,
+  "jev_checked": 1201,
+  "cut": 0.382,
+  "seconds": 128
+ },
+ "llm/general-2B": {
+  "papers": 25784,
+  "population": {
+   "precision": 0.568,
+   "recall": 0.734,
+   "f1": 0.641
+  },
+  "landmarks": 0.818,
+  "jev_usd": 0.034,
+  "jev_checked": 1100,
+  "cut": 0.365,
+  "seconds": 375,
+  "judge_s": 263
+ },
+ "llm/general-0.8B": {
+  "papers": 18130,
+  "population": {
+   "precision": 0.752,
+   "recall": 0.648,
+   "f1": 0.696
+  },
+  "landmarks": 0.818,
+  "jev_usd": 0.031,
+  "jev_checked": 1010,
+  "cut": 0.341,
+  "seconds": 241,
+  "judge_s": 147
+ }
+}

@@ -63,3 +63,27 @@ Setting the line per topic from the run's 400 Kimi answers (`calibrate.py`, `cal
 of on-topic papers right (8.6% vs Kimi's 7.6%; 5.5% vs 4.7%), which counts need. The ranking is the limit, not the line.
 
 Cost: Kimi $46.98 for the training answers; GPU 1 for ~5 hours (shared, stepping aside for maps).
+
+## Inside the real pipeline (`replay.py`, `replay.json`, 2026-10-15)
+
+Both test maps replayed with today's code against the release they were made from (20261014T073821Z: last night's
+release changed the pool, so the teacher's sample would not have matched), the runs' own cached Kimi answers, and only
+the judge that labels 10,000 papers for the students changed. Students, citation combiner, cut-off and Jev's check
+ran for real. The per-topic arm reproduces the real run (38,557 papers vs 38,655; same P/R).
+
+| Topic | Judge | Papers | Population P / R / F1 | Cited 50+ P / R | Meta-analyses' studies (title only) / landmarks | Judge time | Jev |
+|---|---|---:|---:|---:|---:|---:|---:|
+| fragmentation | per-topic decider | 38,557 | 0.82 / 0.69 / 0.75 | 0.93 / 0.81 | 0.82 (0.80) | ~245 s (train 95 + label 150) | $0.43 |
+| fragmentation | general 2B | 47,122 | 0.77 / 0.72 / 0.75 | 0.80 / 0.85 | 0.87 (0.88) | 270 s | $0.60 (cap) |
+| fragmentation | general 0.8B | 61,848 | 0.62 / 0.74 / 0.67 | 0.67 / 0.89 | 0.90 (0.90) | 148 s | $0.60 (cap) |
+| LLM post-training | per-topic decider | 28,099 | 0.55 / 0.79 / 0.65 | - | 0.84 | ~245 s | $0.04 |
+| LLM post-training | general 2B | 25,784 | 0.57 / 0.73 / 0.64 | - | 0.82 | 263 s | $0.03 |
+| LLM post-training | general 0.8B | 18,130 | 0.75 / 0.65 / 0.70 | - | 0.82 | 147 s | $0.03 |
+
+No switch. The general 2B gives the same maps' balance (F1 0.75 / 0.64 vs 0.75 / 0.65) and finds more classics
+(0.87 vs 0.82), but it makes fragmentation's map more lenient (47k papers; well-cited precision 0.80 vs 0.93, the
+part reading lists show), uses Jev's whole cap, and saves no time (a 2B labels 10k papers about as slowly as the
+per-topic decider trains and labels). The 0.8B is faster but mixed (worse on fragmentation, better on LLM
+post-training, whose estimates are noisy: single papers stand for ~1,100 candidates). Why the judge's better
+classics do not carry through: the per-topic decider is already ~0.98 AUC on its own topic, and the final answer comes
+from the students, the combiner and Jev; the general judge's leniency moves the whole map, its classics only a few.
