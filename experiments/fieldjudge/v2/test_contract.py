@@ -37,6 +37,15 @@ class ContractTests(unittest.TestCase):
     def test_provider_failure_stops(self):
         with patch.object(allowance,'get_usage',side_effect=TimeoutError):
             with self.assertRaises(allowance.Pause): allowance.check('sol',force=True)
+    def test_usage_rate_limit_waits_without_allowing_calls(self):
+        import urllib.error
+        error = urllib.error.HTTPError('usage',429,'limited',{},None)
+        status={'rate_limit':{'limit_reached':False,'primary_window':{'used_percent':4}},'credits':{'balance':0}}
+        with tempfile.TemporaryDirectory() as d, patch.object(allowance,'ROOT',Path(d)), \
+             patch.object(allowance,'get_usage',side_effect=[error,status]) as get, patch.object(allowance.time,'sleep') as sleep:
+            allowance.check('sol',force=True)
+            sleep.assert_called_once_with(300.0)
+            self.assertEqual(get.call_count,2)
     def test_checks_all_windows_and_persists_credit_floor(self):
         with tempfile.TemporaryDirectory() as d, patch.object(allowance,'ROOT',Path(d)):
             status={'rate_limit':{'limit_reached':False,'primary_window':{'used_percent':4},'secondary_window':{'used_percent':12}},

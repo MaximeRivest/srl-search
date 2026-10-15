@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 import time
 import urllib.request
+import urllib.error
 from datetime import datetime, timezone
 from pathlib import Path
 from common import ROOT, write_json
@@ -33,6 +34,12 @@ def check(model, force=False):
     """Share one usage observation per minute; querying the usage endpoint itself is rate-limited."""
     try:
         status_path = ROOT / f"allowance-{model}.json"
+        cooldown = ROOT / f"usage-cooldown-{model}.json"
+        if cooldown.exists():
+            remaining = json.loads(cooldown.read_text()).get('until', 0) - time.time()
+            if remaining > 0:
+                print(f'{model}: usage endpoint cooling down; no calls for {remaining:.0f}s', flush=True)
+                time.sleep(remaining)
         if not force and status_path.exists():
             previous = json.loads(status_path.read_text())
             age = time.time() - datetime.fromisoformat(previous['checked']).timestamp()
@@ -46,7 +53,20 @@ def check(model, force=False):
                 if previous.get('blocked'):
                     raise Pause('provider reports allowance exhausted')
                 return previous
-        u = get_usage(model)
+        while True:
+            try:
+                u = get_usage(model)
+                break
+            except urllib.error.HTTPError as error:
+                if error.code != 429:
+                    raise
+                try:
+                    delay = max(300.0, float(error.headers.get('Retry-After') or 0))
+                except (TypeError, ValueError, AttributeError):
+                    delay = 300.0
+                write_json(cooldown, {'until': time.time() + delay})
+                print(f'{model}: usage endpoint rate-limited; no model calls, waiting {delay:.0f}s', flush=True)
+                time.sleep(delay)
         windows = []
         if model == "opus":
             for name in ("five_hour", "seven_day"):

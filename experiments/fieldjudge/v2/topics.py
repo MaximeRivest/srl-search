@@ -118,6 +118,13 @@ def generate():
                 continue
             flagged = set()
             for model in ("sol", "opus"):
+                screen_path = ROOT / 'topic-generation' / f'{key}-{model}-screen.json'
+                if screen_path.exists():
+                    verdicts = json.loads(screen_path.read_text())
+                    if [v['id'] for v in verdicts] != [c['id'] for c in candidates]:
+                        raise ValueError('screen checkpoint/input mismatch')
+                    flagged.update(v['id'] for v in verdicts if v['overlap'])
+                    continue
                 failure = ROOT / "topic-generation" / f"{key}-{model}-failure.json"
                 if failure.exists() and 'Refusal' in str(json.loads(failure.read_text()).get('error')):
                     flagged.update(c['id'] for c in candidates)
