@@ -24,7 +24,7 @@ TOPICS = {"frag": ("habitat fragmentation", None),
           "llm": ("LLM post-training", "training large language models after pretraining: supervised fine-tuning and instruction "
                   "tuning, reinforcement learning from human or AI feedback, preference optimization such as DPO, reinforcement "
                   "learning for reasoning, and alignment training")}
-ARMS = ("per-topic", "general-2B", "general-0.8B")
+ARMS = ("per-topic", "general-2B", "general-0.8B", "ensemble", "2B-only")
 ctx = F.Ctx()
 cit = ctx.cit
 bad = [i for i, tn in enumerate(cit.types) if tn in NON_PUBLICATION_TYPES]
@@ -71,10 +71,13 @@ for (t, arm), m in maps.items():
                 s.add((name, p["id"]))
     seen[(t, arm)] = s
 
-# Kimi on every distinct reading-list paper, once per topic
+# Kimi on every distinct reading-list paper, once per topic (answers from an earlier run kept)
+prev = json.loads((Path(__file__).parent / "readinglists.json").read_text())["labels"] \
+    if (Path(__file__).parent / "readinglists.json").exists() else {}
 labels = {}
 for t, (q, defin) in TOPICS.items():
-    ws = sorted({int(pid[1:]) for arm in ARMS for _, pid in seen[(t, arm)]})
+    old = {int(k): v for k, v in (prev.get(t) or {}).items()}
+    ws = sorted({int(pid[1:]) for arm in ARMS for _, pid in seen[(t, arm)]} - set(old))
     det = F._details(ctx, ws)
     texts = []
     for w in ws:
@@ -86,7 +89,7 @@ for t, (q, defin) in TOPICS.items():
             texts.append(J.paper_text(cit.title(nd) if nd >= 0 else "", None))
     k = J.Teacher(6.0)
     y = k.label(texts, q, defin)
-    labels[t] = {w: v for w, v in zip(ws, y.tolist())}
+    labels[t] = {**old, **{w: v for w, v in zip(ws, y.tolist())}}
     print(t, len(ws), "reading-list papers judged, $", round(k.usd, 2), "failed", k.failed, flush=True)
 
 out = {}

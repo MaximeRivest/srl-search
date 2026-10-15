@@ -21,7 +21,22 @@ RUNS = {"frag": ("habitat fragmentation", None, "fields-test5/a699318c9a209d289e
         "llm": ("LLM post-training", "training large language models after pretraining: supervised fine-tuning and instruction "
                 "tuning, reinforcement learning from human or AI feedback, preference optimization such as DPO, reinforcement "
                 "learning for reasoning, and alignment training", "fields-test6/1a0c3446c53e7f1da081def4")}
-ARMS = {"per-topic": None, "general-2B": D / "m2b" / "merged", "general-0.8B": D / "m08" / "merged"}
+ARMS = {"per-topic": None, "general-2B": D / "m2b" / "merged", "general-0.8B": D / "m08" / "merged",
+        "ensemble": "ensemble",      # Kimi and Jev as now; the 10k labels: mean logit of the per-topic decider and the 2B
+        "2B-only": "2B-only"}        # no Kimi, no Jev: the 2B is the teacher, the 10k labeller and the final checker
+M2B = D / "m2b" / "merged"
+VPY = "/nix/store/skvyvs8jj0k7q4vw2137blrnfp3y5cb2-vllm-runtime-0.29.0/bin/python"
+lgt = lambda p: np.log(np.clip(p, 1e-4, 1 - 1e-4) / (1 - np.clip(p, 1e-4, 1 - 1e-4)))
+
+
+def score_2b(texts, question, work: Path) -> np.ndarray:
+    """The general 2B on these papers, the topic's question in each prompt (vLLM, srl_search/vllm_decider.py)."""
+    work.mkdir(parents=True, exist_ok=True)
+    (work / "score.jsonl").write_text("".join(json.dumps({"text": x, "system": question}) + "\n" for x in texts))
+    J.wait_for_gpu(10000, print)
+    J.run([VPY, str(Path(J.__file__).with_name("vllm_decider.py")), str(M2B), str(work / "score.jsonl"),
+           str(work / "scores.json"), J.GPU], work / "log.txt")
+    return np.array(json.loads((work / "scores.json").read_text()))
 tests = [json.loads(l) for l in open(D / "tests.jsonl")]
 ctx = F.Ctx()
 
@@ -59,7 +74,7 @@ def measure(t, chosen):
 
 
 res = json.loads((Path(__file__).parent / "replay.json").read_text()) if (Path(__file__).parent / "replay.json").exists() else {}
-saved = (J.Teacher, J.train_decider, J.decider_scores)
+saved = (J.Teacher, J.train_decider, J.decider_scores, J.Jev)
 for t, (q, defin, run) in RUNS.items():
     f = json.loads((Path("/mnt/fast/scholarsreadinglist/search") / run / "field.json").read_text())
     teach = {int(w): v for w, v in f["labels"]["teacher"].items()}
@@ -83,6 +98,16 @@ for t, (q, defin, run) in RUNS.items():
 
         def scores(model_dir, texts, say, model=model):
             t0 = time.time()
+            if model == "ensemble":                     # the 2B's scores of these same papers, from its own arm
+                prev = OUT / f"{t}-general-2B" / "work" / "decider"
+                cache = dict(zip((json.loads(l)["text"] for l in open(prev / "score.jsonl")), json.loads((prev / "scores.json").read_text())))
+                miss = sum(x not in cache or x not in by_text_d for x in texts)
+                assert miss == 0, f"{miss} papers not scored by both"
+                return 1 / (1 + np.exp(-(lgt(np.array([by_text_d[x] for x in texts])) + lgt(np.array([cache[x] for x in texts]))) / 2))
+            if model == "2B-only":
+                p = score_2b(texts, question, model_dir)
+                timing["judge_s"] = round(time.time() - t0)
+                return p
             if model is None:
                 miss = sum(x not in by_text_d for x in texts)
                 assert miss == 0, f"{miss} decider texts not cached"
@@ -97,14 +122,27 @@ for t, (q, defin, run) in RUNS.items():
             timing["judge_s"] = round(time.time() - t0)
             return np.array(json.loads((model_dir / "scores.json").read_text()))
 
-        J.Teacher, J.train_decider, J.decider_scores = CachedTeacher, (lambda *a, **k: None), scores
+        work = OUT / f"{t}-{arm}" / "work"
+
+        class Teacher2B:                                # the 2B in Kimi's place
+            def __init__(self, b): self.usd, self.failed, self.slowest = 0.0, 0, {}
+            def label(self, texts, q_, d_): return score_2b(texts, question, work / "teacher2b")
+
+        class Check2B:                                  # the 2B in Jev's place
+            def __init__(self, b): self.usd, self.failed, self.budget = 0.0, 0, b
+            def label(self, pairs, q_, d_): return score_2b([J.paper_text(a_, b_) for a_, b_ in pairs], question, work / "check2b")
+
+        J.Teacher = Teacher2B if model == "2B-only" else CachedTeacher
+        J.train_decider, J.decider_scores = (lambda *a, **k: None), scores
+        if model == "2B-only":
+            J.Jev = Check2B
         job = F.Job(OUT, f"{t}-{arm}")
         job.dir.mkdir(parents=True, exist_ok=True)
         try:
             t0 = time.time()
             sel = F.select_field(ctx, job, q, defin, None)
         finally:
-            J.Teacher, J.train_decider, J.decider_scores = saved
+            J.Teacher, J.train_decider, J.decider_scores, J.Jev = saved
         chosen = {int(w) for w in sel["papers"]}
         res[key] = {**measure(t, chosen), "jev_usd": sel["report"]["check"]["usd"], "jev_checked": sel["report"]["check"]["papers"],
                     "cut": sel["report"]["judging"]["cut"], "seconds": round(time.time() - t0), **timing}

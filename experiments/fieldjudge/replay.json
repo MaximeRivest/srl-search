@@ -98,5 +98,71 @@
   "cut": 0.341,
   "seconds": 241,
   "judge_s": 147
+ },
+ "frag/ensemble": {
+  "papers": 41083,
+  "population": {
+   "precision": 0.798,
+   "recall": 0.684,
+   "f1": 0.736
+  },
+  "cited50": {
+   "precision": 0.811,
+   "recall": 0.814,
+   "f1": 0.813
+  },
+  "meta_refs": 0.838,
+  "meta_refs_title_only": 0.851,
+  "jev_usd": 0.481,
+  "jev_checked": 18060,
+  "cut": 0.351,
+  "seconds": 245
+ },
+ "frag/2B-only": {
+  "papers": 49978,
+  "population": {
+   "precision": 0.747,
+   "recall": 0.726,
+   "f1": 0.737
+  },
+  "cited50": {
+   "precision": 0.84,
+   "recall": 0.871,
+   "f1": 0.855
+  },
+  "meta_refs": 0.833,
+  "meta_refs_title_only": 0.862,
+  "jev_usd": 0.0,
+  "jev_checked": 18884,
+  "cut": 0.381,
+  "seconds": 1025,
+  "judge_s": 272
+ },
+ "llm/ensemble": {
+  "papers": 25297,
+  "population": {
+   "precision": 0.631,
+   "recall": 0.754,
+   "f1": 0.687
+  },
+  "landmarks": 0.841,
+  "jev_usd": 0.035,
+  "jev_checked": 1131,
+  "cut": 0.369,
+  "seconds": 121
+ },
+ "llm/2B-only": {
+  "papers": 29426,
+  "population": {
+   "precision": 0.483,
+   "recall": 0.807,
+   "f1": 0.604
+  },
+  "landmarks": 0.864,
+  "jev_usd": 0.0,
+  "jev_checked": 1033,
+  "cut": 0.408,
+  "seconds": 540,
+  "judge_s": 265
  }
 }

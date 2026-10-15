@@ -110,3 +110,26 @@ per-topic map has 4 mostly-off-topic groups (BERT-era machine translation, visio
 speech recognition: their lists 10-38% on topic); the general models' maps have none, and their "start here" lists go
 from 46% to 67-76% on topic. So where readers look, the general judges help on the topic the per-topic decider gets
 wrong, and the 2B costs nothing on the other. One run per arm, two topics.
+
+## Ensemble, and the 2B alone (no Kimi, no Jev)
+
+Two more replay arms: "ensemble" (Kimi and Jev as now; the 10k labels are the mean logit of the per-topic decider
+and the 2B) and "2B-only" (the 2B is the teacher of the 400 papers, labels the 10k, and does Jev's final check: no
+paid AI at all). Reading lists judged as above (+$0.42 for the new papers).
+
+| Topic | Arm | Papers | Map P / R / F1 | Cited 50+ P / landmarks | Lists on topic | "Start here" | Mostly off-topic groups | AI $ |
+|---|---|---:|---:|---:|---:|---:|---:|---:|
+| fragmentation | per-topic (now) | 38,557 | 0.82 / 0.69 / 0.75 | 0.93 | 80% | 97% | 0 of 11 | 0.91 |
+| fragmentation | general 2B | 47,122 | 0.77 / 0.72 / 0.75 | 0.80 | 79% | 94% | 0 of 12 | 1.08 |
+| fragmentation | ensemble | 41,083 | 0.80 / 0.68 / 0.74 | 0.81 | 80% | 95% | 0 of 12 | 0.96 |
+| fragmentation | 2B only | 49,978 | 0.75 / 0.73 / 0.74 | 0.84 | 77% | 92% | 0 of 11 | 0 |
+| LLM post-training | per-topic (now) | 28,099 | 0.55 / 0.79 / 0.65 | 0.84 | 48% | 46% | 4 of 11 | 0.56 |
+| LLM post-training | general 2B | 25,784 | 0.57 / 0.73 / 0.64 | 0.82 | 61% | 67% | 0 of 10 | 0.55 |
+| LLM post-training | ensemble | 25,297 | 0.63 / 0.75 / 0.69 | 0.84 | 62% | 70% | 2 of 10 | 0.56 |
+| LLM post-training | 2B only | 29,426 | 0.48 / 0.81 / 0.60 | 0.86 | 55% | 61% | 1 of 9 | 0 |
+
+The ensemble is between its two parts, not better. The 2B alone, with no paid AI, makes maps about as good as today's
+on these two topics: a little worse on fragmentation (lists 77% vs 80%, "start here" 92% vs 97%, well-cited precision
+0.84 vs 0.93), better where today's map fails (LLM post-training lists 55% vs 48%, 1 off-topic group vs 4), worse in
+map-wide precision there (0.48 vs 0.55). It costs GPU time instead: ~17 min of selection in the replay vs ~8 min for a
+real run today (two extra vLLM passes: the teacher's 400 and ~19k checked papers), so a map takes ~25 min.
