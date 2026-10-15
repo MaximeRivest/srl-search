@@ -635,24 +635,32 @@ def fields_queue():
     return JSONResponse(topics_service().field_store().queue_view(), headers={"Cache-Control": "no-store"})
 
 
-_FIELD_VECS: dict[str, np.ndarray] = {}
+_FIELD_PAPERS: dict[str, tuple[float, frozenset]] = {}
+
+
+def _field_papers(store, key: str) -> frozenset:
+    """The work numbers of one whole-field map (kept in memory; reread when its field.json changes)."""
+    f = store.root / key / "field.json"
+    m = f.stat().st_mtime
+    if key not in _FIELD_PAPERS or _FIELD_PAPERS[key][0] != m:
+        _FIELD_PAPERS[key] = (m, frozenset(int(w) for w in json.loads(f.read_text())["papers"]))
+    return _FIELD_PAPERS[key][1]
 
 
 @app.get("/fields")
-def fields_made(q: str | None = Query(None, max_length=500, description="Words or a question: the maps closest in "
-                                      "meaning first (score: 0-1 similarity of the topics)."),
+def fields_made(q: str | None = Query(None, max_length=500, description="Words or a question: the maps that hold "
+                                      "most of the 50 studies closest to it first (score: that share, 0-1)."),
                 limit: int = Query(50, ge=1, le=500)):
     """Every whole-field map made so far (public: anyone can open them with /topics?scope=field and the same topic
-    and definition), newest first, or closest to q."""
-    rows = topics_service().field_store().made()
+    and definition), newest first, or the maps that cover q: of the 50 studies closest in meaning to q, the share
+    each map holds (`score`; "direct preference optimization" -> LLM post-training 0.6+, an unrelated subject 0)."""
+    store = topics_service().field_store()
+    rows = store.made()
     if q and rows:
+        near = [int(r["id"][1:]) for r in engine.search(q, k=50, abstracts=False)["results"]]
         for r in rows:
-            if r["key"] not in _FIELD_VECS:
-                text = r["topic"] + (f": {r['definition']}" if r.get("definition") else "")
-                _FIELD_VECS[r["key"]] = engine.encoder.encode(text)[0]
-        qv = engine.encoder.encode(q)[0]
-        for r in rows:
-            r["score"] = round(float(np.dot(qv, _FIELD_VECS[r["key"]])), 3)
+            papers = _field_papers(store, r["key"])
+            r["score"] = round(sum(w in papers for w in near) / max(1, len(near)), 3)
         rows.sort(key=lambda r: -r["score"])
     return JSONResponse({"maps": rows[:limit], "total": len(rows)}, headers={"Cache-Control": "no-store"})
 
