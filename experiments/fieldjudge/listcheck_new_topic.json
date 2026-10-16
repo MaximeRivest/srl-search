@@ -1,0 +1,29 @@
+{
+ "usd": 0.363,
+ "before": {
+  "on_topic": 0.861,
+  "shown": 288,
+  "by_list": {
+   "start_here": 0.917,
+   "core": 0.562,
+   "distinctive": 0.812,
+   "rising": 0.938,
+   "bridges": 0.958,
+   "newest": 0.979,
+   "foundations": null
+  }
+ },
+ "after": {
+  "on_topic": 0.958,
+  "shown": 288,
+  "by_list": {
+   "start_here": 0.917,
+   "core": 0.958,
+   "distinctive": 0.938,
+   "rising": 1.0,
+   "bridges": 0.958,
+   "newest": 0.979,
+   "foundations": 0.333
+  }
+ }
+}
