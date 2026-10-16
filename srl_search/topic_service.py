@@ -44,7 +44,8 @@ PAGE_CHARS = 64_000
 # divides, and "split this group" opens at once (the same split, cached under its own request).
 SPLIT_FROM = 60
 # What the map carries of each subgroup (its papers: papers.sub; the split's own map has everything)
-SUB_KEYS = ("id", "name", "phrases", "size", "years", "typical", "centre", "cites_groups", "between", "cloud", "lenses")
+SUB_KEYS = ("id", "name", "label", "phrases", "size", "years", "typical", "centre", "cites_groups", "between", "cloud",
+            "lenses")                     # label: an AI-written name and description (whole-field maps, srl_search/suggest.py)
 
 
 def clean_abstract(a: str | None) -> str | None:

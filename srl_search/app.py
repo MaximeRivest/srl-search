@@ -650,6 +650,23 @@ def _field_papers(store, key: str) -> frozenset:
     return _FIELD_PAPERS[key][1]
 
 
+@app.get("/fields/suggest")
+def fields_suggest(q: str = Query(..., min_length=2, max_length=300, description="The topic as someone typed it."),
+                   definition: str | None = Query(None, max_length=600, description="What they said it covers (optional).")):
+    """Five well-phrased versions of a topic before asking for its whole-field map, each with a one-sentence
+    definition that sets its scope and settles ambiguous words ("LLM": large language models, or the law degree):
+    the closest to what was typed first, then narrower, broader or other readings (`note` says which). Written by
+    an AI (Kimi K3), cached; a few seconds the first time. 503 when unavailable: the topic as typed still works.
+    Counts as 5 requests at the public door."""
+    from srl_search import suggest
+    try:
+        return JSONResponse(suggest.rewrites(q, definition), headers={"Cache-Control": "no-store"})
+    except suggest.Unavailable as e:
+        raise HTTPException(503, str(e), headers={"Retry-After": "3600"})
+    except ValueError:
+        raise HTTPException(503, "no usable suggestions this time; the topic as typed works")
+
+
 @app.get("/fields")
 def fields_made(q: str | None = Query(None, max_length=500, description="Words or a question: the maps that hold "
                                       "most of the 50 studies closest to it first (score: that share, 0-1)."),

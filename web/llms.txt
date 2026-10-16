@@ -160,6 +160,9 @@ published reviews cite. A topic too broad (its edge still mostly on topic) or to
 **The line** (`GET /fields/queue`): new whole-field maps wait their turn. Free maps go in the order asked, about
 `free_per_day` a day (each takes 15-25 minutes of our graphics card); at most 2 waiting per reader. On sciencemadereadable.com a reader
 can pay to put a map in the paid line, which goes first. Topics in the line are public, as their maps will be.
+**Better topic wording first** (`GET /fields/suggest?q=...`, optional `definition`): five well-phrased versions of a
+topic (`suggestions`: `topic`, `definition`, `note`), the closest to what was typed first, then narrower, broader or
+other readings of ambiguous words; written by an AI and cached. Ask for the map of the one that fits.
 **Maps already made** (`GET /fields`, optional `q`): every whole-field map, newest first or closest in meaning to
 `q` (`score`); open one with `/topics?scope=field` and its `topic` and `definition`.
 

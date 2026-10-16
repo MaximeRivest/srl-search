@@ -926,6 +926,9 @@ def build_maps(ctx: Ctx, job: Job, sel: dict, version: str) -> dict:
     out.update({"question": q, "mode": "field", "filters": {}, "asked_papers": len(seed.wids),
                 "field": {**sel["report"], "made": sel["made"], "release": sel["release"]}})
     dirm = job.dir / "maps" / version
+    field_name = q + (f" ({sel['definition']})" if sel.get("definition") else "")
+    job.stage(6, "naming the research groups")
+    usd = label_maps(field_name, out)
     job.done_stage(6, t)
 
     t = time.time()
@@ -941,13 +944,51 @@ def build_maps(ctx: Ctx, job: Job, sel: dict, version: str) -> dict:
         sub = finish(ctx, cit, sub, sub_seed, ctx.release["id"])
         sub["papers"]["via"] = [via.get(pid[1:], {}).get("via", "") for pid in sub["papers"]["id"]]
         sub.update({"question": q, "mode": "field", "filters": {}, "asked_papers": len(members),
-                    "parent": {"group": g["id"], "name": g["name"], "size": g["size"]}})
+                    "parent": {"group": g["id"], "name": g["name"], "label": g.get("label"), "size": g["size"]}})
+        usd += label_maps(field_name, sub, parent=(g.get("label") or {}).get("name") or g["name"])
         _write(dirm / f"group-{g['id']}.json", sub)
         splits[g["id"]] = sub
     embed_splits(out, splits)
+    out["field"]["labels_usd"] = round(usd, 4)
     _write(dirm / "main.json", out)                    # last: a version with its main map is complete
     job.done_stage(7, t)
     return out
+
+
+def label_maps(field_name: str, m: dict, parent: str | None = None) -> float:
+    """AI names and descriptions for a map's groups (srl_search/suggest.py); never fails the job: without a label a
+    group keeps its phrases."""
+    try:
+        from srl_search import suggest
+        return suggest.label_groups(field_name, m.get("groups", []), parent)
+    except Exception as e:  # noqa: BLE001
+        print(f"group names not written: {type(e).__name__}", flush=True)
+        return 0.0
+
+
+def label_made_maps(store: Path = ROOT) -> None:
+    """Backfill: names and descriptions for the groups of whole-field maps already made (current map code only)."""
+    from srl_search.topic_service import VERSION, embed_splits
+    for st_path in sorted(store.glob("*/job.json")):
+        dirm = st_path.parent / "maps" / VERSION
+        main = _read(dirm / "main.json")
+        if not main:
+            continue
+        req = (_read(st_path) or {}).get("request") or {}
+        name = req.get("q", main.get("question", "")) + (f" ({req['definition']})" if req.get("definition") else "")
+        usd = label_maps(name, main)
+        splits = {}
+        for g in main["groups"]:
+            sub = _read(dirm / f"group-{g['id']}.json")
+            if sub:
+                sub["parent"] = {**sub.get("parent", {}), "label": g.get("label")}
+                usd += label_maps(name, sub, parent=(g.get("label") or {}).get("name") or g["name"])
+                _write(dirm / f"group-{g['id']}.json", sub)
+                splits[g["id"]] = sub
+        embed_splits(main, splits)
+        main.setdefault("field", {})["labels_usd"] = round(usd + main.get("field", {}).get("labels_usd", 0), 4)
+        _write(dirm / "main.json", main)
+        print(f"{name[:60]}: {sum(1 for g in main['groups'] if g.get('label'))}/{len(main['groups'])} groups named, ${usd:.3f}", flush=True)
 
 
 def run_job(ctx: Ctx, store: Path, key: str) -> None:
@@ -1026,6 +1067,8 @@ def worker(store: Path = ROOT) -> None:
 def main(argv: list[str]) -> None:
     if argv[:1] == ["worker"]:
         return worker()
+    if argv[:1] == ["label-maps"]:                  # backfill AI group names on whole-field maps already made
+        return label_made_maps(Path(os.environ.get("SRL_FIELDS", str(ROOT))))
     if argv[:1] == ["run"] and len(argv) >= 2:      # run TOPIC [DEFINITION]: one topic, now, in this process
         store = Path(os.environ.get("SRL_FIELDS", str(ROOT)))
         definition = argv[2] if len(argv) >= 3 else None
