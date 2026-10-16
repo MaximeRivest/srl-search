@@ -241,23 +241,23 @@ class FieldStore:
             start: bool = True) -> dict:
         key = field_key(q, definition, keywords)
         d = self.root / key
-        main = d / "maps" / version / "main.json"
-        if main.exists():
-            if group is None:
-                out = _read(main)
-                if self.credit(key):
-                    out["field"] = {**out.get("field", {}), "credit": self.credit(key)}
-                return out
-            sub = d / "maps" / version / f"group-{group}.json"
-            if sub.exists():
-                return _read(sub)
-            m = _read(main)
-            n = len(m.get("groups", []))
-            if not 1 <= group <= n:
-                raise HTTPException(404, f"no group {group}; this map has groups 1-{n}")
-            raise HTTPException(404, f"group {group} has fewer than {SPLIT_MIN} papers and was not split further: "
-                                     f"read it in full instead (read={group})")
+        if (d / "maps" / version / "main.json").exists():
+            return self._serve(key, d / "maps" / version, group)
         st = self.status(key)
+        older = self._older(d, version)
+        if older is not None:
+            # made by older map code: it opens as it is while the current code remakes it (no AI, minutes)
+            failed_here = bool(st and st.get("status") == "failed" and st.get("version") == version)
+            if not (st and st.get("status") in ("queued", "running")) and not failed_here and (d / "field.json").exists():
+                prev = _read(d / "job.json") or {}
+                _write(d / "job.json", {"status": "queued", "kind": "map", "key": key, "created": _now(),
+                                        "version": version, "request": {"q": q, "definition": definition,
+                                                                        "keywords": keywords},
+                                        **{k: prev[k] for k in ("summary", "finished") if k in prev}})
+                (self.root / "queue" / f"{key}.job").write_text(key)
+            out = self._serve(key, older, group)
+            out["field"] = {**out.get("field", {}), "rebuilding": True}
+            return out
         if st and st.get("status") in ("queued", "running"):
             raise Pending(st)
         if st and st.get("status") == "failed" and st.get("final"):
@@ -287,6 +287,29 @@ class FieldStore:
         _write(d / "job.json", st)
         (self.root / "queue" / f"{key}.job").write_text(key)
         raise Pending(self.status(key) or st)
+
+    @staticmethod
+    def _older(d: Path, version: str) -> Path | None:
+        """The newest map of this topic made by other (older) map code, if any."""
+        dirs = [m.parent for m in (d / "maps").glob("*/main.json") if m.parent.name != version]
+        return max(dirs, key=lambda x: (x / "main.json").stat().st_mtime) if dirs else None
+
+    def _serve(self, key: str, dirm: Path, group: int | None) -> dict:
+        main = dirm / "main.json"
+        if group is None:
+            out = _read(main)
+            if self.credit(key):
+                out["field"] = {**out.get("field", {}), "credit": self.credit(key)}
+            return out
+        sub = dirm / f"group-{group}.json"
+        if sub.exists():
+            return _read(sub)
+        m = _read(main)
+        n = len(m.get("groups", []))
+        if not 1 <= group <= n:
+            raise HTTPException(404, f"no group {group}; this map has groups 1-{n}")
+        raise HTTPException(404, f"group {group} has fewer than {SPLIT_MIN} papers and was not split further: "
+                                 f"read it in full instead (read={group})")
 
     def queue_view(self) -> dict:
         """The public line: what is being made, what waits (topics are public, as the maps will be), today's count."""
@@ -838,7 +861,7 @@ class FinalError(Exception):
 
 def build_maps(ctx: Ctx, job: Job, sel: dict, version: str) -> dict:
     from srl_search import topics as T
-    from srl_search.topic_service import finish
+    from srl_search.topic_service import embed_splits, finish
     cit = ctx.cit
     t = time.time()
     job.stage(6, f"grouping {len(sel['papers']):,} papers")
@@ -864,30 +887,34 @@ def build_maps(ctx: Ctx, job: Job, sel: dict, version: str) -> dict:
     seed = seed.subset(T.collapse_versions(seed, cit))
     q = sel["topic"]
     T.PARALLEL_MIN = 1500                              # the worker owns its cores: Leiden runs side by side
-    raw = T.build(seed, cit, q, T.Options(refs_top=30, workers=LEIDEN_WORKERS))
+    background = ctx.keywords.phrase_counts if ctx.keywords is not None else None
+    raw = T.build(seed, cit, q, T.Options(refs_top=30, workers=LEIDEN_WORKERS), background=background)
     out = finish(ctx, cit, raw, seed, ctx.release["id"])
     via = sel["papers"]
     out["papers"]["via"] = [via.get(pid[1:], {}).get("via", "") for pid in out["papers"]["id"]]
     out.update({"question": q, "mode": "field", "filters": {}, "asked_papers": len(seed.wids),
                 "field": {**sel["report"], "made": sel["made"], "release": sel["release"]}})
     dirm = job.dir / "maps" / version
-    _write(dirm / "main.json", out)
     job.done_stage(6, t)
 
     t = time.time()
     big = [g for g in out["groups"] if g["size"] >= SPLIT_MIN]
+    splits = {}
     by_w = {int(w): i for i, w in enumerate(seed.wids)}
     for j, g in enumerate(big):
         job.stage(7, f"splitting group {g['id']} ({g['size']:,} papers), {j + 1} of {len(big)}")
         members = [by_w[int(pid[1:])] for pid, gg in zip(out["papers"]["id"], out["papers"]["group"]) if gg == g["id"]]
         sub_seed = seed.subset(np.array(members))
         sub = T.build(sub_seed, cit, q, T.Options(refs_top=30, min_size=max(8, len(members) // 25), min_groups=2,
-                                                  max_groups=8, workers=LEIDEN_WORKERS))
+                                                  max_groups=8, workers=LEIDEN_WORKERS), background=background)
         sub = finish(ctx, cit, sub, sub_seed, ctx.release["id"])
         sub["papers"]["via"] = [via.get(pid[1:], {}).get("via", "") for pid in sub["papers"]["id"]]
         sub.update({"question": q, "mode": "field", "filters": {}, "asked_papers": len(members),
                     "parent": {"group": g["id"], "name": g["name"], "size": g["size"]}})
         _write(dirm / f"group-{g['id']}.json", sub)
+        splits[g["id"]] = sub
+    embed_splits(out, splits)
+    _write(dirm / "main.json", out)                    # last: a version with its main map is complete
     job.done_stage(7, t)
     return out
 
