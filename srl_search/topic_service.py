@@ -240,9 +240,13 @@ class TopicService:
                     parent = (g.get("label") or {}).get("name") or (m.get("parent") or {}).get("name")
                     if g.get("label"):
                         m.setdefault("parent", {})["label"] = g["label"]
-                usd = suggest.label_map(q, m, parent, lane="topic_labels", cap=suggest.TOPIC_LABELS_USD)
+                cap = suggest.TOPIC_LABELS_USD           # the groups first (saved at once), then their subgroups
+                usd = suggest.label_groups(q, m.get("groups", []), parent, lane="topic_labels", cap=cap)
                 if any(g.get("label") for g in m.get("groups", [])):
                     m.setdefault("timing", {})["labels_usd"] = round(usd, 4)
+                    self._store(path, m)
+                    usd += suggest.label_map(q, m, parent, lane="topic_labels", cap=cap)
+                    m["timing"]["labels_usd"] = round(usd, 4)
                     self._store(path, m)
             except Exception as e:  # noqa: BLE001
                 print(f"topics: groups not named ({type(e).__name__})", file=sys.stderr, flush=True)
