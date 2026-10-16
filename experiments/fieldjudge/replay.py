@@ -8,14 +8,15 @@ Measured against Kimi: tests.jsonl (population sample, papers cited 50+, meta-an
 
     ../../.venv/bin/python replay.py        (GPU 1; keys in the environment; writes replay.json)
 """
-import json, sys, time
+import json, os, sys, time
 from pathlib import Path
 import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from srl_search import field as F, judges as J
 
 D = Path("/mnt/fast/scholarsreadinglist/fieldjudge")
-OUT = Path("/mnt/fast/scholarsreadinglist/search/fields-r3")
+OUT = Path(os.environ.get("REPLAY_OUT", "/mnt/fast/scholarsreadinglist/search/fields-r3"))
+RESULTS = Path(__file__).parent / os.environ.get("REPLAY_RESULTS", "replay.json")
 ANSWER = ' Answer with one word: "yes" (on topic) or "no" (not on topic).'
 RUNS = {"frag": ("habitat fragmentation", None, "fields-test5/a699318c9a209d289e4c3702"),
         "llm": ("LLM post-training", "training large language models after pretraining: supervised fine-tuning and instruction "
@@ -23,18 +24,25 @@ RUNS = {"frag": ("habitat fragmentation", None, "fields-test5/a699318c9a209d289e
                 "learning for reasoning, and alignment training", "fields-test6/1a0c3446c53e7f1da081def4")}
 ARMS = {"per-topic": None, "general-2B": D / "m2b" / "merged", "general-0.8B": D / "m08" / "merged",
         "ensemble": "ensemble",      # Kimi and Jev as now; the 10k labels: mean logit of the per-topic decider and the 2B
-        "2B-only": "2B-only"}        # no Kimi, no Jev: the 2B is the teacher, the 10k labeller and the final checker
+        "2B-only": "2B-only",        # no Kimi, no Jev: the 2B is the teacher, the 10k labeller and the final checker
+        "new08-only": "new08-only",  # the same, with the round-2 0.8B (Sol + Opus labels)
+        "new2B-only": "new2B-only",  # the same, with the round-2 2B (skipped until it exists)
+        "old08-only": "old08-only"}  # the same, with the round-1 0.8B (Kimi labels): the matched baseline
 M2B = D / "m2b" / "merged"
+ONLY = {"2B-only": M2B, "new08-only": D / "v2" / "models" / "0.8B" / "merged",
+        "new2B-only": D / "v2" / "models" / "2B" / "merged", "old08-only": D / "m08" / "merged"}
+if os.environ.get("REPLAY_ARMS"):          # run only these arms, in this order
+    ARMS = {a: ARMS[a] for a in os.environ["REPLAY_ARMS"].split(",")}
 VPY = "/nix/store/skvyvs8jj0k7q4vw2137blrnfp3y5cb2-vllm-runtime-0.29.0/bin/python"
 lgt = lambda p: np.log(np.clip(p, 1e-4, 1 - 1e-4) / (1 - np.clip(p, 1e-4, 1 - 1e-4)))
 
 
-def score_2b(texts, question, work: Path) -> np.ndarray:
+def score_2b(texts, question, work: Path, model_path: Path = M2B) -> np.ndarray:
     """The general 2B on these papers, the topic's question in each prompt (vLLM, srl_search/vllm_decider.py)."""
     work.mkdir(parents=True, exist_ok=True)
     (work / "score.jsonl").write_text("".join(json.dumps({"text": x, "system": question}) + "\n" for x in texts))
     J.wait_for_gpu(10000, print)
-    J.run([VPY, str(Path(J.__file__).with_name("vllm_decider.py")), str(M2B), str(work / "score.jsonl"),
+    J.run([VPY, str(Path(J.__file__).with_name("vllm_decider.py")), str(model_path), str(work / "score.jsonl"),
            str(work / "scores.json"), J.GPU], work / "log.txt")
     return np.array(json.loads((work / "scores.json").read_text()))
 tests = [json.loads(l) for l in open(D / "tests.jsonl")]
@@ -73,7 +81,7 @@ def measure(t, chosen):
     return m
 
 
-res = json.loads((Path(__file__).parent / "replay.json").read_text()) if (Path(__file__).parent / "replay.json").exists() else {}
+res = json.loads(RESULTS.read_text()) if RESULTS.exists() else {}
 saved = (J.Teacher, J.train_decider, J.decider_scores, J.Jev)
 for t, (q, defin, run) in RUNS.items():
     f = json.loads((Path("/mnt/fast/scholarsreadinglist/search") / run / "field.json").read_text())
@@ -94,6 +102,9 @@ for t, (q, defin, run) in RUNS.items():
         key = f"{t}/{arm}"
         if key in res:
             continue
+        if model in ONLY and not (ONLY[model] / "model.safetensors").exists():
+            print(key, "skipped: model not trained yet", flush=True)
+            continue
         timing = {}
 
         def scores(model_dir, texts, say, model=model):
@@ -104,8 +115,8 @@ for t, (q, defin, run) in RUNS.items():
                 miss = sum(x not in cache or x not in by_text_d for x in texts)
                 assert miss == 0, f"{miss} papers not scored by both"
                 return 1 / (1 + np.exp(-(lgt(np.array([by_text_d[x] for x in texts])) + lgt(np.array([cache[x] for x in texts]))) / 2))
-            if model == "2B-only":
-                p = score_2b(texts, question, model_dir)
+            if model in ONLY:
+                p = score_2b(texts, question, model_dir, ONLY[model])
                 timing["judge_s"] = round(time.time() - t0)
                 return p
             if model is None:
@@ -126,15 +137,15 @@ for t, (q, defin, run) in RUNS.items():
 
         class Teacher2B:                                # the 2B in Kimi's place
             def __init__(self, b): self.usd, self.failed, self.slowest = 0.0, 0, {}
-            def label(self, texts, q_, d_): return score_2b(texts, question, work / "teacher2b")
+            def label(self, texts, q_, d_): return score_2b(texts, question, work / "teacher2b", ONLY[model])
 
         class Check2B:                                  # the 2B in Jev's place
             def __init__(self, b): self.usd, self.failed, self.budget = 0.0, 0, b
-            def label(self, pairs, q_, d_): return score_2b([J.paper_text(a_, b_) for a_, b_ in pairs], question, work / "check2b")
+            def label(self, pairs, q_, d_): return score_2b([J.paper_text(a_, b_) for a_, b_ in pairs], question, work / "check2b", ONLY[model])
 
-        J.Teacher = Teacher2B if model == "2B-only" else CachedTeacher
+        J.Teacher = Teacher2B if model in ONLY else CachedTeacher
         J.train_decider, J.decider_scores = (lambda *a, **k: None), scores
-        if model == "2B-only":
+        if model in ONLY:
             J.Jev = Check2B
         job = F.Job(OUT, f"{t}-{arm}")
         job.dir.mkdir(parents=True, exist_ok=True)
@@ -147,5 +158,5 @@ for t, (q, defin, run) in RUNS.items():
         res[key] = {**measure(t, chosen), "jev_usd": sel["report"]["check"]["usd"], "jev_checked": sel["report"]["check"]["papers"],
                     "cut": sel["report"]["judging"]["cut"], "seconds": round(time.time() - t0), **timing}
         print(key, json.dumps(res[key]), flush=True)
-        (Path(__file__).parent / "replay.json").write_text(json.dumps(res, indent=1))
+        RESULTS.write_text(json.dumps(res, indent=1))
 print("REPLAY DONE", flush=True)

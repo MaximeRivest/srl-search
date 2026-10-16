@@ -8,7 +8,7 @@ groups with reading lists (srl_search.field.build_maps, main map only), against 
 
     ../../.venv/bin/python readinglists.py      (SRL_RELEASE=<the runs' release>; keys in the environment)
 """
-import json, sys
+import json, os, sys
 from collections import defaultdict
 from pathlib import Path
 import numpy as np
@@ -18,13 +18,15 @@ from srl_search.engine import passes
 from srl_search.scope import NON_PUBLICATION_TYPES
 from srl_search.topic_service import VERSION
 
-R3 = Path("/mnt/fast/scholarsreadinglist/search/fields-r3")
+R3 = Path(os.environ.get("REPLAY_OUT", "/mnt/fast/scholarsreadinglist/search/fields-r3"))
+OUTFILE = Path(__file__).parent / os.environ.get("READINGLISTS_RESULTS", "readinglists.json")
 TOP = 10
 TOPICS = {"frag": ("habitat fragmentation", None),
           "llm": ("LLM post-training", "training large language models after pretraining: supervised fine-tuning and instruction "
                   "tuning, reinforcement learning from human or AI feedback, preference optimization such as DPO, reinforcement "
                   "learning for reasoning, and alignment training")}
-ARMS = ("per-topic", "general-2B", "general-0.8B", "ensemble", "2B-only")
+ARMS = tuple(a for a in ("per-topic", "general-2B", "general-0.8B", "ensemble", "2B-only", "old08-only", "new08-only", "new2B-only")
+             if all((R3 / f"{t}-{a}" / "work" / "scores.npz").exists() for t in ("frag", "llm")))
 ctx = F.Ctx()
 cit = ctx.cit
 bad = [i for i, tn in enumerate(cit.types) if tn in NON_PUBLICATION_TYPES]
@@ -72,8 +74,10 @@ for (t, arm), m in maps.items():
     seen[(t, arm)] = s
 
 # Kimi on every distinct reading-list paper, once per topic (answers from an earlier run kept)
-prev = json.loads((Path(__file__).parent / "readinglists.json").read_text())["labels"] \
-    if (Path(__file__).parent / "readinglists.json").exists() else {}
+prev = {}
+for _f in sorted(Path(__file__).parent.glob("readinglists*.json")):
+    for _t, _d in json.loads(_f.read_text()).get("labels", {}).items():
+        prev.setdefault(_t, {}).update(_d)
 labels = {}
 for t, (q, defin) in TOPICS.items():
     old = {int(k): v for k, v in (prev.get(t) or {}).items()}
@@ -94,7 +98,8 @@ for t, (q, defin) in TOPICS.items():
 
 out = {}
 for t in TOPICS:
-    base = {pid for _, pid in seen[(t, "per-topic")]}
+    ref_arm = "per-topic" if (t, "per-topic") in seen else ARMS[0]      # overlap is measured against this arm
+    base = {pid for _, pid in seen[(t, ref_arm)]}
     for arm in ARMS:
         papers = {pid for _, pid in seen[(t, arm)]}
         ys = [labels[t][int(pid[1:])] for pid in papers if labels[t].get(int(pid[1:])) == labels[t].get(int(pid[1:]))]
@@ -109,6 +114,6 @@ for t in TOPICS:
                              "off_topic_examples": off[:0]}
         print(t, arm, json.dumps({k: v for k, v in out[f"{t}/{arm}"].items() if k != "groups"}), flush=True)
         print("   groups:", " | ".join(out[f"{t}/{arm}"]["groups"]), flush=True)
-(Path(__file__).parent / "readinglists.json").write_text(json.dumps({"summary": out, "labels": {t: {str(k): v for k, v in d.items()} for t, d in labels.items()},
+OUTFILE.write_text(json.dumps({"summary": out, "labels": {t: {str(k): v for k, v in d.items()} for t, d in labels.items()},
                                                                      "lists": {f"{t}/{a}": sorted(map(list, s)) for (t, a), s in seen.items()}}, indent=1))
 print("READING LISTS DONE", flush=True)

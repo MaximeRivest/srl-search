@@ -1,0 +1,36 @@
+{
+ "frag/new08-only": {
+  "papers": 41208,
+  "population": {
+   "precision": 0.803,
+   "recall": 0.66,
+   "f1": 0.725
+  },
+  "cited50": {
+   "precision": 0.839,
+   "recall": 0.795,
+   "f1": 0.816
+  },
+  "meta_refs": 0.78,
+  "meta_refs_title_only": 0.777,
+  "jev_usd": 0.0,
+  "jev_checked": 16128,
+  "cut": 0.383,
+  "seconds": 1049,
+  "judge_s": 164
+ },
+ "llm/new08-only": {
+  "papers": 17633,
+  "population": {
+   "precision": 0.813,
+   "recall": 0.637,
+   "f1": 0.714
+  },
+  "landmarks": 0.795,
+  "jev_usd": 0.0,
+  "jev_checked": 781,
+  "cut": 0.327,
+  "seconds": 453,
+  "judge_s": 160
+ }
+}

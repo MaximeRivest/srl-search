@@ -69,6 +69,7 @@ def snapshot():
         return {'updated':time.time(),'labeling':{'target':100000,'attempted':len(ids),'answered':labeled,'binary':binary,
                 'teachers':{m:read(FAST/'answers'/m/'status.json',{}) for m in ANSWERS}},
                 'initial':initial,'final':final,'models':models,'training_service':service,
+                'comparison_08':read(ROOT/'evaluation-08/comparison.json'),
                 'next':'Late accepted training labels enter pass two; validation stays fixed. 2B follows 0.8B. No automatic deployment.'}
 
 class Handler(BaseHTTPRequestHandler):
