@@ -32,5 +32,37 @@
   "cut": 0.327,
   "seconds": 453,
   "judge_s": 160
+ },
+ "frag/new2B-only": {
+  "papers": 40980,
+  "population": {
+   "precision": 0.793,
+   "recall": 0.646,
+   "f1": 0.712
+  },
+  "cited50": {
+   "precision": 0.845,
+   "recall": 0.796,
+   "f1": 0.82
+  },
+  "meta_refs": 0.769,
+  "meta_refs_title_only": 0.771,
+  "jev_usd": 0.0,
+  "jev_checked": 15356,
+  "cut": 0.385,
+  "seconds": 726
+ },
+ "llm/new2B-only": {
+  "papers": 17609,
+  "population": {
+   "precision": 0.784,
+   "recall": 0.66,
+   "f1": 0.717
+  },
+  "landmarks": 0.795,
+  "jev_usd": 0.0,
+  "jev_checked": 819,
+  "cut": 0.327,
+  "seconds": 403
  }
 }
