@@ -2,9 +2,10 @@
 
 Why (experiments/topicmap/README.md): the 1,000 closest papers are a corner of a field of ~10-60k; no distance
 cut-off separates a field from its neighbours; exact phrases miss half of it; and ~30% of the studies meta-analyses
-cite have no English abstract, so only the field's own citations reach them. How, for ~$1 of AI answers: Kimi K3
-teaches small models (its providers allow training on its answers); Jev only checks papers and teaches nothing
-(srl_search/judges.py):
+cite have no English abstract, so only the field's own citations reach them. Since selection v6 (2026-10-16) every
+AI judgment below is made by the general judge (srl_search/judges.py, LocalJudge: one 0.8B model for any topic, on
+GPU 1): no paid AI. SRL_FIELD_JUDGE=paid restores v5, described here, for ~$1 of AI answers: Kimi K3 teaches small
+models (its providers allow training on its answers); Jev only checks papers and teaches nothing:
 
   1 teacher      the 300k papers closest in meaning to the topic; Kimi K3 judges 272 papers spread from nearest
                  to farthest, a quarter of them works the nearest papers cite (many with a title only)
@@ -55,7 +56,8 @@ import numpy as np
 from fastapi import HTTPException
 
 ROOT = Path(os.environ.get("SRL_FIELDS", "/mnt/fast/scholarsreadinglist/search/fields"))
-SELECTION_VERSION = "5"                  # 5: + Jev checks well-cited papers near the cut-off; 4: 400 teacher answers in two rounds (active learning), students learn
+SELECTION_VERSION = "6"                  # 6: the general 0.8B judge does the teacher's, decider's and check's work: no
+                                         #    paid AI (SRL_FIELD_JUDGE=paid: v5); 5: + Jev checks well-cited papers near the cut-off; 4: 400 teacher answers in two rounds (active learning), students learn
                                          #    probabilities, citation combiner, expected-F1 cut-off; 3: held-back
                                          #    cut-offs; 2: first no-Jev recipe; 1: Jev
 TEACHER_USD = float(os.environ.get("SRL_FIELD_TEACHER_USD", "0.50"))   # Kimi K3 labels per field
@@ -68,8 +70,10 @@ CHECK_USD = float(os.environ.get("SRL_FIELD_CHECK_USD", "0.60"))   # Jev per fie
                                          #   most cited first when a field has more
 DECIDER_N = 10_000                       # papers the decider labels for the students
 BUDGET_USD = float(os.environ.get("SRL_FIELD_BUDGET_USD", "60"))    # AI spend a day, all jobs: a safety cap
-FREE_USD = float(os.environ.get("SRL_FIELD_FREE_USD", "10"))        # AI spend a day for the free line
-EST_USD = 1.0                            # a new field's AI cost (v5: Kimi ~$0.50 + Jev $0.04-0.60), for planning
+FREE_USD = float(os.environ.get("SRL_FIELD_FREE_USD", "10"))        # AI spend a day for the free line (paid judges)
+EST_USD = 1.0                            # a new field's AI cost with paid judges (v5: Kimi ~$0.50 + Jev), for planning
+FREE_PER_DAY = int(os.environ.get("SRL_FIELD_FREE_PER_DAY", "40"))  # free maps a day with the general judge ($0 of
+                                         #   AI; ~15-25 min of GPU 1 each, shared with the household services)
 FREE_MAX_QUEUED = 60                     # maps waiting in the free line
 PER_ASKER = 2                            # free maps one reader (the door's per-address code) may have waiting
 POOL = 300_000
@@ -160,6 +164,21 @@ class FieldStore:
             return float((_read(self.root / "spend.json") or {}).get(today, 0.0))
         return float(((_read(self.root / "spend_lanes.json") or {}).get(today) or {}).get(lane, 0.0))
 
+    def free_made_today(self) -> int:
+        """New fields of the free line finished today (the general judge's daily quota counts maps, not dollars)."""
+        today, n = date.today().isoformat(), 0
+        for p in self.root.glob("*/job.json"):
+            st = _read(p) or {}
+            fin = _ts(st.get("finished"))                  # stored in UTC: compare local days
+            if (st.get("kind") == "full" and st.get("lane", "free") == "free" and st.get("status") == "done"
+                    and fin and datetime.fromtimestamp(fin).date().isoformat() == today):
+                n += 1
+        return n
+
+    def free_per_day(self) -> int:
+        from srl_search import judges as J
+        return FREE_PER_DAY if J.LOCAL else round(FREE_USD / EST_USD)
+
     def queued(self) -> list[str]:
         return [p.stem for p in sorted((self.root / "queue").glob("*.job"), key=lambda p: p.stat().st_mtime)]
 
@@ -194,16 +213,22 @@ class FieldStore:
         waiting.sort(key=lambda j: (prio[j["lane"]], _ts((self.paid(j["key"]) or {}).get("paid_at"))
                                     if j["lane"] == "paid" else _ts(j["st"].get("created"))))
         t = now + (running["left"] if running else 60)       # a worker starting loads ~15 GB first (~1 min)
-        free_left = FREE_USD - self.spent_today("free") - (0.5 * EST_USD if running and running["lane"] == "free" else 0)
+        from srl_search import judges as J
+        if J.LOCAL:                                          # no AI cost: a number of free maps a day (GPU time)
+            unit, day_quota = 1.0, float(FREE_PER_DAY)
+            free_left = day_quota - self.free_made_today() - (1.0 if running and running["lane"] == "free" else 0)
+        else:                                                # paid judges: dollars of AI a day
+            unit, day_quota = EST_USD, FREE_USD
+            free_left = FREE_USD - self.spent_today("free") - (0.5 * EST_USD if running and running["lane"] == "free" else 0)
         todo, out = list(waiting), []
         while todo:
-            pick = next((j for j in todo if j["lane"] != "free" or free_left >= 0.5 * EST_USD), None)
-            if pick is None:                                 # only free maps left and today's budget is spent
-                t, free_left = _next_midnight(t), FREE_USD
+            pick = next((j for j in todo if j["lane"] != "free" or free_left >= 0.5 * unit), None)
+            if pick is None:                                 # only free maps left and today's quota is spent
+                t, free_left = _next_midnight(t), day_quota
                 continue
             todo.remove(pick)
             if pick["lane"] == "free":
-                free_left -= EST_USD
+                free_left -= unit
             dur = job_seconds(pick["st"].get("kind"))
             out.append({**pick, "start": t, "ready": t + dur})
             t += dur
@@ -232,7 +257,7 @@ class FieldStore:
                 if mine["lane"] != "paid":
                     st["paid_eta_s"] = round(pl["paid_ready_s"])
             st["gpu_reserved"] = pl["gpu_reserved"]
-            st["free_per_day"] = round(FREE_USD / EST_USD)
+            st["free_per_day"] = self.free_per_day()
         if self.credit(key):
             st["credit"] = self.credit(key)
         return st
@@ -333,7 +358,7 @@ class FieldStore:
                             "stages": len(STAGES), "ready_s": round(run["left"])} if run else None,
                 "waiting": [row(j, i + 1) for i, j in enumerate(pl["waiting"])],
                 "paid_ready_s": round(pl["paid_ready_s"]), "gpu_reserved": pl["gpu_reserved"],
-                "free_per_day": round(FREE_USD / EST_USD), "made_today": made_today}
+                "free_per_day": self.free_per_day(), "made_today": made_today}
 
     def made(self) -> list[dict]:
         """Every whole-field map made, newest first (the public library)."""
@@ -507,8 +532,11 @@ def select_field(ctx: Ctx, job: Job, q: str, definition: str | None, keywords: s
     from srl_search.scope import NON_PUBLICATION_TYPES
     eng, cit = ctx.engine, ctx.cit
     faiss.omp_set_num_threads(16)
-    report: dict = {"topic": q, "definition": definition, "teacher": "Kimi K3", "decider": J.DECIDER_BASE,
-                    "student": J.STUDENT_BASE}
+    local = J.LOCAL                                # the general judge: no paid AI (srl_search/judges.py)
+    report: dict = {"topic": q, "definition": definition,
+                    "teacher": f"general judge ({J.JUDGE_MODEL.name})" if local else "Kimi K3",
+                    "decider": f"general judge ({J.JUDGE_MODEL.name})" if local else J.DECIDER_BASE,
+                    "student": J.STUDENT_BASE, "paid_ai": not local}
     work = job.dir / "work"
     work.mkdir(parents=True, exist_ok=True)
     say = lambda detail: job.stage(job.st.get("stage_index", 0), detail)
@@ -627,7 +655,7 @@ def select_field(ctx: Ctx, job: Job, q: str, definition: str | None, keywords: s
     sw_cit = np.array(t_only + [w for w in pick if w not in t_only_set][:n_t - len(t_only)], np.int64)
     sw = np.concatenate([sw_pool, sw_cit])
     job.stage(0, f"the teacher (Kimi K3) judges {len(sw)} papers")
-    teacher = J.Teacher(TEACHER_USD)
+    teacher = J.LocalJudge(work / "judge-teacher", say) if local else J.Teacher(TEACHER_USD)
     texts_sw = texts_of(sw)
     t_label = time.time()
     lab = teacher.label(texts_sw, q, definition)
@@ -708,7 +736,8 @@ def select_field(ctx: Ctx, job: Job, q: str, definition: str | None, keywords: s
     t = time.time()
     job.stage(2, "teaching the 0.8B decider")
     tw = list(labels)
-    J.train_decider(list(zip(texts_of(tw), [labels[w] for w in tw])), q, definition, work / "decider", say)
+    if not local:                                  # the general judge needs no training per topic
+        J.train_decider(list(zip(texts_of(tw), [labels[w] for w in tw])), q, definition, work / "decider", say)
     job.done_stage(2, t)
 
     # 4 the decider judges a balanced set for the students: likely papers, unsure ones, a spread, and cited works
@@ -723,7 +752,8 @@ def select_field(ctx: Ctx, job: Job, q: str, definition: str | None, keywords: s
         return out
     dws = take(U_w[p0 >= 0.5], int(DECIDER_N * .30)) + take(U_w[(p0 > 0.1) & (p0 < 0.9)], int(DECIDER_N * .25)) \
         + take(U_w, int(DECIDER_N * .15)) + take(C[~hC], int(DECIDER_N * .20)) + take(C[hC], int(DECIDER_N * .10))
-    dp = J.decider_scores(work / "decider", texts_of(dws), say)
+    dp = (J.LocalJudge(work / "judge-decider", say).label(texts_of(dws), q, definition) if local
+          else J.decider_scores(work / "decider", texts_of(dws), say))
     decided = dict(zip(dws, dp.tolist()))
     report["decider_labels"] = {"papers": len(decided), "expected_on_topic": round(float(dp.sum()))}
     job.done_stage(3, t)
@@ -790,7 +820,8 @@ def select_field(ctx: Ctx, job: Job, q: str, definition: str | None, keywords: s
     chk = np.flatnonzero((final >= CHECK_BAND[0]) & (final < CHECK_BAND[1]) & (cites >= CHECK_CITES) & ~is_teacher)
     chk = chk[np.argsort(-cites[chk], kind="stable")]
     job.stage(5, f"Jev checks {len(chk):,} well-cited papers near the cut-off")
-    jev = J.Jev(min(CHECK_USD, max(0.0, BUDGET_USD - FieldStore(job.dir.parent).spent_today())))
+    jev = (J.LocalJudge(work / "judge-check", say) if local
+           else J.Jev(min(CHECK_USD, max(0.0, BUDGET_USD - FieldStore(job.dir.parent).spent_today()))))
     t_jev = time.time()
     jl = jev.label(pairs_of(univ[chk]), q, definition) if len(chk) else np.zeros(0)
     _spend(job.dir.parent, jev.usd, job.st.get("lane", "free"))
@@ -799,7 +830,7 @@ def select_field(ctx: Ctx, job: Job, q: str, definition: str | None, keywords: s
         if v == v:
             checked[int(univ[i])] = float(v)
             final[i] = float(v >= 0.5)
-    report["check"] = {"by": f"Jev ({J.JEV_MODEL})", "band": list(CHECK_BAND), "cited_at_least": CHECK_CITES,
+    report["check"] = {"by": f"general judge ({J.JUDGE_MODEL.name})" if local else f"Jev ({J.JEV_MODEL})", "band": list(CHECK_BAND), "cited_at_least": CHECK_CITES,
                        "papers": len(chk), "answered": len(checked), "failed": jev.failed,
                        "in": int(sum(v >= 0.5 for v in checked.values())), "usd": round(jev.usd, 3),
                        "seconds": round(time.time() - t_jev, 1)}

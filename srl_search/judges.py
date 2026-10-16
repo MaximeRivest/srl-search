@@ -293,6 +293,53 @@ def decider_scores(model_dir: Path, texts: list[str], say) -> np.ndarray:
     return np.array(json.loads((model_dir / "scores.json").read_text()))
 
 
+# ------------------------------------------------------------------------------------------------ the general judge
+# One model for every topic (experiments/fieldjudge/v2): Qwen3.5-0.8B trained on 85,303 topic-paper answers of
+# GPT-6.1 Sol and Claude Opus 5.5 over ~660 topic families; the topic's question goes in each prompt. It replaces
+# Kimi K3 (teacher), the per-topic decider and Jev (check): no paid AI per map. Replay on the two test topics
+# (2026-10-16): fragmentation reading lists 80% on topic (Kimi+Jev: 80%), LLM post-training 52% (49%); 4-6 points
+# fewer of the field's classics. SRL_FIELD_JUDGE=paid brings back Kimi + per-topic decider + Jev.
+JUDGE_MODEL = Path(os.environ.get("SRL_FIELD_JUDGE_MODEL", "/mnt/fast/scholarsreadinglist/models/fieldjudge-0.8b-v2"))
+JUDGE_ANSWER = ' Answer with one word: "yes" (on topic) or "no" (not on topic).'
+LOCAL = os.environ.get("SRL_FIELD_JUDGE", "local") != "paid" and (JUDGE_MODEL / "model.safetensors").exists()
+
+
+def _vllm(model: Path, rows_file: Path, out: Path, log: Path, say) -> np.ndarray:
+    vpy = os.environ.get("SRL_VLLM_PYTHON") or "python"
+    args = [vpy, str(Path(__file__).with_name("vllm_decider.py")), str(model), str(rows_file), str(out), GPU]
+    wait_for_gpu(10000, say)
+    try:
+        run(args, log)
+    except RuntimeError:                        # a household service grew under it: once more, smaller
+        say("the GPU filled up; trying again with less memory")
+        time.sleep(20)
+        wait_for_gpu(8000, say)
+        run(args, log, {"SRL_VLLM_UTIL": "0.3"})
+    return np.array(json.loads(out.read_text()))
+
+
+class LocalJudge:
+    """The general judge with the Teacher/Jev interface: P(on topic) for texts, $0, on GPU 1 (vLLM)."""
+
+    def __init__(self, work: Path, say=lambda s: None):
+        self.work, self.say = Path(work), say
+        self.usd, self.failed, self.slowest, self.calls = 0.0, 0, {}, 0
+
+    def label(self, texts, topic: str, definition: str | None) -> np.ndarray:
+        texts = [paper_text(*t) if isinstance(t, tuple) else t for t in texts]   # Jev's (title, abstract) pairs too
+        if not texts:
+            return np.zeros(0)
+        self.calls += 1
+        d = self.work / f"call{self.calls}"
+        d.mkdir(parents=True, exist_ok=True)
+        system = instruction(topic, definition) + JUDGE_ANSWER
+        (d / "score.jsonl").write_text("".join(json.dumps({"text": t, "system": system}) + "\n" for t in texts))
+        p = _vllm(JUDGE_MODEL, d / "score.jsonl", d / "scores.json", d / "log.txt", self.say)
+        if len(p) != len(texts) or not np.isfinite(p).all():
+            raise RuntimeError("the general judge returned an unexpected number of scores")
+        return p
+
+
 def student_scores(train: list[tuple[str, float]], texts: list[str], work: Path, say) -> np.ndarray:
     work.mkdir(parents=True, exist_ok=True)
     (work / "train.jsonl").write_text("".join(json.dumps({"text": t, "y": y}) + "\n" for t, y in train))

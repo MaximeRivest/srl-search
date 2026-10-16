@@ -94,7 +94,9 @@ def test_free_line_limits(tmp_path, monkeypatch):
     assert e.value.status_code == 503 and "full" in e.value.detail
 
 
-def test_spent_budget_moves_the_free_line_to_tomorrow_and_paid_maps_go_first(tmp_path):
+def test_spent_budget_moves_the_free_line_to_tomorrow_and_paid_maps_go_first(tmp_path, monkeypatch):
+    from srl_search import judges as J
+    monkeypatch.setattr(J, "LOCAL", False)                      # paid judges: a budget in dollars
     st = F.FieldStore(tmp_path)
     for q in ("a b", "c d"):
         _ask(st, q)
@@ -198,3 +200,21 @@ def test_leiden_runs_side_by_side_give_the_same_groups(monkeypatch):
     monkeypatch.setattr(T, "PARALLEL_MIN", 10)
     parallel = T.cluster(W, T.Options(workers=8), 20)
     assert (serial[0] == parallel[0]).all() and serial[2]["resolution"] == parallel[2]["resolution"]
+
+
+def test_general_judge_quota_counts_free_maps_made_today(tmp_path, monkeypatch):
+    from srl_search import judges as J
+    monkeypatch.setattr(J, "LOCAL", True)
+    monkeypatch.setattr(F, "FREE_PER_DAY", 2)
+    st = F.FieldStore(tmp_path)
+    for i in range(2):                                          # two free maps already made today
+        d = tmp_path / f"done{i}"
+        d.mkdir()
+        (d / "job.json").write_text(json.dumps({"status": "done", "kind": "full", "lane": "free", "finished": F._now()}))
+    _ask(st, "a b")
+    pl = st.plan()
+    assert pl["waiting"][0]["start"] >= F._next_midnight(pl["now"]) - 1
+    assert st.queue_view()["free_per_day"] == 2
+    monkeypatch.setattr(F, "FREE_PER_DAY", 3)
+    pl = st.plan()
+    assert pl["waiting"][0]["start"] - pl["now"] < 120

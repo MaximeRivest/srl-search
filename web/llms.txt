@@ -145,18 +145,20 @@ says which page it is, how many there are, and what to call next. A busy group o
 
 **The whole field** (`scope=field`, optional `definition`): every paper of the research field, not the 1,000
 closest: papers close in meaning, the topic's exact phrase, and the works the field cites at least 3 times (which
-reaches classics without abstracts), judged by small classifiers taught for this topic by an AI (Kimi K3), with an
-AI checker (TypeSafe's Jev) deciding the well-cited papers they are unsure about; then mapped into groups and
+reaches classics without abstracts), judged by our own small AI model (one 0.8B model for any topic, trained on
+85,000 judgments by larger models over ~660 topic families) and fast classifiers it teaches for the topic, with
+citation signals; the model rechecks the well-cited papers they are unsure about; then mapped into groups and
 subgroups (groups of 300+ papers are pre-split: `group=N&scope=field`). Give a `definition` when the words are
 ambiguous ("LLM" is also a law degree). Made once by a background job (~15 minutes of work), then kept across data
 updates and instant for everyone; while it waits or is being made the answer is **HTTP 202** with `progress`
-(`status`, `lane`, `position`, `eta_s`): ask again later with the same request. Measured on two topics against Kimi's
-own judgments of stratified samples: habitat fragmentation, 82% of the map's papers on topic, 69% of the field
-found, 94% on topic among papers cited 50+ times; LLM post-training (a young field, where our citation data is thin),
-56% on topic, 79% found. A topic too broad (its edge still mostly on topic) or too unclear answers 422 with the reason.
+(`status`, `lane`, `position`, `eta_s`): ask again later with the same request. Measured on two topics against a
+large model's (Kimi K3) judgments of stratified samples: habitat fragmentation, 80% of the map's papers on topic, 66%
+of the field found, 80% of reading-list papers on topic; LLM post-training (a young field, where our citation data is
+thin), 81% on topic, 64% found, 52% of reading-list papers on topic. It is strict: it finds 78-80% of the classics
+published reviews cite. A topic too broad (its edge still mostly on topic) or too unclear answers 422 with the reason.
 
 **The line** (`GET /fields/queue`): new whole-field maps wait their turn. Free maps go in the order asked, about
-`free_per_day` a day (each costs about $1 of AI); at most 2 waiting per reader. On sciencemadereadable.com a reader
+`free_per_day` a day (each takes 15-25 minutes of our graphics card); at most 2 waiting per reader. On sciencemadereadable.com a reader
 can pay to put a map in the paid line, which goes first. Topics in the line are public, as their maps will be.
 **Maps already made** (`GET /fields`, optional `q`): every whole-field map, newest first or closest in meaning to
 `q` (`score`); open one with `/topics?scope=field` and its `topic` and `definition`.
