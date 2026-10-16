@@ -28,6 +28,7 @@ from srl_search import judges as J
 ROOT = Path(os.environ.get("SRL_FIELDS", "/mnt/fast/scholarsreadinglist/search/fields"))
 SUGGEST_USD = float(os.environ.get("SRL_SUGGEST_USD", "3"))      # topic rewrites a day (~1,000)
 LABELS_USD = float(os.environ.get("SRL_LABELS_USD", "5"))        # group names a day (~20 whole-field maps)
+TOPIC_LABELS_USD = float(os.environ.get("SRL_TOPIC_LABELS_USD", "5"))   # ... of 1,000-paper maps (~50 a day)
 _LOCK = threading.Lock()
 
 
@@ -149,26 +150,60 @@ def _group_prompt(field: str, g: dict, parent: str | None) -> str:
             "\n- ".join(titles[:14]))
 
 
-def label_groups(field: str, groups: list[dict], parent: str | None = None) -> float:
+def label_groups(field: str, groups: list[dict], parent: str | None = None, lane: str = "labels",
+                 cap: float | None = None) -> float:
     """Give each group g["label"] = {"name", "about", "by"} in place (missing on a failure: the page keeps the
-    phrases). Returns the dollars spent. Stops when today's cap is reached."""
+    phrases). Returns the dollars spent. Stops when today's cap for this lane is reached. Labels are cached by
+    their prompt (ROOT/label-cache): the same group in tomorrow's rebuilt map, or a split map's groups already
+    named inside its main map, cost nothing."""
+    cap = LABELS_USD if cap is None else cap
     spent = [0.0]
+    lock = threading.Lock()
+    cache = ROOT / "label-cache"
 
     def one(g):
-        if g.get("label") or _spent("labels") + spent[0] >= LABELS_USD:
+        if g.get("label"):
             return
+        prompt = _group_prompt(field, g, parent)
+        f = cache / (hashlib.sha256((NAME + prompt).encode()).hexdigest()[:32] + ".json")
+        if f.exists():
+            try:
+                g["label"] = json.loads(f.read_text())
+                return
+            except ValueError:
+                pass
+        with lock:
+            if _spent(lane) + spent[0] >= cap:
+                return
         try:
-            text, usd = _kimi(NAME, _group_prompt(field, g, parent), max_tokens=300)
-            spent[0] += usd
+            text, usd = _kimi(NAME, prompt, max_tokens=300)
+            with lock:
+                spent[0] += usd
             v = _json(text)
             name = " ".join(str(v.get("name") or "").split())[:80]
             about = " ".join(str(v.get("about") or "").split())[:400]
             if name:
                 g["label"] = {"name": name, "about": about or None, "by": "Kimi K3"}
-        except (Unavailable, ValueError, AttributeError, TypeError):
+                cache.mkdir(parents=True, exist_ok=True)
+                tmp = f.with_suffix(f".tmp{os.getpid()}.{threading.get_ident()}")
+                tmp.write_text(json.dumps(g["label"]))
+                os.replace(tmp, f)
+        except (Unavailable, ValueError, AttributeError, TypeError, OSError):
             pass
     with ThreadPoolExecutor(16) as ex:
         list(ex.map(one, groups))
     if spent[0]:
-        _spend("labels", spent[0])
+        _spend(lane, spent[0])
     return spent[0]
+
+
+def label_map(question: str, m: dict, parent: str | None = None, lane: str = "labels", cap: float | None = None) -> float:
+    """A map's groups, then the subgroups it carries (each named within its group)."""
+    usd = label_groups(question, m.get("groups", []), parent, lane, cap)
+    subs = [(g, s) for g in m.get("groups", []) for s in (g.get("subgroups") or [])]
+    by_parent: dict[str, list] = {}
+    for g, s in subs:
+        by_parent.setdefault((g.get("label") or {}).get("name") or g.get("name") or "", []).append(s)
+    for pname, ss in by_parent.items():
+        usd += label_groups(question, ss, pname or None, lane, cap)
+    return usd

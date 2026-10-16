@@ -960,7 +960,7 @@ def label_maps(field_name: str, m: dict, parent: str | None = None) -> float:
     group keeps its phrases."""
     try:
         from srl_search import suggest
-        return suggest.label_groups(field_name, m.get("groups", []), parent)
+        return suggest.label_groups(field_name, m.get("groups", []), parent)   # subgroups: their own split maps
     except Exception as e:  # noqa: BLE001
         print(f"group names not written: {type(e).__name__}", flush=True)
         return 0.0

@@ -220,8 +220,33 @@ class TopicService:
             self._store(path, out)
         with self.locks_guard:
             self.locks.pop(path.name, None)
+        self._name_later(path, q, group, self._path(q, papers, mode, year_from, year_to, None))
         out["cached"] = False
         return out
+
+    def _name_later(self, path: Path, q: str, group: int | None, main_path: Path) -> None:
+        """AI names and descriptions for a new map's groups and subgroups (srl_search/suggest.py), in the
+        background: the map is answered at once; asked again a few seconds later it carries the names. Never fails
+        a map: without names, groups keep their phrases."""
+        def work():
+            try:
+                from srl_search import suggest
+                m = json.loads(path.read_text())
+                parent = None
+                if group is not None:            # a split: named within its group, as the main map names it
+                    time.sleep(8)                # (the main map's names are usually being written right now)
+                    main = json.loads(main_path.read_text()) if main_path.exists() else {}
+                    g = next((x for x in main.get("groups", []) if x.get("id") == group), {})
+                    parent = (g.get("label") or {}).get("name") or (m.get("parent") or {}).get("name")
+                    if g.get("label"):
+                        m.setdefault("parent", {})["label"] = g["label"]
+                usd = suggest.label_map(q, m, parent, lane="topic_labels", cap=suggest.TOPIC_LABELS_USD)
+                if any(g.get("label") for g in m.get("groups", [])):
+                    m.setdefault("timing", {})["labels_usd"] = round(usd, 4)
+                    self._store(path, m)
+            except Exception as e:  # noqa: BLE001
+                print(f"topics: groups not named ({type(e).__name__})", file=sys.stderr, flush=True)
+        threading.Thread(target=work, daemon=True).start()
 
     def _path(self, q, papers, mode, year_from, year_to, group) -> Path:
         key_obj = [VERSION, q, papers, mode, year_from, year_to, group]
@@ -522,6 +547,12 @@ def _ref(out: dict, enc) -> str:
     return q + (f", within group {out['parent']['group']}" if out.get("parent") else "")
 
 
+def _gname(g: dict) -> str:
+    """A group's AI-written name with its telltale phrases, or the phrases alone (srl_search/suggest.py)."""
+    lab = (g.get("label") or {}).get("name")
+    return f"{lab} [{g['name']}]" if lab else g["name"]
+
+
 def as_text(out: dict, base: str, page: int = 1) -> str:
     """The whole map as Markdown: the groups at a glance, then every group with every reading list and expert,
     whole groups per page (pages of ~PAGE_CHARS). Raises 404 for a page that does not exist."""
@@ -569,12 +600,12 @@ def as_text(out: dict, base: str, page: int = 1) -> str:
         for g in out["groups"]:
             yrs = g.get("years")
             uses = ", ".join(f"{k}" for k in list((g.get("cites_groups") or {}))[:3])
-            lines.append(f"- Group {g['id']}: {g['name']} · {g['size']} papers"
+            lines.append(f"- Group {g['id']}: {_gname(g)} · {g['size']} papers"
                          + (f" · mostly {yrs[0]}–{yrs[2]}" if yrs else "")
                          + (f" · builds most on groups {uses}" if uses else "")
                          + f" (details on page {next(i for i, pg in enumerate(pages, 1) if g['id'] - 1 + first in pg)})")
             if g.get("subgroups"):
-                lines.append("  divides into: " + "; ".join(f"{g['id']}.{x['id']} {x['name']} ({x['size']})"
+                lines.append("  divides into: " + "; ".join(f"{g['id']}.{x['id']} {_gname(x)} ({x['size']})"
                                                            for x in g["subgroups"])
                              + f" (map_topic group={g['id']} for their reading lists)")
         lines.append("")
@@ -611,7 +642,9 @@ def _group_block(g: dict, names: dict) -> str:
     if g["id"] == 0:
         lines = [f"## Reading lists of {g['name']} (all {g['size']:,} papers{span}; group=0)"]
     else:
-        lines = [f"## Group {g['id']}: {g['name']} ({g['size']} papers{span})"]
+        lines = [f"## Group {g['id']}: {_gname(g)} ({g['size']} papers{span})"]
+        if (g.get("label") or {}).get("about"):
+            lines.append(g["label"]["about"] + " (name and description written by an AI)")
     extra = []
     if g["id"] and g.get("cloud"):
         extra.append("its words, against the other groups: " + _words(g["cloud"], 12))
