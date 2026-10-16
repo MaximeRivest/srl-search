@@ -1,0 +1,32 @@
+{
+ "frag": {
+  "on_topic": 0.931,
+  "shown": 480,
+  "new_kimi": 13,
+  "by_list": {
+   "start_here": 0.95,
+   "core": 0.925,
+   "distinctive": 0.9,
+   "rising": 0.925,
+   "bridges": 0.9,
+   "newest": 0.988,
+   "foundations": 0.325
+  },
+  "classics_in_lists": 54
+ },
+ "llm": {
+  "on_topic": 0.809,
+  "shown": 256,
+  "new_kimi": 5,
+  "by_list": {
+   "start_here": 0.792,
+   "core": 0.792,
+   "distinctive": 0.812,
+   "rising": 0.771,
+   "bridges": 0.688,
+   "newest": 1.0,
+   "foundations": 0.059
+  },
+  "classics_in_lists": 10
+ }
+}

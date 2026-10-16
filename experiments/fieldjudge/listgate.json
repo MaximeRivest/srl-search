@@ -127,6 +127,38 @@
   "core_median_cited_here": 165.5,
   "lists_left_short": 4
  },
+ "frag/new08-only/members_p": {
+  "shown": 475,
+  "distinct": 413,
+  "on_topic": 0.939,
+  "by_list": {
+   "start_here": 0.975,
+   "core": 0.937,
+   "distinctive": 0.909,
+   "rising": 0.924,
+   "bridges": 0.9,
+   "newest": 0.988
+  },
+  "classics_in_lists": 49,
+  "core_median_cited_here": 210.0,
+  "lists_left_short": 3
+ },
+ "frag/new08-only/members_08": {
+  "shown": 475,
+  "distinct": 410,
+  "on_topic": 0.952,
+  "by_list": {
+   "start_here": 0.975,
+   "core": 0.949,
+   "distinctive": 0.935,
+   "rising": 0.911,
+   "bridges": 0.95,
+   "newest": 0.988
+  },
+  "classics_in_lists": 48,
+  "core_median_cited_here": 175.0,
+  "lists_left_short": 3
+ },
  "frag/new2B-only/base": {
   "shown": 528,
   "distinct": 499,
@@ -254,6 +286,38 @@
   "classics_in_lists": 50,
   "core_median_cited_here": 139.0,
   "lists_left_short": 4
+ },
+ "frag/new2B-only/members_p": {
+  "shown": 524,
+  "distinct": 456,
+  "on_topic": 0.937,
+  "by_list": {
+   "start_here": 0.977,
+   "core": 0.943,
+   "distinctive": 0.919,
+   "rising": 0.92,
+   "bridges": 0.886,
+   "newest": 0.977
+  },
+  "classics_in_lists": 50,
+  "core_median_cited_here": 143.0,
+  "lists_left_short": 3
+ },
+ "frag/new2B-only/members_08": {
+  "shown": 524,
+  "distinct": 454,
+  "on_topic": 0.948,
+  "by_list": {
+   "start_here": 0.989,
+   "core": 0.954,
+   "distinctive": 0.942,
+   "rising": 0.943,
+   "bridges": 0.886,
+   "newest": 0.977
+  },
+  "classics_in_lists": 50,
+  "core_median_cited_here": 143.0,
+  "lists_left_short": 3
  },
  "llm/new08-only/base": {
   "shown": 238,
@@ -383,6 +447,38 @@
   "core_median_cited_here": 61.0,
   "lists_left_short": 6
  },
+ "llm/new08-only/members_p": {
+  "shown": 248,
+  "distinct": 163,
+  "on_topic": 0.802,
+  "by_list": {
+   "start_here": 0.771,
+   "core": 0.783,
+   "distinctive": 0.818,
+   "rising": 0.766,
+   "bridges": 0.688,
+   "newest": 1.0
+  },
+  "classics_in_lists": 9,
+  "core_median_cited_here": 61.0,
+  "lists_left_short": 6
+ },
+ "llm/new08-only/members_08": {
+  "shown": 248,
+  "distinct": 163,
+  "on_topic": 0.802,
+  "by_list": {
+   "start_here": 0.771,
+   "core": 0.783,
+   "distinctive": 0.818,
+   "rising": 0.766,
+   "bridges": 0.688,
+   "newest": 1.0
+  },
+  "classics_in_lists": 9,
+  "core_median_cited_here": 61.0,
+  "lists_left_short": 6
+ },
  "llm/new2B-only/base": {
   "shown": 237,
   "distinct": 195,
@@ -503,6 +599,38 @@
    "start_here": 0.792,
    "core": 0.761,
    "distinctive": 0.833,
+   "rising": 0.771,
+   "bridges": 0.646,
+   "newest": 1.0
+  },
+  "classics_in_lists": 8,
+  "core_median_cited_here": 84.0,
+  "lists_left_short": 5
+ },
+ "llm/new2B-only/members_p": {
+  "shown": 251,
+  "distinct": 165,
+  "on_topic": 0.789,
+  "by_list": {
+   "start_here": 0.792,
+   "core": 0.761,
+   "distinctive": 0.769,
+   "rising": 0.75,
+   "bridges": 0.646,
+   "newest": 1.0
+  },
+  "classics_in_lists": 8,
+  "core_median_cited_here": 84.0,
+  "lists_left_short": 5
+ },
+ "llm/new2B-only/members_08": {
+  "shown": 251,
+  "distinct": 164,
+  "on_topic": 0.789,
+  "by_list": {
+   "start_here": 0.771,
+   "core": 0.761,
+   "distinctive": 0.769,
    "rising": 0.771,
    "bridges": 0.646,
    "newest": 1.0

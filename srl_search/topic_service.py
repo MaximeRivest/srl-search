@@ -534,9 +534,12 @@ def _abstract(p: dict) -> list[str]:
 
 LENS_TITLES = [
     ("start_here", "Start here: recent papers of the group citing most of its key works (often reviews)"),
-    ("core", "Core: what the group's papers cite most (its foundations; may be older or outside the mapped set)"),
+    ("core", "Core: what the group's papers cite most (its foundations; may be older or outside the mapped set; in "
+             "whole-field maps only works of the field, and its most cited papers where few list their references)"),
     ("rising", "Rising: works of the last 5 years already cited by many of the group's papers"),
     ("distinctive", "Only here: cited mostly by this group, not the others (what sets it apart)"),
+    ("foundations", "Foundations from outside the field (whole-field maps): what the group's papers cite most that is not "
+                    "itself part of the field: methods, tools, neighbouring classics"),
     ("bridges", "Bridges: papers of the group with many links to another group"),
     ("newest", "Newest papers of the group"),
 ]

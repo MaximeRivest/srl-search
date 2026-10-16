@@ -612,7 +612,8 @@ def topics(q: str = Query(..., min_length=2, max_length=2000, description=D_TOPI
     over-represented in it) and reading lists computed from its own papers' citations: core (most cited by the
     group), distinctive (cited mostly by this group), rising (recent works gathering citations fast), start_here
     (recent papers citing most of the group's key works, often reviews), bridges (papers linking to another group),
-    newest, and experts (authors with the highest position-weighted h-index inside the group); "overall" has the
+    newest, foundations (whole-field maps only: works cited most from outside the field; their other lists keep to
+    papers of the field), and experts (authors with the highest position-weighted h-index inside the group); "overall" has the
     same lists for the whole topic. Word clouds: each group's "cloud" holds the phrases it uses more than the other
     groups, and overall's the phrases the topic uses more than the rest of science (share = of its papers, lift = how
     many times more often, score = LDAvis relevance with lambda 0.6, what the order follows). Every paper comes

@@ -85,6 +85,7 @@ TOO_BROAD_TAIL = 0.30                    # share on topic among the farthest of 
 TOO_BROAD_PAPERS = 150_000
 SPLIT_MIN = 300                          # groups at least this big get their own subgroups
 LEIDEN_WORKERS = int(os.environ.get("SRL_FIELDS_WORKERS", "24"))
+LENS_MIN_SCORE = 0.5     # reading lists: papers of the field the judge scores at least this (topics.Options)
 STAGES = [("teacher", 40), ("candidates", 60), ("decider", 110), ("decider labels", 160), ("students", 170),
           ("judging", 40), ("map", 250), ("subgroups", 220)]
 
@@ -919,7 +920,7 @@ def build_maps(ctx: Ctx, job: Job, sel: dict, version: str) -> dict:
     q = sel["topic"]
     T.PARALLEL_MIN = 1500                              # the worker owns its cores: Leiden runs side by side
     background = ctx.keywords.phrase_counts if ctx.keywords is not None else None
-    raw = T.build(seed, cit, q, T.Options(refs_top=30, workers=LEIDEN_WORKERS), background=background)
+    raw = T.build(seed, cit, q, T.Options(refs_top=30, workers=LEIDEN_WORKERS, lens_min_score=LENS_MIN_SCORE), background=background)
     out = finish(ctx, cit, raw, seed, ctx.release["id"])
     via = sel["papers"]
     out["papers"]["via"] = [via.get(pid[1:], {}).get("via", "") for pid in out["papers"]["id"]]
@@ -939,7 +940,7 @@ def build_maps(ctx: Ctx, job: Job, sel: dict, version: str) -> dict:
         job.stage(7, f"splitting group {g['id']} ({g['size']:,} papers), {j + 1} of {len(big)}")
         members = [by_w[int(pid[1:])] for pid, gg in zip(out["papers"]["id"], out["papers"]["group"]) if gg == g["id"]]
         sub_seed = seed.subset(np.array(members))
-        sub = T.build(sub_seed, cit, q, T.Options(refs_top=30, min_size=max(8, len(members) // 25), min_groups=2,
+        sub = T.build(sub_seed, cit, q, T.Options(refs_top=30, min_size=max(8, len(members) // 25), min_groups=2, lens_min_score=LENS_MIN_SCORE,
                                                   max_groups=8, workers=LEIDEN_WORKERS), background=background)
         sub = finish(ctx, cit, sub, sub_seed, ctx.release["id"])
         sub["papers"]["via"] = [via.get(pid[1:], {}).get("via", "") for pid in sub["papers"]["id"]]

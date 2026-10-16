@@ -543,3 +543,70 @@ def test_a_map_carries_its_groups_subgroups_the_same_as_splitting_them(tmp_path,
     assert split["cached"] is True and split["parent"]["group"] == g["id"]
     assert [x["name"] for x in split["groups"]] == [x["name"] for x in g["subgroups"]]
     assert "divides into:" in as_text(out, "https://api.example")
+
+
+def _field_literature():
+    """literature(), read as a whole field: group 0's papers also cite three papers of the map (works 2 and 3, judged
+    on topic, and work 176, judged off topic: seed.score falls from 1 to 0 along the papers); group 1's papers keep
+    their reference lists for 5 of 60 only (like arXiv preprints in OpenAlex), and three of them are much cited."""
+    seed, cit = literature()
+    for i in range(60):
+        cit._refs[i] = sorted(set(cit._refs[i]) | {1, 2, 175})
+    for i in range(65, 120):
+        cit._refs[i] = []
+    off = np.zeros(len(cit.year) + 1, np.int64)
+    for i in range(len(cit.year)):
+        off[i + 1] = off[i] + len(cit._refs.get(i, []))
+    cit.fwd_off = off
+    cit.cites = cit.cites.copy()
+    cit.cites[[70, 65, 100]] = [500, 300, 1000]        # node 100 (work 101) is judged off topic (score < 0.5)
+    return seed, cit
+
+
+def _group_of(out, planted_g, per=60):
+    group, truth = planted(out, per)
+    return next(g for g in out["groups"] if np.bincount(truth[group == g["id"]]).argmax() == planted_g)
+
+
+def test_whole_field_lists_keep_to_the_field_and_name_its_foundations():
+    seed, cit = _field_literature()
+    plain = T.build(seed, cit, "coral reefs")
+    assert all("foundations" not in g["lenses"] for g in plain["groups"])        # topic maps: lists as before
+    assert any(w > 1000 for w in (it["w"] for it in _group_of(plain, 0)["lenses"]["core"]))
+    out = T.build(seed, cit, "coral reefs", T.Options(lens_min_score=0.5))
+    score = dict(zip(seed.wids.tolist(), seed.score.tolist()))
+    g0 = _group_of(out, 0)
+    core = [it["w"] for it in g0["lenses"]["core"]]
+    assert set(core) == {2, 3}                         # in the field and judged on topic; not 176, nothing outside
+    found = [it["w"] for it in g0["lenses"]["foundations"]]
+    assert found and all(w > 1000 for w in found) and 1121 in found and 1122 not in found   # textbook, not software
+    for g in out["groups"]:
+        for key in ("start_here", "newest", "bridges", "core", "rising", "distinctive"):
+            assert all(score.get(it["w"], 1) >= 0.5 and it["w"] <= 180 for it in g["lenses"].get(key, [])), key
+    overall = out["overall"]["lenses"]
+    assert "foundations" in overall and all(it["w"] > 1000 for it in overall["foundations"])
+
+
+def test_a_group_without_reference_lists_reads_its_own_most_cited_papers():
+    seed, cit = _field_literature()
+    out = T.build(seed, cit, "coral reefs", T.Options(lens_min_score=0.5))
+    g1 = _group_of(out, 1)
+    assert g1["with_references"] < 0.3 * g1["size"]
+    core = [it["w"] for it in g1["lenses"]["core"]]
+    assert core[:2] == [71, 66] and 101 not in core   # by citations from all of science, judged on topic only
+    assert "across science" in g1["lenses"]["core"][0]["why"]
+    assert all(it["w"] <= 180 for it in g1["lenses"]["rising"] + g1["lenses"]["start_here"])
+    g2 = _group_of(out, 2)            # has its reference lists, all to works outside the field: those are foundations
+    assert g2["with_references"] >= 0.3 * g2["size"]
+    assert g2["lenses"]["core"] == [] and len(g2["lenses"]["foundations"]) == 8
+
+
+def test_a_work_entered_twice_fills_one_place_of_a_list():
+    seed, cit = literature()
+    titles = {1000: "The Theory of Island Biogeography", 1001: "The theory of island biogeography."}
+    cit.title = lambda node: titles.get(int(node), f"Work {int(node) + 1}")
+    out = T.build(seed, cit, "coral reefs")
+    for g in out["groups"]:
+        core = [it["w"] for it in g["lenses"]["core"]]
+        assert not (1001 in core and 1002 in core)
+    assert any(1001 in [it["w"] for it in g["lenses"]["core"]] for g in out["groups"])

@@ -333,7 +333,8 @@ How to search well:
         they cite and the words they use. For every group: its name (its most distinctive phrases), size, years,
         which groups it builds on, and its full reading lists computed from its own papers' citations — start here
         (recent papers citing most of the group's key works, often reviews), core (its foundations), rising,
-        only here (what sets it apart), bridges (to other groups), newest — and its experts (authors with the
+        only here (what sets it apart), bridges (to other groups), newest, and in whole-field maps foundations
+        from outside the field — and its experts (authors with the
         highest position-weighted h-index inside the group). The same lists for the whole topic come first, with
         the words that set it apart from the rest of science. Use it first for any question about a field, then
         read the relevant groups in depth with read_topic_group (group=0: the whole topic's lists). Long maps come in pages (page 1 lists every group

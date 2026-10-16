@@ -42,7 +42,7 @@ TOPICS = {"frag": ("habitat fragmentation", None),
                   "learning for reasoning, and alignment training")}
 ARMS = ("new08-only", "new2B-only")
 LISTS = ("start_here", "core", "distinctive", "rising", "bridges", "newest")
-RULES = ("base", "in_map", "j08", "j2B", "both", "both_strict", "in_map_both", "members")
+RULES = ("base", "in_map", "j08", "j2B", "both", "both_strict", "in_map_both", "members", "members_p", "members_08")
 SPARSE = 0.3
 SURVEY = re.compile(r"\b(survey|review|overview|tutorial|primer)\b", re.I)
 
@@ -137,7 +137,7 @@ maps = {(t, a): deep_map(t, a) for t in TOPICS for a in ARMS}
 
 # the first 8 are today's lists (same groups, same order): a check that the deeper build changed nothing else
 for (t, a), m in maps.items():
-    today = json.loads((R4 / f"{t}-{a}" / "maps" / VERSION / "main.json").read_text())
+    today = json.loads(min((R4 / f"{t}-{a}" / "maps").glob("*/main.json"), key=lambda f: f.stat().st_mtime).read_text())
     same = sum(g["name"] == h["name"] and all([p["id"] for p in (g["lenses"].get(n) or [])[:SHOW]] ==
                                               [p["id"] for p in (h["lenses"].get(n) or [])[:SHOW]] for n in LISTS)
                for g, h in zip(m["groups"], today["groups"]))
@@ -153,12 +153,18 @@ for t in TOPICS:
     print(t, len(ws), "candidates judged by both models", flush=True)
 
 
-def keep(rule, t, p):
+FINAL = {t: {a: dict(zip(np.load(R4 / f"{t}-{a}" / "work" / "scores.npz")["ids"].tolist(),
+                         np.load(R4 / f"{t}-{a}" / "work" / "scores.npz")["final"].tolist())) for a in ARMS} for t in TOPICS}
+
+
+def keep(rule, t, p, a=None):
     s = scores[t][int(p["id"][1:])]
     return {"base": True, "in_map": p.get("in_map", False), "j08": s["08"] >= TAU, "j2B": s["2B"] >= TAU,
             "both": s["both"] >= TAU, "both_strict": s["both"] >= TAU_STRICT,
             "in_map_both": p.get("in_map", False) and s["both"] >= TAU,
-            "members": p.get("in_map", False) and s["both"] >= TAU}[rule]
+            "members": p.get("in_map", False) and s["both"] >= TAU,
+            "members_08": p.get("in_map", False) and s["08"] >= TAU,
+            "members_p": p.get("in_map", False) and FINAL[t][a].get(int(p["id"][1:]), 0) >= TAU}[rule]
 
 
 def member_pools(m):
@@ -202,9 +208,9 @@ for (t, a), m in maps.items():
         for g in m["groups"]:
             for n in LISTS:
                 items = g["lenses"].get(n) or []
-                if rule == "members" and n in ("core", "rising", "start_here") and g["id"] in pools[(t, a)]:
+                if rule in ("members", "members_p", "members_08") and n in ("core", "rising", "start_here") and g["id"] in pools[(t, a)]:
                     items = pools[(t, a)][g["id"]][n]
-                pick = items[:SHOW] if rule == "base" else [p for p in items if keep(rule, t, p)][:SHOW]
+                pick = items[:SHOW] if rule == "base" else [p for p in items if keep(rule, t, p, a)][:SHOW]
                 rows += [(g["id"], n, p) for p in pick]
         shown[(t, a, rule)] = rows
 

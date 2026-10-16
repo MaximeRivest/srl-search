@@ -41,6 +41,7 @@ import numpy as np
 from scipy import sparse
 
 YEAR_NOW = date.today().year
+SURVEY = re.compile(r"\b(survey|review|overview|tutorial|primer)\b", re.I)
 BLOCK = 2000          # rows per block for the big products (memory stays ~linear in n: whole fields are 50k+ papers)
 # References that are not reading material: left out of the lenses (they still link papers in the graph).
 NOT_READING = frozenset({"dataset", "paratext", "supplementary-materials", "software", "peer-review", "libguides",
@@ -69,6 +70,15 @@ class Options:
     seed: int = 20161028           # Scimeetr's first commit day
     workers: int = 1               # Leiden runs side by side (forked processes) for maps of PARALLEL_MIN+ papers
     lens_size: int = 8              # per reading list (experts too)
+    # Whole-field maps (seed.score = the judge's P(on topic)): the reading lists show only papers of the field scored
+    # at least this; the works cited most from outside the field go to their own list, "foundations". None (topic
+    # maps): lists as before. Measured on two replayed fields (experiments/fieldjudge/listgate.py): papers on topic in
+    # the lists 80% -> 94% (habitat fragmentation), 50% -> 80% (LLM post-training, with sparse_refs below)
+    lens_min_score: float | None = None
+    # ... and a group where fewer than this share of papers have reference lists (OpenAlex has few for arXiv
+    # preprints: 45 of 3,111 in an RLHF group) takes core, rising and start here from its own papers, ranked by
+    # citations from all of science: its few lists name 1950s statistics and child language, not InstructGPT
+    sparse_refs: float = 0.3
 
 
 @dataclass
@@ -613,39 +623,70 @@ def h_index(values) -> int:
     return h
 
 
+def distinct_works(js, gr: Graph, cit, k: int) -> list:
+    """The first k reference columns of js with different titles: OpenAlex can hold two records for one work (a book
+    entered twice: "The Theory of Island Biogeography" filled two places of one list)."""
+    seen, out = set(), []
+    for j in js:
+        key = re.sub(r"[^a-z0-9]", "", (cit.title(int(gr.refs[j])) or "").lower())[:150]
+        if key and key in seen:
+            continue
+        seen.add(key)
+        out.append(j)
+        if len(out) == k:
+            break
+    return out
+
+
 def lenses_for(c: int, idx: np.ndarray, gr: Graph, seed: Seed, group: np.ndarray, cit, opt: Options,
-               ref_year: np.ndarray, ref_ok: np.ndarray, total_local: np.ndarray | None, unit: str = "group") -> dict:
+               ref_year: np.ndarray, ref_ok: np.ndarray, total_local: np.ndarray | None, unit: str = "group",
+               ref_seed: np.ndarray | None = None) -> dict:
     """Reading lists of one group, or of the whole map (unit="topic", idx = every paper, total_local None: no
-    "only here" list, which compares a group with the others). Items: {"w": work number, "why": sentence, ...}."""
+    "only here" list, which compares a group with the others). Items: {"w": work number, "why": sentence, ...}.
+    With opt.lens_min_score and ref_seed (the row in seed of each reference column, -1 outside the map): whole-field
+    rules, see Options.lens_min_score and Options.sparse_refs."""
     k = opt.lens_size
     ng = len(idx)
     A = gr.A
     local = np.asarray(A[idx].sum(0)).ravel() if A.shape[1] else np.zeros(0)
     out: dict[str, list] = {}
+    judged = opt.lens_min_score is not None and ref_seed is not None and seed.score is not None
+    if judged:
+        score = np.asarray(seed.score, np.float64)
+        ok = ref_ok & (ref_seed >= 0) & (score[np.maximum(ref_seed, 0)] >= opt.lens_min_score)
+        outside = ref_ok & (ref_seed < 0)
+        members = idx[score[idx] >= opt.lens_min_score]
+    else:
+        ok, outside, members = ref_ok, None, idx
 
-    order = [j for j in np.argsort(-local, kind="stable") if local[j] >= 2 and ref_ok[j]]
-    core = order[:k]
+    core = distinct_works((j for j in np.argsort(-local, kind="stable") if local[j] >= 2 and ok[j]), gr, cit, k)
     out["core"] = [{"w": cit.work(gr.refs[j]), "cited_here": int(local[j]),
                     "why": f"cited by {int(local[j])} of the {ng:,} papers in this {unit}"} for j in core]
+    if outside is not None:
+        found = distinct_works((j for j in np.argsort(-local, kind="stable") if local[j] >= 3 and outside[j]), gr, cit, k)
+        out["foundations"] = [{"w": cit.work(gr.refs[j]), "cited_here": int(local[j]),
+                               "why": f"cited by {int(local[j])} of the {ng:,} papers in this {unit}"} for j in found]
 
     if total_local is not None:
         lift = np.where(total_local > 0, local / np.maximum(total_local, 1), 0)
         core_set = set(core)
-        dist = [j for j in np.argsort(-(local * lift), kind="stable")
-                if local[j] >= 3 and ref_ok[j] and j not in core_set and lift[j] >= 0.5][:k]
+        dist = distinct_works((j for j in np.argsort(-(local * lift), kind="stable")
+                               if local[j] >= 3 and ok[j] and j not in core_set and lift[j] >= 0.5), gr, cit, k)
         out["distinctive"] = [{"w": cit.work(gr.refs[j]), "cited_here": int(local[j]), "cited_in_map": int(total_local[j]),
                                "why": f"{int(local[j])} of its {int(total_local[j])} citations in this map come from this group"}
                               for j in dist]
 
-    recent = (ref_year >= YEAR_NOW - 5) & (local >= 3) & ref_ok
+    recent = (ref_year >= YEAR_NOW - 5) & (local >= 3) & ok
     rate = np.where(recent, local / np.maximum(YEAR_NOW - ref_year + 1, 1), 0)
     out["rising"] = [{"w": cit.work(gr.refs[j]), "cited_here": int(local[j]), "year": int(ref_year[j]),
                       "why": f"from {int(ref_year[j])}, already cited by {int(local[j])} papers of this {unit}"}
-                     for j in np.argsort(-rate, kind="stable")[:k] if rate[j] > 0]
+                     for j in distinct_works((j for j in np.argsort(-rate, kind="stable") if rate[j] > 0), gr, cit, k)]
 
     top = [j for j in np.argsort(-local, kind="stable")[:30] if local[j] >= 2]
     if top:
         cov = np.asarray(A[idx][:, top].sum(1)).ravel()
+        if judged:
+            cov = np.where(score[idx] >= opt.lens_min_score, cov, 0)
         years = np.array([seed.details[i].get("year") or 0 for i in idx])
         pool = np.flatnonzero((years >= YEAR_NOW - 8) & (cov >= 3))
         if len(pool) < 3:
@@ -666,13 +707,41 @@ def lenses_for(c: int, idx: np.ndarray, gr: Graph, seed: Seed, group: np.ndarray
     else:
         out["start_here"] = []
 
-    newest = sorted(idx, key=lambda i: (-(seed.details[i].get("year") or 0),
-                                        -(seed.score[i] if seed.score is not None else 0)))[:k]
+    newest = sorted(members, key=lambda i: (-(seed.details[i].get("year") or 0),
+                                            -(seed.score[i] if seed.score is not None else 0)))[:k]
     out["newest"] = [{"w": int(seed.wids[i]), "why": ""} for i in newest]
+
+    with_refs = int((np.asarray(A[idx].sum(1)).ravel() > 0).sum()) if A.shape[1] else 0
+    if judged and len(members) and with_refs < opt.sparse_refs * ng:
+        out.update(own_lists(members, gr, seed, cit, k, unit, out["start_here"]))
     return out, local
 
 
-def bridges_for(c: int, idx: np.ndarray, WG: np.ndarray, G: int, k: int, seed: Seed) -> list[dict]:
+def own_lists(members: np.ndarray, gr: Graph, seed: Seed, cit, k: int, unit: str, start_here: list) -> dict:
+    """Core, rising and start here from a group's own papers, ranked by how often all of science cites them: for a
+    group whose papers mostly lack reference lists (Options.sparse_refs)."""
+    nd = gr.nodes[members]
+    cites = np.where(nd >= 0, np.asarray(cit.cites)[np.maximum(nd, 0)], 0).astype(np.int64)
+    years = np.array([seed.details[i].get("year") or 0 for i in members])
+    why = f"cited {{:,}} times across science (few papers of this {unit} list their references here)"
+    out = {"core": [{"w": int(seed.wids[members[p]]), "citations_all": int(cites[p]), "why": why.format(int(cites[p]))}
+                    for p in np.argsort(-cites, kind="stable")[:k] if cites[p] > 0]}
+    rec = np.flatnonzero((years >= YEAR_NOW - 5) & (cites > 0))
+    rate = cites[rec] / np.maximum(YEAR_NOW - years[rec] + 1, 1)
+    out["rising"] = [{"w": int(seed.wids[members[p]]), "year": int(years[p]), "citations_all": int(cites[p]),
+                      "why": f"from {int(years[p])}, already cited {int(cites[p]):,} times"}
+                     for p in rec[np.argsort(-rate, kind="stable")][:k]]
+    reviews = [p for p in np.argsort(-cites, kind="stable") if years[p] >= YEAR_NOW - 8 and cites[p] > 0 and (
+        seed.details[members[p]].get("type") == "review" or SURVEY.search(seed.details[members[p]].get("title") or ""))]
+    first = [{"w": int(seed.wids[members[p]]), "citations_all": int(cites[p]),
+              "why": f"a review of the {unit}, cited {int(cites[p]):,} times"} for p in reviews[:k]]
+    have = {it["w"] for it in first}
+    out["start_here"] = (first + [it for it in start_here if it["w"] not in have])[:k]
+    return out
+
+
+def bridges_for(c: int, idx: np.ndarray, WG: np.ndarray, G: int, k: int, seed: Seed,
+                min_score: float | None = None) -> list[dict]:
     S = WG[idx]
     tot = S.sum(1)
     with np.errstate(invalid="ignore", divide="ignore"):
@@ -685,6 +754,8 @@ def bridges_for(c: int, idx: np.ndarray, WG: np.ndarray, G: int, k: int, seed: S
     # a bridge others have used: broad reviews in obscure venues link everything and are cited by no one
     cited = np.array([float(seed.details[i].get("citations") or 0) for i in idx])
     sc = np.where(bshare >= 0.2, pc * np.sqrt(tot) * (1 + np.log1p(cited)), -1)
+    if min_score is not None and seed.score is not None:           # whole-field maps: papers judged on topic only
+        sc = np.where(np.asarray(seed.score)[idx] >= min_score, sc, -1)
     out = []
     for p in np.argsort(-sc, kind="stable")[:k]:
         if sc[p] <= 0:
@@ -815,11 +886,12 @@ def build(seed: Seed, cit, query: str = "", opt: Options | None = None, backgrou
         m[m] &= group[tgt[m]] >= 0
         np.add.at(flows, (group[C.row[m]], group[tgt[m]]), 1)
 
+    ref_seed = ref_is_seed if opt.lens_min_score is not None else None
     groups = []
     for c in range(G):
         idx = np.flatnonzero(group == c)
-        lens, local = lenses_for(c, idx, gr, seed, group, cit, opt, ref_year, ref_ok, total_local)
-        lens["bridges"] = bridges_for(c, idx, WG, G, opt.lens_size, seed)
+        lens, local = lenses_for(c, idx, gr, seed, group, cit, opt, ref_year, ref_ok, total_local, ref_seed=ref_seed)
+        lens["bridges"] = bridges_for(c, idx, WG, G, opt.lens_size, seed, opt.lens_min_score)
         lens["experts"] = experts_for(idx, local, gr, seed, cit, opt.lens_size)
         strength = WG[idx, c]
         years = [d.get("year") for d in (seed.details[i] for i in idx) if d.get("year")]
@@ -843,7 +915,8 @@ def build(seed: Seed, cit, query: str = "", opt: Options | None = None, backgrou
     every = np.arange(n)
     lens = {}
     if n:
-        lens, local = lenses_for(-1, every, gr, seed, group, cit, opt, ref_year, ref_ok, None, unit="topic")
+        lens, local = lenses_for(-1, every, gr, seed, group, cit, opt, ref_year, ref_ok, None, unit="topic",
+                                 ref_seed=ref_seed)
         lens["experts"] = experts_for(every, local, gr, seed, cit, opt.lens_size, unit="topic")
     years = [d.get("year") for d in seed.details if d.get("year")]
     overall = {"id": 0, "size": int(n), "years": [int(np.percentile(years, p)) for p in (10, 50, 90)] if years else None,
