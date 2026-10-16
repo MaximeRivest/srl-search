@@ -722,6 +722,12 @@ def own_lists(members: np.ndarray, gr: Graph, seed: Seed, cit, k: int, unit: str
     group whose papers mostly lack reference lists (Options.sparse_refs)."""
     nd = gr.nodes[members]
     cites = np.where(nd >= 0, np.asarray(cit.cites)[np.maximum(nd, 0)], 0).astype(np.int64)
+    # one place per work (a preprint and its proceedings copy): the most cited copy
+    key = lambda i: re.sub(r"[^a-z0-9]", "", (seed.details[i].get("title") or "").lower())[:150] or f"#{i}"
+    by_cites = np.argsort(-cites, kind="stable")
+    _, first = np.unique([key(members[p]) for p in by_cites], return_index=True)
+    keep = np.sort(by_cites[first])
+    members, cites = members[keep], cites[keep]
     years = np.array([seed.details[i].get("year") or 0 for i in members])
     why = f"cited {{:,}} times across science (few papers of this {unit} list their references here)"
     out = {"core": [{"w": int(seed.wids[members[p]]), "citations_all": int(cites[p]), "why": why.format(int(cites[p]))}

@@ -596,6 +596,11 @@ def test_a_group_without_reference_lists_reads_its_own_most_cited_papers():
     assert core[:2] == [71, 66] and 101 not in core   # by citations from all of science, judged on topic only
     assert "across science" in g1["lenses"]["core"][0]["why"]
     assert all(it["w"] <= 180 for it in g1["lenses"]["rising"] + g1["lenses"]["start_here"])
+    seed.details[64]["title"] = seed.details[70]["title"]  # work 65 is work 71 entered twice (a preprint and its copy)
+    cit.cites[64] = 400
+    again = _group_of(T.build(seed, cit, "coral reefs", T.Options(lens_min_score=0.5)), 1)
+    titles = [seed.details[it["w"] - 1]["title"] for it in again["lenses"]["core"]]
+    assert len(titles) == len(set(titles)) and again["lenses"]["core"][0]["w"] == 71   # the more cited copy stays
     g2 = _group_of(out, 2)            # has its reference lists, all to works outside the field: those are foundations
     assert g2["with_references"] >= 0.3 * g2["size"]
     assert g2["lenses"]["core"] == [] and len(g2["lenses"]["foundations"]) == 8
