@@ -3,14 +3,39 @@
 **Current status: accelerated streaming run.** The user explicitly prioritized
 labels over order checks and heavyweight preparation. Sol and Opus label in
 25-paper requests with short ID + label outputs. The remaining work is now split
-between them, not double-judged (see below). No new model is trained or
-deployed. The old staged jobs are stopped; the accelerated labelers do NOT stop at
+between them, not double-judged (see below). Labeling is now finished; experimental
+0.8B training is running, with 2B queued afterward. Nothing is deployed. The old
+staged jobs are stopped; the accelerated labelers did NOT stop at
 2,000 pairs. Source and data live separately:
 
 - Code: `experiments/fieldjudge/v2/`
 - Data/progress: `/mnt/fast/scholarsreadinglist/fieldjudge/v2/`
 - Search/corpus scripts: `search-dev/.venv/bin/python`
 - Subscription/FunctAI scripts: `sciencemadereadable/.venv/bin/python`
+
+## Training and live dashboard (2026-10-15 evening)
+
+- Dashboard: https://lambda.tail69222b.ts.net:18943/ (private tailnet; also opened as
+  a Chattering artifact). `dashboard_server.py` serves metrics only, not papers or credentials.
+- `training_data.py` freezes topic-family connected components based on retrieval
+  overlap, excludes held-out topics/papers and normalized titles, and fixes validation
+  before the first gradient step. Teacher agreement is silver supervision, not truth.
+- First pass: 84,377 usable training pairs. Second pass: 85,303, including 926 late
+  arrivals. Validation stays fixed at 3,921 pairs; late validation labels are not added.
+- Both sizes use exactly the same initial-then-final curriculum, from their public
+  base weights, not the old fine-tunes. No guessed labels for uncertainty/refusals/conflicts.
+- `train_incremental.py`: LoRA rank 32, batch 32, lr 1e-4; tokenization preserves
+  the question and answer prefix. Checkpoints include optimizer, row cursor/order,
+  RNG, configuration and data hashes. Export is the final state so it has seen all
+  usable late examples; best-validation checkpoints are retained separately.
+- `run_models.sh` runs 0.8B then 2B, yielding to live maps. `finalize_labels.py`
+  automatically freezes the final snapshot when both labelers finish. If that is
+  delayed, training checkpoints at the epoch boundary and releases GPU while waiting.
+- `evaluate_finished.py` waits for both models, then evaluates on all eight new
+  held-out topics, with retrieval-pool and title-only results reported separately.
+  This uses no provider calls. It does not deploy either model.
+- Services: `fj-v2-models`, `fj-v2-final-labels`, `fj-v2-evaluate`, `fj-v2-dashboard`.
+  They are independent of Chattering; jobs are transient, not reboot-persistent.
 
 ## Remaining work split between teachers (2026-10-15)
 
