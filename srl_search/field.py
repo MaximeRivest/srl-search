@@ -1104,10 +1104,13 @@ SPLIT3_MIN = 1500                        # a subgroup this big is split once mor
                                          #   the group's page (a third level; 2M papers: 19 groups, ~150 subgroups)
 
 
-def _memory_ok(n: int) -> bool:
-    """Room for one more forked split of n papers: ~6 GB + 40 KB a paper (measured peaks), in the machine and in
-    this service's memory limit."""
-    need = 6 * 2**30 + 40_000 * n
+def _memory_ok(n: int, total: int) -> bool:
+    """Room for one more forked split of n papers of a map of `total`: ~4 GB + 60 KB a paper of the group, + 20 KB a
+    paper of the whole map (a child copies the pages of the map's Python objects it touches: refcounts are writes;
+    measured, a 723k-paper map with three 37-59k groups side by side: 31 GB anonymous, 49 GB file cache, 12 GB
+    swapped at the 80 GB limit), in the machine and in this
+    service's memory limit (its anonymous memory: the rest is file cache, which the kernel takes back)."""
+    need = 4 * 2**30 + 60_000 * n + 20_000 * total
     try:
         avail = int(next(l for l in open("/proc/meminfo") if l.startswith("MemAvailable")).split()[1]) * 1024
     except (OSError, StopIteration, ValueError):
@@ -1117,10 +1120,9 @@ def _memory_ok(n: int) -> bool:
         cg = Path("/sys/fs/cgroup") / open("/proc/self/cgroup").read().strip().split("::")[-1].lstrip("/")
         mx = (cg / "memory.max").read_text().strip()
         if mx != "max":
-            cur = int((cg / "memory.current").read_text())
             stat = dict(l.split() for l in (cg / "memory.stat").read_text().splitlines())
-            used = cur - int(stat.get("inactive_file", 0)) - int(stat.get("active_file", 0)) // 2
-            ok = ok and used + need < int(mx) * 0.9
+            used = int(stat.get("anon", 0)) + int(stat.get("shmem", 0))
+            ok = ok and used + need < int(mx) * 0.85         # file cache (often half of it) is reclaimable
     except (OSError, ValueError, IndexError):
         pass
     return ok
@@ -1243,7 +1245,7 @@ def build_maps(ctx: Ctx, job: Job, sel: dict, version: str) -> dict:
     running: dict[int, tuple] = {}                     # pid -> (group, started)
     par = SPLIT_PARALLEL if len(big) > 1 else 1
     while left or running:
-        while left and len(running) < par and (not running or _memory_ok(len(rows_of[left[0]["id"]]))):
+        while left and len(running) < par and (not running or _memory_ok(len(rows_of[left[0]["id"]]), len(seed.wids))):
             g = left.pop(0)
             if par == 1:
                 _split_group(ctx_split, g, rows_of[g["id"]], LEIDEN_WORKERS)
