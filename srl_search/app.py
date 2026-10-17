@@ -931,6 +931,48 @@ def institution(ref: str,
     return PlainTextResponse(profile_text(out, PUBLIC_BASE)) if format == "text" else out
 
 
+@app.get("/sources")
+def sources(q: str = Query(..., min_length=2, max_length=200, description="A journal's (conference's, repository's) name, "
+                           "or part of it ('nature', 'j ecol' does not work: whole words, the last may be a prefix), or an ISSN."),
+            k: int = Query(10, ge=1, le=50), format: str = Query("json", pattern="^(json|text)$", description=D_FORMAT)):
+    """Sources (journals, conferences, repositories, book series: OpenAlex's S-records) by name or ISSN: those whose
+    name holds every word of q, the exact name first, then the most published. Each has its type, ISSN, publisher,
+    publications, citations, h-index, years and share of open-access papers."""
+    out = people_service().search_sources(q, k)
+    return PlainTextResponse(people_search_text(out, PUBLIC_BASE, "source")) if format == "text" else out
+
+
+@app.get("/sources/{ref}")
+def source(ref: str,
+           read: str | None = Query(None, pattern=r"^(\d{1,3}(\.\d{1,3})?)?$", description="As for /authors/{ref}."),
+           lens: str | None = Query(None, alias="list", pattern="^(cited|newest|authors|institutions)$"),
+           offset: int = Query(8, ge=0, le=5000), limit: int = Query(25, ge=1, le=50),
+           word: str | None = Query(None, min_length=1, max_length=100, description=(
+               "A word of the source's (or, with read=, one field's) word cloud: its papers that use it, among the "
+               "sample the clouds are counted on, the most cited first.")),
+           format: str = Query("json", pattern="^(json|text)$", description=D_FORMAT)):
+    """One source's profile (a journal, conference, repository or book series; S-number or ISSN), shaped like
+    /authors/{ref}: its publications in groups by field, each with lists cited, newest, authors (who publishes most in
+    it, with their most cited paper there) and institutions (where its authors are from), and a word cloud (what its
+    papers say: the whole against all of science, each field against the rest of the source, from a sample of up to
+    3,000 papers plus 400 of each field); "person" the figures (type, ISSN, publisher, publications, citations,
+    h-index, years, open-access share, authors, and "recent": the mean and median citations of its papers of three
+    complete years 2-4 years back; OpenAlex's counts, not an impact factor). A paper counts for the source of its
+    primary location. Large journals take a few seconds the first time, then are kept."""
+    svc = people_service()
+    row = svc.source_row(ref)
+    if row is None:
+        raise HTTPException(404, f"{ref} is not a source we know (an OpenAlex S-number or an ISSN)")
+    if word is not None:
+        return svc.word_papers(row, read or "", word, min(limit, 20))
+    if lens is not None:
+        out = svc.more("source", row, read or "", lens, offset, limit)
+        return PlainTextResponse(more_text(out, lens, PUBLIC_BASE, f"sources/{svc.ident('source', row)}", read or "", offset)) \
+            if format == "text" else out
+    out = svc.profile("source", row)
+    return PlainTextResponse(profile_text(out, PUBLIC_BASE)) if format == "text" else out
+
+
 # Last, once every function above exists: the MCP tools call them.
 from srl_search import mcp_server  # noqa: E402
 

@@ -98,7 +98,7 @@ position, `works`, `h`), `institutions`, and `affiliations`: `"exact"` when each
 the institutions they signed from on this paper (OpenAlex's authorships), `"none"` when only the paper's
 institutions are known; `references` and `cited_by`: `count`, `years` (count per year), `top` (most cited), `newest`
 (cited_by), `plot` (up to 400 as `[year, citations, W-number, title]`); `references_listed` (what the paper lists, linked
-or not); `maps`: the whole-field maps holding it, most specific first, each with `topic`, `group` and `sub` (`id`,
+or not); `source`: where it was published (as /sources gives it); `maps`: the whole-field maps holding it, most specific first, each with `topic`, `group` and `sub` (`id`,
 `name`, AI-written `about`, `size`) and `via` (`topic`: on topic; `cited`: in the map because the field cites it).
 `/links?direction=references|cited_by&sort=cited|newest|oldest&offset=0&limit=25` pages through either list (up to
 100 at a time) with its `total`. Links count only papers in the OpenAlex snapshot (see coverage).
@@ -222,6 +222,19 @@ and `/institutions/I5023651 are the same for organisations (universities, hospit
 I-records, matched from affiliation strings), with lists `cited`, `newest`, `people` (its authors on the most of
 those papers) and `partners` (the other organisations on its papers), and in `person`: works, authors, citations,
 h-index, years, country, kind, ROR.
+
+### GET /sources?q=...   ·   GET /sources/{id}
+Journals, conferences, repositories and book series (OpenAlex's S-records). `/sources?q=journal of ecology` finds them
+by name (every word, the last may be a prefix; the exact name first, then the most published) or by ISSN
+(`/sources?q=0012-9658`); each has `type`, `issn`, `publisher`, `works`, `citations`, `h`, `years`, `open_access`
+(share of its papers free to read). `/sources/S9692511` (or an ISSN) is one source's profile, shaped like an author's:
+`groups` are its fields with lists `cited`, `newest`, `authors` (who publishes most in it) and `institutions` (where
+they work), each group with its `cloud` (the words its papers use more than the rest of the source; the whole's against
+all of science, from a sample of up to 3,000 papers plus 400 of each field); `person` holds the figures and `recent`
+(mean and median citations of its papers of three complete years, 2-4 years back: OpenAlex's counts, not an impact
+factor). `word=corridors` (with `read=3` for one field) gives its sampled papers that use a word of its cloud. Lists
+read further as for authors (`read=&list=&offset=&limit=`); `format=text` as Markdown. A paper counts for one source,
+its primary location's (`/works/{ref}/context` gives it as `source`).
 
 ### GET /map/place?ids=W1,W2&q=...   ·   GET /map/regions   ·   GET /map/counts
 Positions on the map of science for up to 200 papers and/or a question; field names, colours and label

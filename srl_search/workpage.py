@@ -128,6 +128,10 @@ class WorkPage:
         if nrefs.exists():                              # what the paper lists, against the part we can link
             out["references_listed"] = int(np.load(nrefs, mmap_mode="r")[nd])
         out.update(self._people(nd))
+        src = getattr(getattr(self.app, "PEOPLE", None), "src", None)     # where it was published (sources.py)
+        r = src.of_paper(nd) if src is not None else None
+        if r is not None:
+            out["source"] = src.describe(r)
         refs, citing = self._refs(nd), self._cited_by(nd)
         out["references"] = {"count": int(len(refs)), "years": self._years(refs), "plot": self._plot(refs),
                              "top": [self.item(int(n)) for n in self._order(refs, "cited")[:12]]}

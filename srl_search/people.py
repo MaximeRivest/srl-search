@@ -39,7 +39,8 @@ EDITIONS_UP_TO = 20000     # papers: up to this, a page lists each work once (ed
 MAX_TOGETHER = 20          # author records seen together on one page
 CACHE_FROM = 5000          # papers: profiles this big are kept on disk (computed once per snapshot; see warm())
 LIST_TITLES = {"cited": "Most cited", "newest": "Newest", "first": "As first author", "coauthors": "Co-authors",
-               "people": "People", "partners": "Partner organisations"}
+               "people": "People", "partners": "Partner organisations", "authors": "Authors who publish most here",
+               "institutions": "Institutions its authors are from"}
 
 
 DATED = re.compile(r"[(\[]\s*(1[5-9]\d\d|20[0-2]\d)\s*[)\]]\s*\.?\s*$")
@@ -52,6 +53,32 @@ def edition_key(title: str) -> str:
     t = DATED.sub("", NUMBERING.sub("", title or ""))
     k = re.sub(r"[^a-z0-9]+", " ", fold(t)).strip()
     return k if len(k) >= 25 and len(k.split()) >= 4 else ""
+
+
+# Words a journal's house style puts in every abstract or front matter, not what its papers are about: the section
+# headings of structured abstracts ("Synthesis." ends every Journal of Ecology abstract) and its notices.
+BOILERPLATE = ("summary", "synthesis", "abstract", "background", "aims", "aim", "objective", "objectives", "purpose",
+               "methods", "method", "results", "conclusions", "conclusion", "discussion", "introduction", "findings",
+               "importance", "design", "setting", "participants", "interventions", "main outcome measures",
+               "interpretation", "funding", "context", "location", "time period", "major taxa studied", "highlights",
+               "keywords", "main", "main conclusions", "significance", "rationale", "evidence", "copyright", "elsevier", "wiley", "rights reserved",
+               "books received", "shorter notices", "publications received", "correction", "erratum", "front matter",
+               "back matter", "issue information", "lookup", "doi", "lookup doi", "google scholar", "crossref", "pubmed", "table of contents", "editorial board", "cover image", "review")
+
+
+# What a scraper took from a publisher's page instead of an abstract (metrics widgets, access notices)
+SCRAPED = re.compile(r"article metrics|downloads\s*citations|last 12 months|whole calendar month|total citations|"
+                     r"no data available|access through your institution|sign in to|purchase this|"
+                     r"you do not have access|full text of this article", re.I)
+GLUED = re.compile(r"[a-z]{2,}[A-Z][a-z]{2,}[A-Z]|[a-z]\d+[A-Z]")
+
+
+def boilerplate() -> frozenset:
+    from srl_search import topics as T
+    return frozenset(" ".join(T.stem(t) for t in T.TOKEN.findall(x)) for x in BOILERPLATE)
+
+
+_POOL = __import__("concurrent.futures", fromlist=["ThreadPoolExecutor"]).ThreadPoolExecutor(2, thread_name_prefix="source-words")
 
 
 def rows_of(row) -> tuple[int, ...]:
@@ -93,6 +120,11 @@ class People:
                     shutil.rmtree(d, ignore_errors=True)
         self.au = cit.authors
         self.inst = getattr(cit, "institutions", None)
+        # journals, conferences, repositories (citewalk/build_sources.py; srl_search/sources.py)
+        from srl_search.sources import Sources
+        self.src = Sources(cit.root / "sources") if (cit.root / "sources" / "meta.json").exists() else None
+        if self.src is not None:                     # its name index (~4 s), ready before the first search
+            threading.Thread(target=self.src._all, name="source-names", daemon=True).start()
         self.ok = self.au is not None and getattr(self.au, "by", False)
         self.topic = None
         self.topics: list[dict] = []
@@ -125,6 +157,9 @@ class People:
             return self.inst.row_of(int(r[1:]))
         return None
 
+    def source_row(self, ref: str) -> int | None:
+        return self.src.row(ref) if self.src is not None else None
+
     def authors_of_work(self, w: int) -> list[dict]:
         """Who wrote a paper, in order, with ids (positions OpenAlex could not tie to a person are left out)."""
         nd = int(self.cit.nodes([w])[0])
@@ -152,13 +187,18 @@ class People:
         author records seen together."""
         if kind == "author":
             return sum(int(self.au.by_off[r + 1] - self.au.by_off[r]) for r in rows_of(row))
+        if kind == "source":
+            return int(self.src.s_off[row + 1] - self.src.s_off[row])
         return int(self.inst.i_off[row + 1] - self.inst.i_off[row])
 
     def ident(self, kind: str, row) -> str:
+        if kind == "source":
+            return self.src.openalex_id(row)
         return ",".join(self.au.openalex_id(r) for r in rows_of(row)) if kind == "author" else self.inst.openalex_id(row)
 
     def _cached(self, root: Path | None, kind: str, row: int) -> Path | None:
-        if root is None or self.size_of(kind, row) < CACHE_FROM:
+        # a source's page reads a sample of its abstracts and counts words in all of science: kept from 300 papers
+        if root is None or self.size_of(kind, row) < (300 if kind == "source" else CACHE_FROM):
             return None
         return root / kind / f"{self.ident(kind, row).replace(',', '+')}.json.gz"
 
@@ -192,9 +232,10 @@ class People:
         path = self._cached(self.cache_raw, kind, row)
         out = self._read(path)
         if out is None:
-            out = self._raw_author(row) if kind == "author" else self._raw_institution(row)
-            out.pop("_years", None)
-            out.pop("_cites", None)
+            out = self._raw_author(row) if kind == "author" else self._raw_source(row) if kind == "source" \
+                else self._raw_institution(row)
+            for k in ("_years", "_cites", "_gid", "_sid"):
+                out.pop(k, None)
             self._write(path, out)
         with self.lock:
             self.recent[key] = out
@@ -296,6 +337,172 @@ class People:
         out["person"] = d
         out["kind"] = "institution"
         return out
+
+    def _raw_source(self, row: int) -> dict:
+        """A journal (conference, repository, book series): its publications in groups by field, with lists most
+        cited, newest, authors (who publishes most in it) and institutions (where they work); the word clouds of what
+        it publishes, from a sample of its titles and abstracts (srl_search/topics.py's clouds: the whole against all
+        of science, each field against the rest of the source, each subfield against the rest of its field). The
+        whole's words (reading ~2,000 abstracts, counting its phrases in all of science: the slow part) are read in
+        a second thread while the lists are made."""
+        src, au, ins = self.src, self.au, self.inst
+        T0 = time.perf_counter()
+        nodes = src.papers(row)
+        nodes = nodes[self._publications(nodes)]
+        rng = np.random.default_rng(row)
+        n = len(nodes)
+        whole_ix = np.sort(rng.choice(n, min(n, self.WORD_SAMPLE), replace=False)) if n else np.zeros(0, np.int64)
+        whole_job = _POOL.submit(self._whole_words, nodes[whole_ix].tolist())
+        owner, at = gather(au.off, nodes)
+        listed = np.asarray(au.nauth[nodes])[owner] if len(owner) else owner
+        co = np.asarray(au.auth[at]).astype(np.int64) if len(at) else at
+        keep = listed <= MAX_COAUTHOR_PAPER
+        people = (owner[keep], co[keep])         # (no namesake merging: two people with one name in a journal are common)
+        if ins is not None:
+            o2, at2 = gather(ins.w_off, nodes)
+            partners = (o2, np.asarray(ins.w_inst[at2]).astype(np.int64) if len(at2) else at2)
+        else:
+            partners = (np.zeros(0, np.int64), np.zeros(0, np.int64))
+        out = self._raw(nodes, None, people, partners, editions=False)
+        for u in [out["overall"], *out["groups"], *(x for g in out["groups"] for x in g.get("subgroups", []))]:
+            L = u["lenses"]
+            L["authors"] = L.pop("people", [])
+            L["institutions"] = L.pop("partners", [])
+            u["cloud"] = []
+        T1 = time.perf_counter()
+        gid, sid = out["_gid"], out["_sid"]
+        extra = []                                       # each field's own sample, so small fields have words too
+        for g in np.unique(gid[gid > 0]):
+            ix = np.flatnonzero(gid == g)
+            extra.append(rng.choice(ix, min(len(ix), self.WORD_SAMPLE_GROUP), replace=False))
+        more = np.setdiff1d(np.concatenate(extra) if extra else np.zeros(0, np.int64), whole_ix)
+        ix = np.concatenate([whole_ix, more]).astype(np.int64)
+        out["sample"] = {"node": nodes[ix].tolist(), "g": gid[ix].tolist(), "s": sid[ix].tolist(), "whole": int(len(whole_ix))}
+        terms_more, surf_more, _ = self._sample_terms(nodes[more].tolist())
+        terms_whole, surf_whole, cloud = whole_job.result()
+        for k, c in surf_more.items():                   # the spellings seen, both samples together
+            surf_whole.setdefault(k, type(c)()).update(c)
+        out["overall"]["cloud"] = cloud
+        self._group_clouds(out, terms_whole + terms_more, surf_whole)
+        out["clouds_ms"] = round((time.perf_counter() - T1) * 1000)
+        print(f"source {src.openalex_id(row)}: {n:,} papers, lists {1000 * (T1 - T0):.0f} ms, then clouds "
+              f"{out['clouds_ms']} ms ({len(ix):,} abstracts)", flush=True)
+        cites, years = out["_cites"], out["_years"]
+        d = src.describe(row)
+        d.update({"works": int(n), "citations": int(cites.sum()), "h": self._h(cites),
+                  "years": self._first_last(years), "authors": int(len(np.unique(people[1]))) if len(people[1]) else 0,
+                  "open_access": round(float(np.asarray(src.oa[nodes]).mean()), 3) if n else None})
+        # how much its recent work is cited: its papers of three complete years, two to four years back (cited by
+        # OpenAlex's count at the snapshot: a plain average, not a journal impact factor)
+        y = int(time.strftime("%Y"))
+        m = (years >= y - 4) & (years <= y - 2)
+        if m.sum() >= 20:
+            d["recent"] = {"years": [y - 4, y - 2], "papers": int(m.sum()), "mean_citations": round(float(cites[m].mean()), 1),
+                           "median_citations": float(np.median(cites[m]))}
+        out["person"] = d
+        out["kind"] = "source"
+        return out
+
+    WORD_SAMPLE, WORD_SAMPLE_GROUP = 2000, 300
+    WORD_BACKGROUND = 90             # phrases counted in all of science for the whole's cloud (each ~50-300 ms once)
+
+    def _whole_words(self, sample: list[int]):
+        """The whole source's sample: its papers' phrases, and its cloud against all of science."""
+        from srl_search import topics as T
+        terms, surfaces, _ = self._sample_terms(sample)
+        kw = getattr(self.api, "KEYWORDS", None)
+        if not terms or kw is None:
+            return terms, surfaces, []
+        df = T.group_counts(terms, np.zeros(len(terms), np.int64), 1)[0]
+        # the commonest phrases only: their counts in all of science are what the first view of a page waits for
+        top = set(k for k, _ in sorted(df.items(), key=lambda x: (-x[1], x[0]))[:self.WORD_BACKGROUND])
+        df = type(df)({k: v for k, v in df.items() if k in top})
+        return terms, surfaces, T.topic_cloud(terms, "", surfaces, df, kw.phrase_counts)
+
+    def _sample_terms(self, sample_nodes: list[int]) -> tuple[list[set], dict, list[int]]:
+        """Each sampled paper's phrases (topics.py doc_terms), from its title and abstract, without the house
+        style's boilerplate; papers without either get an empty set. Returns (terms, surfaces, work numbers)."""
+        from srl_search import topics as T
+        ws = [self.cit.work(int(nd)) for nd in sample_nodes]
+        det: dict = {}
+        for s0 in range(0, len(ws), 1000):
+            det.update(self.api.engine.details(ws[s0:s0 + 1000]))
+        surfaces: dict = {}
+        stop = boilerplate()
+
+        def text(w, nd):
+            d = det.get(w) or {}
+            ab = d.get("abstract")
+            if ab and SCRAPED.search(ab):              # a publisher page's widgets, not an abstract: the title only
+                ab = None
+            return d.get("title") or self.cit.title(int(nd)), ab
+        terms = [{k for k in T.doc_terms(*text(w, nd), surfaces) if k not in stop} for w, nd in zip(ws, sample_nodes)]
+        # words run together by a scraper ("MetricsDownloadsCitationsNo") are not words
+        glued = {k for k, c in surfaces.items() if GLUED.search(c.most_common(1)[0][0])}
+        if glued:
+            terms = [t - glued for t in terms]
+        return terms, surfaces, ws
+
+    def _group_clouds(self, out: dict, terms: list[set], surfaces: dict) -> None:
+        """Each field's words against the rest of the source; each subfield's against the rest of its field."""
+        from srl_search import topics as T
+        smp = out["sample"]
+        g = np.array(smp["g"], np.int64)
+        sid = np.array(smp["s"], np.int64)
+        G = len(out["groups"])
+        if G >= 2:
+            lab = np.where(g > 0, g - 1, G)                  # papers in no group: counted in the rest, given no cloud
+            for grp, c in zip(out["groups"], T.group_clouds(terms, lab, G, "", surfaces, T.group_counts(terms, lab, G))):
+                grp["cloud"] = c
+        for grp in out["groups"]:
+            subs = grp.get("subgroups") or []
+            if len(subs) < 2:
+                continue
+            ix = np.flatnonzero(g == grp["id"])
+            S = len(subs)
+            lab = np.where(sid[ix] > 0, sid[ix] - 1, S)
+            sub_terms = [terms[i] for i in ix]
+            for sub, c in zip(subs, T.group_clouds(sub_terms, lab, S, "", surfaces, T.group_counts(sub_terms, lab, S))):
+                sub["cloud"] = c
+
+    def word_papers(self, row: int, at: str, word: str, limit: int = 8) -> dict:
+        """The source's sampled papers in one unit ("" the whole, "3" a field, "3.2" a subfield) that use a word of its
+        cloud, the most cited first: the clouds are counted on that sample."""
+        from srl_search import topics as T
+        from srl_search.topic_service import resolve
+        raw = self.raw("source", row)
+        smp = raw.get("sample") or {"node": [], "g": [], "s": [], "whole": 0}
+        g_, _, s_ = at.partition(".")
+        idx = [i for i in range(len(smp["node"]))
+               if (not at and i < smp["whole"]) or (at and smp["g"][i] == int(g_) and (not s_ or smp["s"][i] == int(s_)))]
+        key = " ".join(T.stem(t) for t in T.TOKEN.findall(word))
+        nodes = [smp["node"][i] for i in idx]
+        terms, _, ws = self._sample_terms(nodes)
+        hit = [nd for nd, t in zip(nodes, terms) if key and key in t]
+        hit.sort(key=lambda nd: -int(self.cit.cites[nd]))
+        papers = resolve(self.api, self.cit, {self.cit.work(nd) for nd in hit[:limit]})
+        item = lambda p: {"id": p["id"], "title": p["title"], "year": p.get("year"), "citations": p.get("citations") or 0,   # noqa: E731
+                          "first_author": (p.get("authors") or [None])[0], "authors_count": p.get("authors_count")}
+        unit = raw["overall"]
+        if at:
+            unit = next((x for x in raw["groups"] if x["id"] == int(g_)), unit)
+            if s_:
+                unit = next((x for x in unit.get("subgroups", []) if x["id"] == int(s_)), unit)
+        return {"word": word, "scanned": len(nodes), "matched": len(hit), "total": int(unit.get("size") or len(nodes)), "sampled": True,
+                "papers": [item(papers[self.cit.work(nd)]) for nd in hit[:limit]]}
+
+    def search_sources(self, q: str, k: int) -> dict:
+        if self.src is None:
+            from fastapi import HTTPException
+            raise HTTPException(503, "the source index is not built")
+        t0 = time.perf_counter()
+        words = set(WORD.findall(fold(q)))
+        out = []
+        for r in self.src.search(q, k):
+            d = self.src.describe(r)
+            d["match"] = "full" if words == set(WORD.findall(fold(d["name"]))) else "part"
+            out.append(d)
+        return {"q": q, "results": out, "timing": {"ms": round((time.perf_counter() - t0) * 1000, 1)}}
 
     @staticmethod
     def _cited_span(years: np.ndarray, cites: np.ndarray) -> list[int] | None:
@@ -413,7 +620,8 @@ class People:
                 "sub": sid[chosen].tolist(), "node": nodes[chosen].tolist()}
         yu, yc = np.unique(years[years > 0], return_counts=True)
         tv = tp[tp >= 0]
-        return {"editions": {str(k): v for k, v in kept.items()}, "_topic": int(np.bincount(tv).argmax()) if len(tv) else -1,
+        return {"_gid": gid, "_sid": sid,
+                "editions": {str(k): v for k, v in kept.items()}, "_topic": int(np.bincount(tv).argmax()) if len(tv) else -1,
                 "level": level, "groups": groups, "overall": overall, "other": other, "dots": dots, "n": n,
                 "per_year": {int(y): int(c) for y, c in zip(yu, yc)}, "_years": years, "_cites": cites,
                 "ms": round((time.perf_counter() - t0) * 1000, 1)}
@@ -734,7 +942,7 @@ def profile_text(d: dict, base: str) -> str:
     """A profile as Markdown for a model: the figures, the fields at a glance, then every field's lists."""
     p, kind = d["person"], d["kind"]
     ids = p["id"].split(",")
-    ref = f"{'authors' if kind == 'author' else 'institutions'}/{ids[0]}" + (f"?with={','.join(ids[1:])}" if len(ids) > 1 else "")
+    ref = f"{ {'author': 'authors', 'source': 'sources'}.get(kind, 'institutions')}/{ids[0]}" + (f"?with={','.join(ids[1:])}" if len(ids) > 1 else "")
     yrs = f"{p['years'][0]}–{p['years'][1]}" if p.get("years") else ""
     facts = [_n(p['works'], "publication"), _n(p['authors'], "author") if p.get("authors") else "",
              f"cited {p['citations']:,} times", f"h-index {p['h']}", yrs]
@@ -754,13 +962,29 @@ def profile_text(d: dict, base: str) -> str:
                 for i in p["institutions"][:5]))
         pos = p.get("positions") or {}
         lines.append(f"Position on papers: first author on {pos.get('first', 0)}, second on {pos.get('second', 0)}, other on {pos.get('other', 0)}.")
+    elif kind == "source":
+        pub = (p.get("publisher") or {}).get("name")
+        lines.append(" · ".join(x for x in (p.get("type"), f"ISSN {p['issn']}" if p.get("issn") else "",
+                                            f"published by {pub}" if pub else "",
+                                            f"{round(100 * p['open_access'])}% open access" if p.get("open_access") is not None else "") if x))
+        if p.get("recent"):
+            r = p["recent"]
+            lines.append(f"Its {r['papers']:,} papers of {r['years'][0]}–{r['years'][1]} are cited {r['mean_citations']} times on "
+                         f"average (median {r['median_citations']:g}; OpenAlex's counts; not an impact factor).")
+        words = [w["t"] for w in (d.get("overall") or {}).get("cloud") or []][:20]
+        if words:
+            lines.append("Words its papers use far more than the rest of science: " + ", ".join(words))
     else:
         lines.append(" · ".join(x for x in (p.get("kind"), p.get("country"), p.get("ror")) if x))
-    site = f"author={ids[0]}" + (f"&with={','.join(ids[1:])}" if len(ids) > 1 else "") if kind == "author" else f"institution={p['id']}"
+    site = (f"author={ids[0]}" + (f"&with={','.join(ids[1:])}" if len(ids) > 1 else "") if kind == "author"
+            else f"source={p['id']}" if kind == "source" else f"institution={p['id']}")
     lines += [f"On ScienceMadeReadable: https://sciencemadereadable.com/?{site} · "
               f"OpenAlex: https://openalex.org/{p['id']}", "",
-              f"Caveat: this is one OpenAlex {'author' if kind == 'author' else 'institution'} record. "
-              + ("A person can be split across several records, and about a quarter of author names on recent papers are "
+              f"Caveat: this is one OpenAlex {'author' if kind == 'author' else 'source' if kind == 'source' else 'institution'} record. "
+              + ("A paper counts for the source of its primary location (where it was published). Citation counts are "
+                 "OpenAlex's. Authors on papers with over 100 authors are not counted; institutions are those OpenAlex "
+                 "matched from affiliations." if kind == "source" else
+                 "A person can be split across several records, and about a quarter of author names on recent papers are "
                  "tied to no record, so some of their work can be missing; two different people with one name are rarely "
                  "merged. Co-authors on papers with over 100 authors are not counted."
                  if kind == "author" else
@@ -775,7 +999,7 @@ def profile_text(d: dict, base: str) -> str:
         lines.append(f"{g['id']}. **{g['name']}**: {_n(g['size'])}" + (f", mostly {yrs[0]}–{yrs[2]}" if yrs else "") +
                      (" — " + "; ".join(f"{g['id']}.{x['id']} {x['name']} ({x['size']:,})" for x in subs[:12]) +
                       (f"; … {len(subs)} in all" if len(subs) > 12 else "") if subs else ""))
-    lines += ["", "## All its work" if kind == "institution" else "## All their work", ""]
+    lines += ["", "## All their work" if kind == "author" else "## All its work", ""]
     lines += _unit_text(d["overall"], base, ref, "", HEAD)
     for g in d["groups"]:
         lines += [f"## {g['id']}. {g['name']} ({_n(g['size'])})", ""]
@@ -788,7 +1012,7 @@ def profile_text(d: dict, base: str) -> str:
 
 def search_text(d: dict, base: str, kind: str) -> str:
     """Name-search results as Markdown."""
-    lines = [f"# {'Authors' if kind == 'author' else 'Institutions'} named “{d['q']}” ({len(d['results'])} found, the most published first)", ""]
+    lines = [f"# {'Authors' if kind == 'author' else 'Sources' if kind == 'source' else 'Institutions'} named “{d['q']}” ({len(d['results'])} found, the most published first)", ""]
     if d.get("how") == "fuzzy":
         lines += ["No name holds every word exactly; these are one letter off.", ""]
     for r in d["results"]:
@@ -797,6 +1021,10 @@ def search_text(d: dict, base: str, kind: str) -> str:
             facts = [f"{r['works']:,} papers", f"cited {r['citations']:,} times" if r.get("citations") else "", f"h {r['h']}" if r.get("h") else "", yrs,
                      r["topic"]["name"] if r.get("topic") else "", r["institution"]["name"] if r.get("institution") else ""]
             lines.append(f"- **{r['name']}** ({r['id']}): " + " · ".join(f for f in facts if f) + f" · {base}/authors/{r['id']}")
+        elif kind == "source":
+            facts = [r.get("type") or "", f"{r['works']:,} papers", f"h {r['h']}" if r.get("h") else "", yrs,
+                     f"ISSN {r['issn']}" if r.get("issn") else "", (r.get("publisher") or {}).get("name") or ""]
+            lines.append(f"- **{r['name']}** ({r['id']}): " + " · ".join(f for f in facts if f) + f" · {base}/sources/{r['id']}")
         else:
             facts = [f"{r['works']:,} papers", r.get("kind") or "", r.get("country") or ""]
             lines.append(f"- **{r['name']}** ({r['id']}): " + " · ".join(f for f in facts if f) + f" · {base}/institutions/{r['id']}")
@@ -834,13 +1062,18 @@ def warm(api_base: str, cit_root: Path, min_inst: int = 10000, min_author: int =
         an = np.load(cit_root / "authors" / "author_an.npy", mmap_mode="r")
         rows = np.flatnonzero(w >= min_author)
         jobs += [("authors", f"A{int(an[r])}", int(w[r])) for r in rows[np.argsort(-w[rows])]]
+    if (cit_root / "sources" / "s_works.npy").exists():         # journals of 10,000+ publications
+        w = np.load(cit_root / "sources" / "s_works.npy").astype(np.int64)
+        si = np.load(cit_root / "sources" / "src_in.npy", mmap_mode="r")
+        rows = np.flatnonzero(w >= min_inst)
+        jobs += [("sources", f"S{int(si[r])}", int(w[r])) for r in rows[np.argsort(-w[rows])]]
     done = skipped = failed = 0
     t0 = time.time()
     print(f"{time.strftime('%H:%M:%S')} warming {len(jobs)} pages for {gen} through {api_base}", flush=True)
     for i, (kind, ident, n) in enumerate(jobs, 1):
         if cache_root:
             atlas_dirs = [d for d in Path(cache_root).glob(f"{gen}-*") if d.is_dir()]
-            sub = "author" if kind == "authors" else "institution"
+            sub = {"authors": "author", "sources": "source"}.get(kind, "institution")
             if any((d / sub / f"{ident}.json.gz").exists() for d in atlas_dirs):
                 skipped += 1
                 continue
