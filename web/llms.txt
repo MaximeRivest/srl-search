@@ -97,7 +97,7 @@ Everything around one paper, in one call (what a paper's page shows; ~20-300 ms)
 position, `works`, `h`), `institutions`, and `affiliations`: `"exact"` when each author's `at` lists the indexes of
 the institutions they signed from on this paper (OpenAlex's authorships), `"none"` when only the paper's
 institutions are known; `references` and `cited_by`: `count`, `years` (count per year), `top` (most cited), `newest`
-(cited_by), `plot` (up to 400 as `[year, citations, W-number]`); `references_listed` (what the paper lists, linked
+(cited_by), `plot` (up to 400 as `[year, citations, W-number, title]`); `references_listed` (what the paper lists, linked
 or not); `maps`: the whole-field maps holding it, most specific first, each with `topic`, `group` and `sub` (`id`,
 `name`, AI-written `about`, `size`) and `via` (`topic`: on topic; `cited`: in the map because the field cites it).
 `/links?direction=references|cited_by&sort=cited|newest|oldest&offset=0&limit=25` pages through either list (up to

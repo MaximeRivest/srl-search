@@ -109,7 +109,7 @@ def test_context_counts_orders_and_signs(tmp_path):
     assert c["cited_by"]["count"] == 2 and [x["id"] for x in c["cited_by"]["top"]] == ["W14", "W13"]
     assert [x["id"] for x in c["cited_by"]["newest"]] == ["W14", "W13"]
     assert c["cited_by"]["years"] == {"2015": 1, "2020": 1}
-    assert sorted(p[2] for p in c["references"]["plot"]) == ["W11", "W12"]
+    assert sorted((p[2], p[3]) for p in c["references"]["plot"]) == [("W11", "Old classic"), ("W12", "Older classic")]
     # authors in their order; organisations numbered in the order the authors sign (Ann first: Sea University)
     assert [a["name"] for a in c["authors"]] == ["Ann Reef", "Bo Fish"] and c["authors_count"] == 3
     assert c["affiliations"] == "exact"

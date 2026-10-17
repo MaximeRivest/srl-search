@@ -514,7 +514,7 @@ def work_context(ref: str):
     its organisations, and which author signed from which ("affiliations": "exact", from OpenAlex's authorships;
     "none" while that index is missing: then the organisations are the paper's, not tied to authors); its references
     and the papers citing it (counts, counts per year, the most cited, the newest citing ones, and up to 400 of each as
-    [year, citations, W-number] to draw a timeline); and the whole-field maps that hold it, with its group and
+    [year, citations, W-number, title] to draw a timeline); and the whole-field maps that hold it, with its group and
     subgroup there (most specific map first). Links count only papers in the snapshot."""
     w = engine.resolve(ref)
     if w is None:

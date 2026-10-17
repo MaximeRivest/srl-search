@@ -104,11 +104,14 @@ class WorkPage:
         return {str(int(a)): int(b) for a, b in zip(u, n)}
 
     def _plot(self, nodes: np.ndarray) -> list[list]:
-        """[year, citations, W-number] for the most cited PLOT_MAX of them (the timeline's dots)."""
+        """[year, citations, W-number, title cut to 100 characters] for the most cited PLOT_MAX of them (the
+        timeline's dots: the title is shown when a dot is pointed at, without another request)."""
         top = self._order(nodes, "cited")[:PLOT_MAX]
         y = _arr(self.cit.year)[top]
         cs = _arr(self.cit.cites)[top]
-        return [[int(a), int(b), f"W{self.cit.work(int(n))}"] for a, b, n in zip(y, cs, top) if a > 0]
+        cut = lambda t: t if len(t) <= 100 else t[:99].rsplit(" ", 1)[0] + "…"
+        return [[int(a), int(b), f"W{self.cit.work(int(n))}", cut(self.cit.title(int(n)))]
+                for a, b, n in zip(y, cs, top) if a > 0]
 
     # ------------------------------------------------------------------ the answer
     def context(self, w: int) -> dict:
