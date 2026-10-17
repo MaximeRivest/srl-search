@@ -131,3 +131,18 @@ def test_without_a_matcher_nothing_changes(tmp_path):
     made(tmp_path, "human-computer interaction", HCI_DEF)
     with pytest.raises(F.Pending):
         F.FieldStore(tmp_path).get("human-computer interaction", None, None, "v1", None)
+
+
+def test_a_merged_duplicate_leaves_the_library_and_opens_the_map_it_was_merged_into(tmp_path):
+    keep = made(tmp_path, "AI-assisted programming", "Research on AI systems that help people write code.")
+    dup = made(tmp_path, "ai programming")
+    st = store(tmp_path, AI())
+    st.merge(dup, keep, "a duplicate")
+    assert [m["key"] for m in st.made()] == [keep]                    # out of the library
+    assert dup not in [m["key"] for m in st.topics()]                  # never what a new request is the same as
+    out = st.get("ai programming", None, None, "v1", None)             # old links open the kept map
+    assert out["field"]["same_as"]["topic"] == "AI-assisted programming" and not st.queued()
+    with pytest.raises(ValueError):
+        st.merge(keep, dup, "")                                        # never into a retired map
+    st.unmerge(dup)
+    assert sorted(m["key"] for m in st.made()) == sorted([keep, dup])
