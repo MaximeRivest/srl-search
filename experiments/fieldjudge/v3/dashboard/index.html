@@ -1,0 +1,94 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Field classifier · round 3</title><style>
+:root{color-scheme:light dark;--bg:var(--color-background-primary,light-dark(#f7f7f3,#141615));--card:var(--color-background-secondary,light-dark(#fff,#1e2420));
+--fg:var(--color-text-primary,light-dark(#202923,#e5eae6));--mut:var(--color-text-secondary,light-dark(#5e6b62,#a5b3aa));--line:var(--color-border-primary,light-dark(#d9e0da,#3d4b42));
+--a:light-dark(#2f7d5b,#5fcf9a);--b:light-dark(#6a4fb3,#b39cff);--c:light-dark(#b8742a,#f0b45f);--bad:light-dark(#b23b3b,#ff8a8a)}
+*{box-sizing:border-box}body{margin:0;padding:clamp(14px,3vw,36px);background:var(--bg);color:var(--fg);font-family:var(--font-sans,system-ui);line-height:1.45}
+main{max-width:1150px;margin:auto}h1{font-size:clamp(22px,4vw,34px);font-weight:600;letter-spacing:-.03em;margin:2px 0}h2{font-size:18px;margin:0 0 10px}
+.mut{color:var(--mut)}.eyebrow{font-size:12px;text-transform:uppercase;letter-spacing:.14em}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,330px),1fr));gap:18px;margin:18px 0}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px}.steps{display:grid;gap:10px}
+.step{display:grid;grid-template-columns:26px 1fr auto;gap:10px;align-items:center}.dot{width:22px;height:22px;border-radius:50%;border:2px solid var(--line);display:grid;place-items:center;font-size:12px}
+.dot.done{background:var(--a);border-color:var(--a);color:#fff}.dot.now{border-color:var(--a);box-shadow:0 0 0 4px color-mix(in srgb,var(--a) 25%,transparent)}
+.bar{height:9px;border-radius:9px;background:color-mix(in srgb,var(--line) 70%,transparent);overflow:hidden;margin-top:5px}.bar>i{display:block;height:100%;background:var(--a);border-radius:9px}
+.big{font-size:30px;font-weight:600;letter-spacing:-.03em}table{width:100%;border-collapse:collapse;font-size:14px}th,td{padding:7px 8px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+th:first-child,td:first-child{text-align:left;white-space:normal}th{font-weight:600;font-size:12px;color:var(--mut)}td.ref{color:var(--mut)}.good{color:var(--a);font-weight:600}
+svg text{fill:var(--mut);font-size:11px}.legend span{display:inline-flex;align-items:center;gap:5px;margin-right:14px;font-size:13px}.legend i{width:14px;height:3px;border-radius:2px;display:inline-block}
+</style></head><body><main>
+<div class="eyebrow mut">Scholars Reading List · field classifier</div>
+<h1>Round 3: one model, any list of fields</h1>
+<p class="mut" id="sub">Loading…</p>
+<div class="grid">
+ <section class="card"><h2>Where we are</h2><div class="steps" id="steps"></div></section>
+ <section class="card"><h2>Now</h2><div id="now"></div></section>
+</div>
+<section class="card"><h2>Is it learning?</h2>
+ <p class="mut">Held-back questions, checked every 400 steps. "Pick" = it chooses the same option as the teacher (Sol and Opus agree with each other about 90% of the time, so that is the ceiling). "Yes/no" = round 2's skill, which must not get worse.</p>
+ <div class="legend" id="legend"></div><div id="chart"></div></section>
+<section class="card" style="margin-top:18px"><h2>Test results</h2>
+ <p class="mut">Filled in when each model finishes. The expert test: 200 articles sorted by 5–6 experts into 176 subfields of a classification the model never trained on. Higher is better except where noted.</p>
+ <div id="results"></div></section>
+<p class="mut" style="font-size:12px;margin-top:14px" id="foot"></p>
+</main><script>
+const $=id=>document.getElementById(id), pct=x=>x==null?'–':Math.round(100*x)+'%';
+const clock=s=>new Date(s*1000).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'});
+const dur=s=>s==null?'–':s<3600?Math.round(s/60)+' min':(s/3600).toFixed(1)+' h';
+function chart(models){
+  const W=1080,H=260,P=38, all=models.flatMap(m=>m.validation.map(v=>v[0])), maxX=Math.max(2694,...all,1);
+  const x=s=>P+(W-2*P)*s/maxX, y=v=>H-P-(H-2*P)*v;
+  let g=`<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="validation agreement by training step">`;
+  for(const t of [0,.25,.5,.75,1]) g+=`<line x1="${P}" x2="${W-P}" y1="${y(t)}" y2="${y(t)}" stroke="currentColor" opacity=".12"/><text x="4" y="${y(t)+4}">${t*100}%</text>`;
+  g+=`<line x1="${P}" x2="${W-P}" y1="${y(.9)}" y2="${y(.9)}" stroke="currentColor" stroke-dasharray="4 4" opacity=".4"/><text x="${W-P-150}" y="${y(.9)-5}">teachers agree with each other</text>`;
+  for(const s of [0,500,1000,1500,2000,2500]) if(s<=maxX) g+=`<text x="${x(s)-10}" y="${H-12}">${s}</text>`;
+  const col={'0.8B':['var(--a)','var(--c)'],'2B':['var(--b)','var(--bad)']}; let leg='';
+  for(const m of models){ if(!m.validation.length) continue;
+    [[1,'pick'],[2,'yes/no']].forEach(([k,name],i)=>{
+      const pts=m.validation.map(v=>`${x(v[0])},${y(v[k])}`).join(' ');
+      g+=`<polyline points="${pts}" fill="none" stroke="${col[m.size][i]}" stroke-width="2.5"/>`+m.validation.map(v=>`<circle cx="${x(v[0])}" cy="${y(v[k])}" r="3.5" fill="${col[m.size][i]}"><title>${m.size} ${name}, step ${v[0]}: ${pct(v[k])}</title></circle>`).join('');
+      leg+=`<span><i style="background:${col[m.size][i]}"></i>${m.size} ${name}</span>`;});}
+  $('chart').innerHTML=g+`<text x="${W/2-40}" y="${H-1}">training step</text></svg>`; $('legend').innerHTML=leg;
+}
+function results(E){
+  const cols=[['round2-0.8B','Before (round-2 0.8B)'],['v3-0.8B','New 0.8B'],['v3-2B','New 2B']];
+  const rows=[
+   ['Expert test, specialist journals (one question, 176 options)',e=>e.expert_flat?.disciplinary?.[0]/100,'Jev 64–68% · Qwen 27B 57–64% · one human expert 63% · Sol 66%'],
+   ['Expert test, general journals',e=>e.expert_flat?.multidisciplinary?.[0]/100,'Jev 61–67% · Qwen 27B 62–67% · human 57% · Sol 69%'],
+   ['Expert test, the 22 broad fields',e=>e.expert_field?.field_agreement?.[0]/100,'Jev 78–86% · Qwen 27B 78–84%'],
+   ['Expert test, level by level (field, then subfield), specialist',e=>e.expert_tree?.disciplinary?.[0]/100,''],
+   ['Same pick when the options are shuffled',e=>e.expert_shuffled?.same_pick_as_unshuffled/100,'goal ≥ 90%'],
+   ['Honest probabilities: calibration error (lower is better)',e=>e.expert_flat?.ece_vs_experts,'goal ≤ 0.05',1],
+   ['Yes/no on 8 held-out topics (average precision)',e=>e.yesno_heldout_topics?.macro_average_precision,'round 2: 0.68 (0.8B) · 0.75 (2B)',1],
+   ['Unseen classification: economics JEL codes, agrees with Sol',e=>e.unseen_jel?.sol?.agree_top/100,'Sol vs Opus 92%'],
+   ['Unseen invented classifications, agrees with Sol',e=>e.unseen_invented?.sol?.agree_top/100,'Sol vs Opus 90%'],
+   ['Unseen papers on known classifications, agrees with Sol',e=>e.unseen_papers?.sol?.agree_top/100,'Sol vs Opus 92%'],
+   ['Speed: questions per second (shared card)',e=>e.speed?(e.speed.questions/e.speed.seconds.at(-1)):null,'',2]];
+  let h='<table><tr><th>Test</th>'+cols.map(c=>`<th>${c[1]}</th>`).join('')+'<th>For comparison</th></tr>';
+  for(const [name,f,ref,kind] of rows){ h+=`<tr><td>${name}</td>`;
+    for(const [k] of cols){const e=E[k]; let v=e?f(e):null; let s=v==null||isNaN(v)?'–':kind==1?v.toFixed(3):kind==2?Math.round(v):pct(v);
+      h+=`<td class="${k.startsWith('v3')&&v!=null?'good':''}">${s}</td>`;}
+    h+=`<td class="ref">${ref}</td></tr>`;}
+  $('results').innerHTML=h+'</table>';
+}
+async function tick(){
+  let d; try{d=await (await fetch('status.json',{cache:'no-store'})).json();}catch(e){$('sub').textContent='Cannot reach the dashboard server.';return;}
+  const [m08,m2]=d.models, E=d.evaluation, mf=d.manifest||{};
+  const st=(done,now,name,detail,bar)=>`<div class="step"><div class="dot ${done?'done':now?'now':''}">${done?'✓':''}</div><div><b>${name}</b><div class="mut" style="font-size:13px">${detail}</div>${bar!=null?`<div class="bar"><i style="width:${100*bar}%"></i></div>`:''}</div><div class="mut" style="font-size:13px"></div></div>`;
+  const prog=m=>m.total?m.step/m.total:0;
+  $('steps').innerHTML=
+    st(true,false,'Classifications collected',`${d.schemes} schemes: 8 from the web, our 28 maps, invented ones (some held out)`)+
+    st(true,false,'Teachers labelled',`Sol ${d.teachers.sol.units} requests, Opus ${d.teachers.opus.units} · ${(mf.pick_train||0).toLocaleString()} questions + ${(mf.yesno_train||0).toLocaleString()} yes/no`)+
+    st(m08.state==='done',m08.state!=='done','Train the 0.8B',m08.state==='done'?'finished':`step ${m08.step} of ${m08.total||'?'} · ${m08.state}`,m08.state==='done'?null:prog(m08))+
+    st(!!E['v3-0.8B'],m08.state==='done'&&!E['v3-0.8B'],'Test the 0.8B','expert test, yes/no, unseen classifications, speed')+
+    st(m2.state==='done',m2.state!=='done'&&m2.state!=='not started','Train the 2B',m2.state==='done'?'finished':m2.state==='not started'?'starts after the 0.8B test (needs 8.5 GB free on the card)':`step ${m2.step} of ${m2.total||'?'} · ${m2.state}`,m2.state==='training'?prog(m2):null)+
+    st(!!E['v3-2B'],m2.state==='done'&&!E['v3-2B'],'Test the 2B','then compare and decide what to deploy');
+  const cur=[m08,m2].find(m=>m.state!=='done'&&m.state!=='not started')||m08, g1=(d.gpu||[]).find(g=>g.index===1);
+  $('now').innerHTML=cur.state==='done'?'<p>Both trainings finished.</p>':
+    `<div class="big">${Math.round(100*prog(cur))}%</div><p>${cur.size} · step ${cur.step} of ${cur.total||'?'} · ${cur.state}</p>`+
+    `<p class="mut">Speed ${cur.rows_s?cur.rows_s.toFixed(1):'–'} examples/s · about ${dur(cur.eta_s)} left`+(cur.eta_s?` (around ${clock(d.now+cur.eta_s)}, plus pauses for live maps)`:'')+`</p>`+
+    `<p class="mut">Paused for live maps ${cur.yields} times · second card: ${g1?Math.round(g1.free_mb/1024*10)/10+' GB free, '+g1.util+'% busy':'?'}</p>`+
+    (cur.validation.length?`<p>Latest check (step ${cur.validation.at(-1)[0]}): picks like the teacher <b>${pct(cur.validation.at(-1)[1])}</b>, yes/no <b>${pct(cur.validation.at(-1)[2])}</b> (started at ${pct(cur.validation[0][1])} / ${pct(cur.validation[0][2])})</p>`:'');
+  chart(d.models); results(E);
+  $('sub').textContent=`Updated ${clock(d.now)} · refreshes every 30 s · nothing is deployed`;
+  $('foot').textContent='Teachers: Sol 6.1 and Opus 5.5 (subscriptions). Reference labels are AI labels except the expert test. Data: /mnt/fast/scholarsreadinglist/fieldjudge/v3.';
+}
+tick(); setInterval(tick,30000);
+</script></body></html>
