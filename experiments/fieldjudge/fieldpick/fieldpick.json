@@ -1,0 +1,284 @@
+{
+ "rows": {
+  "base-0.8B/pick": {
+   "disciplinary": [
+    15.0,
+    9.305903191162297,
+    23.283733332157837
+   ],
+   "multidisciplinary": [
+    17.0,
+    10.893476059773155,
+    25.548181233642975
+   ],
+   "all": 16.0,
+   "with_abstract": 14.465408805031446,
+   "title_only": 21.951219512195124,
+   "field": 26.5,
+   "top3": 30.0,
+   "p_on_expert_choice": 0.06085349366666667,
+   "log_loss": 4.620643672206403,
+   "mean_confidence": 0.25685106999999996,
+   "hit_when_confident": 23.88059701492537,
+   "hit_when_unsure": 8.955223880597014,
+   "coverage": 0.740759,
+   "seconds": 119
+  },
+  "round1-0.8B/pick": {
+   "disciplinary": [
+    18.0,
+    11.700131654251038,
+    26.667536024213085
+   ],
+   "multidisciplinary": [
+    8.0,
+    4.1092969485810915,
+    14.998266879403072
+   ],
+   "all": 13.0,
+   "with_abstract": 13.20754716981132,
+   "title_only": 12.195121951219512,
+   "field": 27.500000000000004,
+   "top3": 27.0,
+   "p_on_expert_choice": 0.04017926583333333,
+   "log_loss": 4.179164363350567,
+   "mean_confidence": 0.16090905,
+   "hit_when_confident": 10.44776119402985,
+   "hit_when_unsure": 2.9850746268656714,
+   "coverage": 0.23248044999999998,
+   "seconds": 99
+  },
+  "round2-0.8B/pick": {
+   "disciplinary": [
+    0.0,
+    0.0,
+    3.699480747600191
+   ],
+   "multidisciplinary": [
+    1.0,
+    0.17673865655472645,
+    5.4487524760934605
+   ],
+   "all": 0.5,
+   "with_abstract": 0.628930817610063,
+   "title_only": 0.0,
+   "field": 28.000000000000004,
+   "top3": 6.0,
+   "p_on_expert_choice": 0.011629876,
+   "log_loss": 5.477317891244564,
+   "mean_confidence": 0.11997082500000002,
+   "hit_when_confident": 1.4925373134328357,
+   "hit_when_unsure": 0.0,
+   "coverage": 0.0628262,
+   "seconds": 154
+  },
+  "base-2B/pick": {
+   "disciplinary": [
+    28.000000000000004,
+    20.13955916759837,
+    37.488212361345724
+   ],
+   "multidisciplinary": [
+    28.000000000000004,
+    20.13955916759837,
+    37.488212361345724
+   ],
+   "all": 28.000000000000004,
+   "with_abstract": 28.30188679245283,
+   "title_only": 26.82926829268293,
+   "field": 46.5,
+   "top3": 50.5,
+   "p_on_expert_choice": 0.15510007599999998,
+   "log_loss": 3.737902633665739,
+   "mean_confidence": 0.43447188499999995,
+   "hit_when_confident": 43.28358208955223,
+   "hit_when_unsure": 17.91044776119403,
+   "coverage": 0.8046202,
+   "seconds": 286
+  },
+  "round1-2B/pick": {
+   "disciplinary": [
+    24.0,
+    16.691211265459966,
+    33.23251872329213
+   ],
+   "multidisciplinary": [
+    17.0,
+    10.893476059773155,
+    25.548181233642975
+   ],
+   "all": 20.5,
+   "with_abstract": 18.867924528301888,
+   "title_only": 26.82926829268293,
+   "field": 38.5,
+   "top3": 45.5,
+   "p_on_expert_choice": 0.12107955416666666,
+   "log_loss": 3.7079826586738376,
+   "mean_confidence": 0.41728976500000003,
+   "hit_when_confident": 26.865671641791046,
+   "hit_when_unsure": 16.417910447761194,
+   "coverage": 0.7263338000000001,
+   "seconds": 157
+  },
+  "round2-2B/pick": {
+   "disciplinary": [
+    9.0,
+    4.807199516388487,
+    16.226374696643667
+   ],
+   "multidisciplinary": [
+    6.0,
+    2.778574526665662,
+    12.476968531222507
+   ],
+   "all": 7.5,
+   "with_abstract": 4.40251572327044,
+   "title_only": 19.51219512195122,
+   "field": 21.0,
+   "top3": 17.0,
+   "p_on_expert_choice": 0.0420416105,
+   "log_loss": 4.725458669116663,
+   "mean_confidence": 0.22684341500000002,
+   "hit_when_confident": 14.925373134328357,
+   "hit_when_unsure": 7.462686567164178,
+   "coverage": 0.2998837,
+   "seconds": 158
+  },
+  "base-0.8B/yesno": {
+   "disciplinary": [
+    16.0,
+    10.095202349473716,
+    24.420444558894413
+   ],
+   "multidisciplinary": [
+    8.0,
+    4.1092969485810915,
+    14.998266879403072
+   ],
+   "all": 12.0,
+   "with_abstract": 8.80503144654088,
+   "title_only": 24.390243902439025,
+   "field": 28.499999999999996,
+   "top3": 21.5,
+   "p_on_expert_choice": 0.006135763987646101,
+   "log_loss": 5.099666839281559,
+   "mean_confidence": 0.006318357437437058,
+   "hit_when_confident": 28.35820895522388,
+   "hit_when_unsure": 1.4925373134328357,
+   "seconds": 775
+  },
+  "round2-0.8B/yesno": {
+   "disciplinary": [
+    47.0,
+    37.51065198210374,
+    56.71131686275227
+   ],
+   "multidisciplinary": [
+    44.0,
+    34.67186540096833,
+    53.7720722887437
+   ],
+   "all": 45.5,
+   "with_abstract": 47.79874213836478,
+   "title_only": 36.58536585365854,
+   "field": 64.5,
+   "top3": 75.5,
+   "p_on_expert_choice": 0.1526170949794388,
+   "log_loss": 2.9713473797098255,
+   "mean_confidence": 0.2513539428498954,
+   "hit_when_confident": 43.28358208955223,
+   "hit_when_unsure": 37.3134328358209,
+   "seconds": 664
+  },
+  "base-2B/yesno": {
+   "disciplinary": [
+    17.0,
+    10.893476059773155,
+    25.548181233642975
+   ],
+   "multidisciplinary": [
+    18.0,
+    11.700131654251038,
+    26.667536024213085
+   ],
+   "all": 17.5,
+   "with_abstract": 15.09433962264151,
+   "title_only": 26.82926829268293,
+   "field": 30.0,
+   "top3": 36.0,
+   "p_on_expert_choice": 0.00735023819455787,
+   "log_loss": 4.963482406879832,
+   "mean_confidence": 0.007943868623630286,
+   "hit_when_confident": 23.88059701492537,
+   "hit_when_unsure": 17.91044776119403,
+   "seconds": 1221
+  },
+  "round2-2B/yesno": {
+   "disciplinary": [
+    49.0,
+    39.42183009238615,
+    58.65215952256586
+   ],
+   "multidisciplinary": [
+    55.00000000000001,
+    45.24442703164345,
+    64.38562489359654
+   ],
+   "all": 52.0,
+   "with_abstract": 50.943396226415096,
+   "title_only": 56.09756097560976,
+   "field": 69.0,
+   "top3": 81.0,
+   "p_on_expert_choice": 0.1986084096103486,
+   "log_loss": 2.8494875627645935,
+   "mean_confidence": 0.2899749789339326,
+   "hit_when_confident": 58.2089552238806,
+   "hit_when_unsure": 52.23880597014925,
+   "seconds": 1234
+  }
+ },
+ "paired": {
+  "round1-0.8B/pick": {
+   "minus_base": -3.0,
+   "ci95": [
+    -8.5,
+    2.5
+   ]
+  },
+  "round2-0.8B/pick": {
+   "minus_base": -15.5,
+   "ci95": [
+    -20.5,
+    -10.5
+   ]
+  },
+  "round1-2B/pick": {
+   "minus_base": -7.5,
+   "ci95": [
+    -13.5,
+    -1.5
+   ]
+  },
+  "round2-2B/pick": {
+   "minus_base": -20.5,
+   "ci95": [
+    -27.0,
+    -14.000000000000002
+   ]
+  },
+  "round2-0.8B/yesno": {
+   "minus_base": 33.5,
+   "ci95": [
+    26.0,
+    41.5
+   ]
+  },
+  "round2-2B/yesno": {
+   "minus_base": 34.5,
+   "ci95": [
+    27.0,
+    41.5
+   ]
+  }
+ }
+}
