@@ -570,6 +570,12 @@ CITATIONS = Citations(P["citations"]) if "citations" in P and (P["citations"] / 
 # (the dev API, search/dev.sh, keeps its own cache: answers from unpromoted code must never reach the public)
 TOPICS = TopicService(sys.modules[__name__], Path(os.environ.get("SRL_TOPICS_CACHE", ROOT / "topics-cache")),
                       CITATIONS) if CITATIONS is not None else None
+if TOPICS is not None:
+    # one whole-field map per topic (srl_search/same.py). Wired here, not in topic_service.py: that file is part of
+    # the maps' VERSION hash, and changing it would mark every map made as older and queue them all for a rebuild.
+    from srl_search.same import Matcher as _SameTopic
+    _fs = TOPICS.field_store()
+    _fs.same = _SameTopic(_fs.root, encode=lambda t: engine.encoder.encode(t)[0])
 D_TOPIC_Q = ("A question or topic in plain words (by meaning), or exact-words syntax (quotes, AND/OR/NOT, word*), "
              "as in /search.")
 D_PAPERS = "How many papers to map: the closest in meaning, or the best exact-word matches. More = broader, slower."

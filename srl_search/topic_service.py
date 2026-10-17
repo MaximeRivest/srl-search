@@ -328,10 +328,7 @@ class TopicService:
     def field_store(self):
         if getattr(self, "_fields", None) is None:
             from srl_search.field import FieldStore
-            from srl_search.same import Matcher
-            root = Path(os.environ.get("SRL_FIELDS", "/mnt/fast/scholarsreadinglist/search/fields"))
-            # one map per topic: a request for a topic mapped or waiting under other words opens that map
-            self._fields = FieldStore(root, same=Matcher(root, encode=lambda t: self.api.engine.encoder.encode(t)[0]))
+            self._fields = FieldStore(Path(os.environ.get("SRL_FIELDS", "/mnt/fast/scholarsreadinglist/search/fields")))
         return self._fields
 
     def read(self, out: dict, group: int, part: str = "lists", page: int = 1, abstracts: str = "full") -> dict:
