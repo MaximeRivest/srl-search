@@ -583,7 +583,11 @@ D_GROUP = "Split this group of the map (its id, from a previous answer) into its
 D_READ = ("Read this group of the map in depth, with abstracts: its reading lists (part=lists) or all of its papers, "
           "most central first (part=papers), in pages of ~64k characters (page=N). The map must exist (409 if not: "
           "call /topics first). read=0: the whole topic's reading lists (lists only). Counts as 1 request, not 5.")
-D_PART = "With read: lists (its reading lists) or papers (all its papers, page by page)."
+D_PART = ("With read: lists (its reading lists) or papers (all its papers, page by page); more: one reading list "
+          "further than the map gives (list=, offset=, limit=), its items as in the map's lenses, with the list's "
+          "total length.")
+D_LIST = ("With part=more: which reading list (core, start_here, rising, distinctive, foundations, bridges, newest, "
+          "experts).")
 D_SCOPE = ("closest (default): the papers closest to the question, mapped in seconds. field: the whole research field "
            "(every paper on topic, up to a million: by meaning, an AI judge, the exact phrase and the studies the "
            "field cites), mapped by a background job the first time (15-30 minutes for most topics, up to ~2 hours "
@@ -612,12 +616,16 @@ def topics(q: str = Query(..., min_length=2, max_length=2000, description=D_TOPI
            year_to: int | None = Query(None, description=D_YEAR_TO),
            group: int | None = Query(None, ge=1, le=50, description=D_GROUP),
            read: int | None = Query(None, ge=0, le=50, description=D_READ),
-           part: str = Query("lists", pattern="^(lists|papers)$", description=D_PART),
+           part: str = Query("lists", pattern="^(lists|papers|more)$", description=D_PART),
            page: int = Query(1, ge=1, le=100, description=D_PAGE),
            abstracts: str = Query("full", pattern="^(full|short|none)$",
                                   description="With read: full abstracts, their first sentences, or none."),
            scope: str = Query("closest", pattern="^(closest|field)$", description=D_SCOPE),
-           definition: str | None = Query(None, max_length=1000, description=D_DEFINITION)):
+           definition: str | None = Query(None, max_length=1000, description=D_DEFINITION),
+           lens: str | None = Query(None, alias="list", pattern="^(core|start_here|rising|distinctive|foundations|bridges|newest|experts)$",
+                                    description=D_LIST),
+           offset: int = Query(8, ge=0, le=5000, description="With part=more: the first item (0: the list's start)."),
+           limit: int = Query(25, ge=1, le=50, description="With part=more: how many items.")):
     """The research groups inside a topic, and what to read in each. The papers (closest in meaning, or exact-word
     matches) are grouped by the works they cite and the words they use; each group gets a name (the phrases most
     over-represented in it) and reading lists computed from its own papers' citations: core (most cited by the
@@ -634,11 +642,15 @@ def topics(q: str = Query(..., min_length=2, max_length=2000, description=D_TOPI
     svc = topics_service()
     try:
         out = svc.get(q, papers, mode, year_from, year_to, group, cached_only=read is not None, scope=scope,
-                      definition=definition)
+                      definition=definition, keep_more=part == "more")
     except Pending as e:
         return JSONResponse({"status": e.status.get("status"), "progress": e.status, "question": q, "scope": "field",
                              "message": "The whole-field map is being made; ask again later (the same request)."},
                             status_code=202, headers={"Retry-After": "60"})
+    if part == "more":
+        if read is None or lens is None:
+            raise HTTPException(400, "part=more reads one reading list further: give read=N (0: the whole map) and list=")
+        return svc.more(out, read, lens, offset, limit)
     return svc.read(out, read, part, page, abstracts) if read is not None else out
 
 

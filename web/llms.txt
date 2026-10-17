@@ -137,6 +137,10 @@ each paper with its abstract; `part=papers&page=1, 2, …` gives *all* of its pa
 first (most linked to the rest of the group). `read=0` gives the whole topic's reading lists the same way (lists
 only). Add `group=M` to read a group of the split of group M.
 As text: `/topics/{question}?read=N&part=lists` (`abstracts=full|short|none`).
+**A reading list further** (1 request): the map gives each list's first 8; `read=N&part=more&list=core&offset=8&limit=25`
+(any list: `core`, `start_here`, `rising`, `distinctive`, `foundations`, `bridges`, `newest`, `experts`; `read=0`: the
+whole map; a subgroup: `group=G&read=S`) gives the next items, as in the map, with `total`, the list's length (up to
+150; maps made before 2026-10-17 have only the first 8 until they are remade).
 
 **Pages, never cuts.** Text answers are pages of at most ~64k characters (~16-20k tokens: under what AI apps
 accept from one call), so nothing is shortened: the map itself (`/topics/{question}?page=2`; page 1 opens with every

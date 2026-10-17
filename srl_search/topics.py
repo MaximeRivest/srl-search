@@ -85,7 +85,11 @@ class Options:
     min_size: int | None = None    # smallest group shown (default max(12, n/50)); smaller ones are "other papers"
     seed: int = 20161028           # Scimeetr's first commit day
     workers: int = 1               # Leiden runs side by side (forked processes) for maps of PARALLEL_MIN+ papers
-    lens_size: int = 8              # per reading list (experts too)
+    lens_size: int = 8              # per reading list (experts too): sent with the map
+    # ... and computed this deep: the rest is kept beside the map and read a page at a time (topic_service.py
+    # finish: "more"; GET /topics read=N&part=more). Each list also ends where its own rule does (cited by 2+ papers
+    # of the group, ...): most stop well before this in small groups.
+    lens_depth: int = 150
     # Whole-field maps (seed.score = the judge's P(on topic)): the reading lists show only papers of the field scored
     # at least this; the works cited most from outside the field go to their own list, "foundations". None (topic
     # maps): lists as before. Measured on two replayed fields (experiments/fieldjudge/listgate.py): papers on topic in
@@ -775,7 +779,7 @@ def lenses_for(c: int, idx: np.ndarray, gr: Graph, seed: Seed, group: np.ndarray
     "only here" list, which compares a group with the others). Items: {"w": work number, "why": sentence, ...}.
     With opt.lens_min_score and ref_seed (the row in seed of each reference column, -1 outside the map): whole-field
     rules, see Options.lens_min_score and Options.sparse_refs."""
-    k = opt.lens_size
+    k = opt.lens_depth
     ng = len(idx)
     A = gr.A
     local = np.asarray(A[idx].sum(0)).ravel() if A.shape[1] else np.zeros(0)
@@ -1031,8 +1035,8 @@ def build(seed: Seed, cit, query: str = "", opt: Options | None = None, backgrou
     for c in range(G):
         idx = np.flatnonzero(group == c)
         lens, local = lenses_for(c, idx, gr, seed, group, cit, opt, ref_year, ref_ok, total_local, ref_seed=ref_seed)
-        lens["bridges"] = bridges_for(c, idx, WG, G, opt.lens_size, seed, opt.lens_min_score)
-        lens["experts"] = experts_for(idx, local, gr, seed, cit, opt.lens_size)
+        lens["bridges"] = bridges_for(c, idx, WG, G, opt.lens_depth, seed, opt.lens_min_score)
+        lens["experts"] = experts_for(idx, local, gr, seed, cit, opt.lens_depth)
         strength = WG[idx, c]
         years = [d.get("year") for d in (seed.details[i] for i in idx) if d.get("year")]
         topics = Counter(seed.details[i].get("topic") for i in idx if seed.details[i].get("topic"))
@@ -1057,7 +1061,7 @@ def build(seed: Seed, cit, query: str = "", opt: Options | None = None, backgrou
     if n:
         lens, local = lenses_for(-1, every, gr, seed, group, cit, opt, ref_year, ref_ok, None, unit="topic",
                                  ref_seed=ref_seed)
-        lens["experts"] = experts_for(every, local, gr, seed, cit, opt.lens_size, unit="topic")
+        lens["experts"] = experts_for(every, local, gr, seed, cit, opt.lens_depth, unit="topic")
     years = [d.get("year") for d in seed.details if d.get("year")]
     overall = {"id": 0, "size": int(n), "years": [int(np.percentile(years, p)) for p in (10, 50, 90)] if years else None,
                "cloud": cloud, "lenses": lens}

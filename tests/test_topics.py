@@ -603,7 +603,7 @@ def test_a_group_without_reference_lists_reads_its_own_most_cited_papers():
     assert len(titles) == len(set(titles)) and again["lenses"]["core"][0]["w"] == 71   # the more cited copy stays
     g2 = _group_of(out, 2)            # has its reference lists, all to works outside the field: those are foundations
     assert g2["with_references"] >= 0.3 * g2["size"]
-    assert g2["lenses"]["core"] == [] and len(g2["lenses"]["foundations"]) == 8
+    assert g2["lenses"]["core"] == [] and len(g2["lenses"]["foundations"]) >= T.Options.lens_size   # a full list
 
 
 def test_a_work_entered_twice_fills_one_place_of_a_list():
@@ -615,3 +615,25 @@ def test_a_work_entered_twice_fills_one_place_of_a_list():
         core = [it["w"] for it in g["lenses"]["core"]]
         assert not (1001 in core and 1002 in core)
     assert any(1001 in [it["w"] for it in g["lenses"]["core"]] for g in out["groups"])
+
+
+def test_reading_lists_send_their_first_items_and_read_the_rest_a_page_at_a_time(tmp_path):
+    from srl_search.topic_service import TopicService, HEAD, strip_more
+    seed, cit = literature()
+    svc = TopicService(FakeApi(), tmp_path, cit)
+    out = svc.finish(T.build(seed, cit, "coral reefs"), seed)
+    g = max(out["groups"], key=lambda x: len(x.get("more", {}).get("core", [])))
+    deep = g["lenses"]["core"] + g["more"]["core"]
+    assert len(g["lenses"]["core"]) == HEAD and len(deep) > HEAD + 10          # a group's 40 cited works: deeper than 8
+    assert all("title" in it for it in g["lenses"]["core"])                    # the head is resolved ...
+    assert all(set(it) <= {"w", "cited_here", "why", "in_map"} for it in g["more"]["core"])   # ... the rest is not
+    page = svc.more(out, g["id"], "core", HEAD, 25)
+    assert page["total"] == len(deep) and page["offset"] == HEAD
+    assert [it["id"] for it in page["items"]] == [f"W{it['w']}" for it in g["more"]["core"][:25]]
+    assert all(it["title"] and it["why"] and "in_map" in it for it in page["items"])
+    assert svc.more(out, g["id"], "core", 0, 3)["items"] == g["lenses"]["core"][:3]   # from the start: the head as sent
+    assert svc.more(out, g["id"], "core", len(deep), 25)["items"] == []
+    assert g["more"]["core"][0].get("title") is None                           # reading did not change the stored map
+    ex = svc.more(out, 0, "experts", 0, 50)
+    assert all(e["top"]["title"] for e in ex["items"])
+    assert all("more" not in x for x in strip_more(out)["groups"]) and "more" not in out["overall"]

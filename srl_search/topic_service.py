@@ -33,11 +33,12 @@ from srl_search.engine import JUNK_PENALTY, passes
 # The cache key includes the method's code: any change to it makes new answers (no stale maps after a promote).
 VERSION = hashlib.sha256(b"".join((Path(__file__).parent / f).read_bytes()
                                   for f in ("topics.py", "topic_service.py", "citations.py"))).hexdigest()[:12]
+HEAD = T.Options.lens_size     # items of each reading list sent with the map; the rest ("more") a page at a time
 MAX_CONCURRENT = int(os.environ.get("SRL_TOPICS_CONCURRENT", "2"))
 WAIT_S = 25                    # a request waits this long for a free slot, then gets a 503 with Retry-After
 NPROBE = 512                   # the 1000th-closest paper needs a wider scan than the top 10
 JUNK_MAX = 0.5
-CACHE_KEEP = 20000             # files per release (~150 KB each)
+CACHE_KEEP = 20000             # files per release (~300-500 KB each: reading lists kept 150 deep)
 # One answer about a group stays under ~64k characters (~16-20k tokens): AI apps cap a tool's answer (Claude Code at
 # 25k tokens by default) and cut what is over, so pages carry the rest instead.
 PAGE_CHARS = 64_000
@@ -176,7 +177,15 @@ class TopicService:
     # ------------------------------------------------------------------------------------------ the answer
     def get(self, q: str, papers: int = 1000, mode: str = "auto", year_from=None, year_to=None,
             group: int | None = None, cached_only: bool = False, scope: str = "closest",
-            definition: str | None = None) -> dict:
+            definition: str | None = None, keep_more: bool = False) -> dict:
+        """The map, as sent: without the reading lists' further items ("more", read a page at a time with
+        more()); keep_more: as stored."""
+        out = self._get(q, papers, mode, year_from, year_to, group, cached_only, scope, definition)
+        return out if keep_more else strip_more(out)
+
+    def _get(self, q: str, papers: int = 1000, mode: str = "auto", year_from=None, year_to=None,
+             group: int | None = None, cached_only: bool = False, scope: str = "closest",
+             definition: str | None = None) -> dict:
         """The map (cached or made now). cached_only: reading a group uses a map already made (it is priced as
         one request, so it must never cost a map's work): 409 if there is none. scope="field": the whole-field map
         (srl_search/field.py), made by a background job: raises field.Pending while it is being made."""
@@ -420,6 +429,28 @@ class TopicService:
             res["pages_estimated"] = True
         return res
 
+    def more(self, out: dict, group: int, lens: str, offset: int = HEAD, limit: int = 25) -> dict:
+        """Further items of one reading list of a group (0: the whole map), from `offset` (0: its first item),
+        resolved now: {"list", "offset", "items", "total"}. total: how long the list is (maps made before
+        2026-10-17 keep only the first HEAD)."""
+        g = overall_group(out) if group == 0 else next((x for x in out["groups"] if x["id"] == group), None)
+        if g is None:
+            raise HTTPException(404, f"no group {group}; this map has groups 1-{len(out['groups'])}"
+                                     + (" (and 0, the whole topic)" if out.get("overall") else ""))
+        head = (g.get("lenses") or {}).get(lens) or []
+        tail = (g.get("more") or {}).get(lens) or []
+        total = len(head) + len(tail)
+        want = list(range(offset, min(total, offset + limit)))
+        fresh = [json.loads(json.dumps(tail[i - len(head)])) for i in want if i >= len(head)]
+        ws = [x for it in fresh for x in ((it.get("top"), it.get("latest")) if lens == "experts" else (it["w"],)) if x]
+        papers = resolve(self.api, self.cit, ws)
+        for it in fresh:                               # in_map was decided when the map was made
+            if lens != "experts":
+                papers[int(it["w"])] = {**papers[int(it["w"])], "in_map": it.pop("in_map", True)}
+        _resolve_items(lens, fresh, papers)
+        items = [head[i] for i in want if i < len(head)] + fresh
+        return {"list": lens, "group": group, "offset": offset, "items": items, "total": total}
+
     def _paper(self, w: int, det: dict, abstracts: str = "full") -> dict:
         d = det[w]
         names = [a.strip() for a in (d.get("authors") or "").split("|") if a.strip()]
@@ -450,6 +481,17 @@ class TopicService:
             p.unlink(missing_ok=True)
 
 
+def strip_more(out: dict) -> dict:
+    """The map as sent: every block without its reading lists' further items (kept on disk; more())."""
+    for g in out.get("groups") or []:
+        g.pop("more", None)
+        for x in g.get("subgroups") or []:
+            x.pop("more", None)
+    if out.get("overall"):
+        out["overall"].pop("more", None)
+    return out
+
+
 def overall_group(out: dict) -> dict | None:
     """The whole map as a group (id 0) for reading: maps made before 2026-10-15 have none."""
     o = out.get("overall")
@@ -473,52 +515,81 @@ def embed_splits(out: dict, splits: dict[int, dict]) -> None:
     out["papers"]["sub"] = [sub_of.get(pid, 0) for pid in out["papers"]["id"]]
 
 
+def resolve(api, cit, ws, by_seed: dict | None = None, inside: set | None = None) -> dict[int, dict]:
+    """Work numbers -> papers a person can open (title, year, venue, authors, links). by_seed: details already at
+    hand (a map's own papers); inside: the map's papers (in_map). Works known only from the citation index (no
+    English abstract) get its title, year, type, citations and authors."""
+    ws = sorted({int(w) for w in ws})
+    det = api.engine.details(ws)
+    by_seed = by_seed or {}
+    au = getattr(cit, "authors", None)
+    out = {}
+    for w in ws:
+        d = det.get(w) or by_seed.get(w)
+        if d is None:                              # in the citation index only (no English abstract)
+            nd = int(cit.nodes([w])[0])
+            names = []
+            if au is not None and nd >= 0:
+                rows, pos, _ = au.of(nd)
+                names = [au.name(int(r)) for r in rows[np.argsort(pos)][:12]]
+            d = {"title": cit.title(nd) if nd >= 0 else None, "year": int(cit.year[nd]) if nd >= 0 else None,
+                 "type": cit.type(nd) if nd >= 0 else None, "citations": int(cit.cites[nd]) if nd >= 0 else None,
+                 "authors": " | ".join(names), "authors_count": len(names)}
+        names = [a.strip() for a in (d.get("authors") or "").split("|") if a.strip()]
+        p = {"id": f"W{w}", "title": T.TAG.sub("", d.get("title") or "") or "(no title)", "year": d.get("year"),
+             "type": d.get("type"), "venue": d.get("venue"), "authors": names[:3],
+             "authors_count": d.get("authors_count") or len(names), "citations": d.get("citations"),
+             "doi": d.get("doi"), "pmcid": d.get("pmcid")}
+        if inside is not None:
+            p["in_map"] = w in inside
+        if api.readable(w):
+            p["readable"] = True
+        out[w] = {k: v for k, v in p.items() if v not in (None, [], "")}
+    return out
+
+
+def _resolve_items(name: str, items: list, papers: dict) -> None:
+    """A reading list's items, in place: work numbers -> papers (experts: their top and latest work)."""
+    for it in items:
+        if name == "experts":
+            it["top"] = papers[int(it["top"])]
+            if it.get("latest"):
+                it["latest"] = papers[int(it["latest"])]
+            else:
+                it.pop("latest", None)
+        else:
+            it.update(papers[int(it.pop("w"))])
+
+
 def finish(api, cit, raw: dict, seed: T.Seed, release: str) -> dict:
     """Work numbers -> papers a person can open: titles, years, venues, links, map positions. (Shared with the
-    whole-field worker, srl_search/field.py, which is not this service.)"""
+    whole-field worker, srl_search/field.py, which is not this service.) Each reading list keeps its first HEAD
+    items, resolved; the rest go to the block's "more", as work numbers (with in_map), resolved when read."""
     t = time.perf_counter()
     inside = {int(w) for w in seed.wids}
-    wanted = set()
     blocks = raw["groups"] + ([raw["overall"]] if raw.get("overall") else [])
+    wanted = set()
     for g in blocks:
         if "typical" in g:
             wanted.add(g["typical"])
         for name, items in g["lenses"].items():
+            if len(items) > HEAD:
+                tail = items[HEAD:]
+                for it in tail:
+                    if name != "experts":
+                        it["in_map"] = int(it["w"]) in inside
+                g.setdefault("more", {})[name] = tail
+                g["lenses"][name] = items = items[:HEAD]
             for it in items:
                 for k in ("w", "top", "latest"):
                     if it.get(k):
                         wanted.add(int(it[k]))
-    det = api.engine.details(sorted(wanted))
-    by_seed = {int(w): d for w, d in zip(seed.wids, seed.details)}
-
-    def paper(w: int) -> dict:
-        d = det.get(w) or by_seed.get(w)
-        if d is None:                              # in the citation index only (no English abstract)
-            nd = int(cit.nodes([w])[0])
-            d = {"title": cit.title(nd) if nd >= 0 else None, "year": int(cit.year[nd]) if nd >= 0 else None,
-                 "type": cit.type(nd) if nd >= 0 else None, "citations": int(cit.cites[nd]) if nd >= 0 else None}
-        names = [a.strip() for a in (d.get("authors") or "").split("|") if a.strip()]
-        out = {"id": f"W{w}", "title": T.TAG.sub("", d.get("title") or "") or "(no title)", "year": d.get("year"),
-               "type": d.get("type"), "venue": d.get("venue"), "authors": names[:3],
-               "authors_count": d.get("authors_count") or len(names), "citations": d.get("citations"),
-               "doi": d.get("doi"), "pmcid": d.get("pmcid"), "in_map": w in inside}
-        r = api.readable(w)
-        if r:
-            out["readable"] = True
-        return {k: v for k, v in out.items() if v not in (None, [], "")}
-
+    papers = resolve(api, cit, wanted, {int(w): d for w, d in zip(seed.wids, seed.details)}, inside)
     for g in blocks:
         if "typical" in g:
-            g["typical"] = paper(g["typical"])
+            g["typical"] = papers[int(g["typical"])]
         for name, items in g["lenses"].items():
-            if name == "experts":
-                for it in items:
-                    it["top"] = paper(it["top"])
-                    if it.get("latest"):
-                        it["latest"] = paper(it["latest"])
-                continue
-            for it in items:
-                it.update(paper(int(it.pop("w"))))
+            _resolve_items(name, items, papers)
 
     # map positions: the release's table (one row per embedded paper)
     xs, ys = [], []
