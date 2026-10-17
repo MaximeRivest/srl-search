@@ -291,9 +291,22 @@ class FieldStore:
         return st
 
     def get(self, q: str, definition: str | None, keywords: str | None, version: str, group: int | None,
-            start: bool = True, match: bool = True) -> dict:
+            start: bool = True, match: bool = True, hops: int = 0) -> dict:
         key = field_key(q, definition, keywords)
         d = self.root / key
+        st0 = _read(d / "job.json") or {}
+        if st0.get("status") == "merged" and hops < 3:  # a duplicate retired into another map: that map
+            into = (_read(self.root / st0["into"] / "job.json") or {}).get("request") or {}
+            same_as = {"topic": into.get("q"), "definition": into.get("definition"), "asked": q,
+                       "asked_definition": definition}
+            try:
+                out = self.get(into["q"], into.get("definition"), into.get("keywords"), version, group, start,
+                               match=False, hops=hops + 1)
+            except Pending as e:
+                e.status["same_as"] = same_as
+                raise
+            out["field"] = {**(out.get("field") or {}), "same_as": same_as}
+            return out
         if (d / "maps" / version / "main.json").exists():
             return self._serve(key, d / "maps" / version, group)
         st = self.status(key)
@@ -347,7 +360,7 @@ class FieldStore:
         for p in self.root.glob("*/job.json"):
             st, k = _read(p) or {}, p.parent.name
             req = st.get("request") or {}
-            if k == exclude or not req.get("q"):
+            if k == exclude or not req.get("q") or st.get("status") in ("merged", "failed"):
                 continue
             if st.get("status") in ("queued", "running") or (p.parent / "field.json").exists():
                 out.append({"key": k, "topic": req["q"], "definition": req.get("definition"), "keywords": req.get("keywords")})
@@ -438,7 +451,7 @@ class FieldStore:
         out = []
         for p in self.root.glob("*/job.json"):
             st = _read(p) or {}
-            if not (p.parent / "field.json").exists():
+            if not (p.parent / "field.json").exists() or st.get("status") == "merged":
                 continue
             if st.get("status") != "done" and st.get("kind") != "map":   # a map being rebuilt (new map code) stays listed
                 continue
@@ -453,6 +466,26 @@ class FieldStore:
                                   "found": chk["estimate"].get("recall_of_candidates")}
             out.append(row)
         return sorted(out, key=lambda r: r.get("made") or "", reverse=True)
+
+    def merge(self, key: str, into: str, reason: str) -> None:
+        """Retire a duplicate: its map leaves the library and the topics new requests are compared with, and asking
+        for it opens `into` (its files stay: unmerge puts it back)."""
+        if key == into or (_read(self.root / into / "job.json") or {}).get("status") != "done":
+            raise ValueError(f"{into} is not a finished map")
+        st = _read(self.root / key / "job.json")
+        if not st or st.get("status") not in ("done", "merged"):
+            raise ValueError(f"{key} is not a finished map")
+        (self.root / "queue" / f"{key}.job").unlink(missing_ok=True)
+        _write(self.root / key / "job.json", {**st, "status": "merged", "into": into, "merged": _now(),
+                                              "merge_reason": reason, "status_before": st.get("status", "done")})
+
+    def unmerge(self, key: str) -> None:
+        st = _read(self.root / key / "job.json") or {}
+        if st.get("status") == "merged":
+            st["status"] = st.pop("status_before", "done")
+            for k in ("into", "merged", "merge_reason"):
+                st.pop(k, None)
+            _write(self.root / key / "job.json", st)
 
     def remove(self, key: str, reason: str) -> None:
         """Moderation: take a waiting topic out of the line (its text is public)."""
@@ -1447,6 +1480,11 @@ def worker(store: Path = ROOT) -> None:
 def main(argv: list[str]) -> None:
     if argv[:1] == ["worker"]:
         return worker()
+    if argv[:1] in (["merge"], ["unmerge"]) and len(argv) >= 2:   # merge KEY INTO REASON / unmerge KEY: duplicates
+        fs = FieldStore(Path(os.environ.get("SRL_FIELDS", str(ROOT))))
+        fs.merge(argv[1], argv[2], " ".join(argv[3:]) or "a duplicate") if argv[0] == "merge" else fs.unmerge(argv[1])
+        print(json.dumps(_read(fs.root / argv[1] / "job.json"), indent=1)[:800])
+        return
     if argv[:1] == ["label-maps"]:                  # backfill AI group names on whole-field maps already made
         return label_made_maps(Path(os.environ.get("SRL_FIELDS", str(ROOT))))
     if argv[:1] == ["run"] and len(argv) >= 2:      # run TOPIC [DEFINITION]: one topic, now, in this process
