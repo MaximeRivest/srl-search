@@ -584,7 +584,10 @@ D_SCOPE = ("closest (default): the papers closest to the question, mapped in sec
            "for the biggest), then kept for everyone; while it is being made the answer is HTTP 202 with its progress; too "
            "broad: 422 (/fields/suggest?narrower=true gives parts of it). Groups of 300+ papers are split into "
            "subgroups (group=N), and their subgroups of 1,500+ papers once more.")
-D_DEFINITION = "With scope=field: what the topic covers, in a sentence (optional; part of the map's identity)."
+D_DEFINITION = ("With scope=field: what the topic covers, in a sentence (optional; it settles ambiguous words). One map "
+                "per topic: a topic already mapped or waiting under other words (a synonym, an abbreviation, no "
+                "definition or one with the same scope) opens that map, and field.same_as (progress.same_as while it is "
+                "made) names it; a narrower, broader or other topic gets its own.")
 D_PAGE = ("Which page: of the map itself (as text), or with read of the group's lists or papers. Each answer says "
           "how many pages there are and what to call next.")
 

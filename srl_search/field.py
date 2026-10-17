@@ -179,8 +179,9 @@ class FieldStore:
     as long as today's free budget (FREE_USD of AI) lasts, then tomorrow's. Map rebuilds (no AI) go with the free
     line but need no budget."""
 
-    def __init__(self, root: Path = ROOT):
+    def __init__(self, root: Path = ROOT, same=None):
         self.root = Path(root)
+        self.same = same                               # srl_search/same.py Matcher: one map per topic (None: off)
         (self.root / "queue").mkdir(parents=True, exist_ok=True)
 
     def spent_today(self, lane: str | None = None) -> float:
@@ -290,7 +291,7 @@ class FieldStore:
         return st
 
     def get(self, q: str, definition: str | None, keywords: str | None, version: str, group: int | None,
-            start: bool = True) -> dict:
+            start: bool = True, match: bool = True) -> dict:
         key = field_key(q, definition, keywords)
         d = self.root / key
         if (d / "maps" / version / "main.json").exists():
@@ -314,6 +315,46 @@ class FieldStore:
             raise Pending(st)
         if st and st.get("status") == "failed" and st.get("final"):
             raise HTTPException(422, st.get("error") or "this topic cannot be mapped as a whole field")
+        if match and self.same is not None and not (d / "field.json").exists():
+            with self.same.lock:                       # held until queued: two wordings at once, the second sees the first
+                return self._new_or_same(key, q, definition, keywords, version, group, start)
+        return self._new(key, q, definition, keywords, version, start)
+
+    def _new_or_same(self, key, q, definition, keywords, version, group, start) -> dict:
+        """A request with no map or job of its own: the map of the same topic under other words, made or waiting
+        (srl_search/same.py), else a new job."""
+        from srl_search.same import Unsure
+        try:
+            m = self.same.find(key, q, definition, self.topics(exclude=key))
+        except Unsure:
+            raise HTTPException(503, "We can't check right now whether this topic is already mapped or waiting under "
+                                     "other words, and it is close to one that is. Try again in an hour; maps already "
+                                     "made still open.", headers={"Retry-After": "3600"})
+        if m is None:
+            return self._new(key, q, definition, keywords, version, start)
+        same_as = {"topic": m["topic"], "definition": m.get("definition"), "asked": q, "asked_definition": definition}
+        try:
+            out = self.get(m["topic"], m.get("definition"), m.get("keywords"), version, group, start, match=False)
+        except Pending as e:
+            e.status["same_as"] = same_as
+            raise
+        out["field"] = {**(out.get("field") or {}), "same_as": same_as}
+        return out
+
+    def topics(self, exclude: str | None = None) -> list[dict]:
+        """Every topic mapped or waiting to be: [{key, topic, definition, keywords}] (what a new request may be)."""
+        out = []
+        for p in self.root.glob("*/job.json"):
+            st, k = _read(p) or {}, p.parent.name
+            req = st.get("request") or {}
+            if k == exclude or not req.get("q"):
+                continue
+            if st.get("status") in ("queued", "running") or (p.parent / "field.json").exists():
+                out.append({"key": k, "topic": req["q"], "definition": req.get("definition"), "keywords": req.get("keywords")})
+        return out
+
+    def _new(self, key, q, definition, keywords, version, start) -> dict:
+        d = self.root / key
         if not start:
             raise HTTPException(409, "No whole-field map of this topic yet: ask for it without read= to start one.")
         kind = "map" if (d / "field.json").exists() else "full"
