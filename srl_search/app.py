@@ -579,9 +579,11 @@ D_READ = ("Read this group of the map in depth, with abstracts: its reading list
           "call /topics first). read=0: the whole topic's reading lists (lists only). Counts as 1 request, not 5.")
 D_PART = "With read: lists (its reading lists) or papers (all its papers, page by page)."
 D_SCOPE = ("closest (default): the papers closest to the question, mapped in seconds. field: the whole research field "
-           "(every paper on topic: by meaning, an AI judge, the exact phrase and the studies the field cites), mapped "
-           "by a background job in ~15-40 minutes the first time, then kept for everyone; while it is being made the "
-           "answer is HTTP 202 with its progress. Groups of 300+ papers are split into subgroups (group=N).")
+           "(every paper on topic, up to a few million: by meaning, an AI judge, the exact phrase and the studies the "
+           "field cites), mapped by a background job the first time (15-30 minutes for most topics, hours for the "
+           "biggest), then kept for everyone; while it is being made the answer is HTTP 202 with its progress; too "
+           "broad: 422 (/fields/suggest?narrower=true gives parts of it). Groups of 300+ papers are split into "
+           "subgroups (group=N), and their subgroups of 1,500+ papers once more.")
 D_DEFINITION = "With scope=field: what the topic covers, in a sentence (optional; part of the map's identity)."
 D_PAGE = ("Which page: of the map itself (as text), or with read of the group's lists or papers. Each answer says "
           "how many pages there are and what to call next.")

@@ -148,17 +148,23 @@ closest: papers close in meaning, the topic's exact phrase, and the works the fi
 reaches classics without abstracts), judged by our own small AI model (one 0.8B model for any topic, trained on
 85,000 judgments by larger models over ~660 topic families) and fast classifiers it teaches for the topic, with
 citation signals; the model rechecks the well-cited papers they are unsure about; then mapped into groups and
-subgroups (groups of 300+ papers are pre-split: `group=N&scope=field`). Give a `definition` when the words are
-ambiguous ("LLM" is also a law degree). Made once by a background job (~15 minutes of work), then kept across data
-updates and instant for everyone; while it waits or is being made the answer is **HTTP 202** with `progress`
+subgroups (groups of 300+ papers are pre-split: `group=N&scope=field`, and inside those, subgroups of 1,500+
+papers are split once more, in each subgroup's `subgroups`). Any size up to a few million papers: the search looks
+as deep as the field goes. Give a `definition` when the words are ambiguous ("LLM" is also a law degree). Made once
+by a background job (15-30 minutes for most topics; ~1 hour for 200-600k papers; a few hours for ~2 million), then
+kept across data updates and instant for everyone. Maps of more than 25,000 papers list a random sample of each
+group in `papers` (`papers_shown` says how many of how many); every paper of a group is in
+`read=N&part=papers`; while it waits or is being made the answer is **HTTP 202** with `progress`
 (`status`, `lane`, `position`, `eta_s`): ask again later with the same request. Measured on two topics against a
 large model's (Kimi K3) judgments of stratified samples: habitat fragmentation, 80% of the map's papers on topic, 66%
 of the field found, 80% of reading-list papers on topic; LLM post-training (a young field, where our citation data is
 thin), 81% on topic, 64% found, 52% of reading-list papers on topic. It is strict: it finds 78-80% of the classics
-published reviews cite. A topic too broad (its edge still mostly on topic) or too unclear answers 422 with the reason.
+published reviews cite. A topic too broad (more papers than the limit, said within ~2 minutes from a first estimate) or too unclear
+answers 422 with the reason; `GET /fields/suggest?q=...&narrower=true` then gives five narrower parts of it.
 
 **The line** (`GET /fields/queue`): new whole-field maps wait their turn. Free maps go in the order asked, about
-`free_per_day` a day (each takes 15-25 minutes of our graphics card); at most 2 waiting per reader. On sciencemadereadable.com a reader
+`free_per_day` a day; at most 2 waiting per reader. A very big field (300k+ papers) waits until the smaller free
+maps asked before it are made, and its `eta_s` counts its size. On sciencemadereadable.com a reader
 can pay to put a map in the paid line, which goes first. Topics in the line are public, as their maps will be.
 **Better topic wording first** (`GET /fields/suggest?q=...`, optional `definition`): five well-phrased versions of a
 topic (`suggestions`: `topic`, `definition`, `note`), the closest to what was typed first, then narrower, broader or

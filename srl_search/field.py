@@ -98,7 +98,8 @@ CITED_K = 3
 EXPANSION_MAX = 300_000
 BAND = (0.1, 0.9)                        # the vector student is unsure here: the text student judges too
 TOO_BROAD_TAIL = 0.30                    # share on topic among the farthest of the 300k: the field goes on beyond
-TOO_BROAD_PAPERS = int(os.environ.get("SRL_FIELD_MAX_PAPERS", "150000"))   # largest field mapped
+TOO_BROAD_PAPERS = int(os.environ.get("SRL_FIELD_MAX_PAPERS", "1000000"))  # largest field mapped (estimated at
+                                         #   ~2 min; 637k papers measured within the worker's 80 GB, ~70 min)
 BIG_FIELD = 300_000                      # estimated papers: a big field waits until the smaller free maps are made
 SECONDS_PER_PAPER = 0.005                # a big field's extra time (measured: 190k ~40 min, 637k ~70 min)
 EARLY_MARGIN = 0.7                       # refused at once when even 70% of the first estimate is over the limit
@@ -1017,7 +1018,7 @@ def select_field(ctx: Ctx, job: Job, q: str, definition: str | None, keywords: s
     yes = np.flatnonzero(final >= cut)
     ok = publications(univ[yes])
     field = {int(univ[i]): {"via": srcs[i], "p": round(float(final[i]), 3)} for i, o_ in zip(yes, ok) if o_}
-    if len(field) > TOO_BROAD_PAPERS:
+    if len(field) > 1.5 * TOO_BROAD_PAPERS:           # the estimate said it fits; only far over is refused now
         raise FinalError(f"“{q}” has about {len(field):,} papers: too broad for a whole-field map today. Map a narrower topic.")
     report["papers"] = len(field)
     report["by_route"] = {v: sum(1 for f in field.values() if f["via"] == v) for v in ("meaning", "phrase", "cited")}

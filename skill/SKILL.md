@@ -37,9 +37,11 @@ bears on the question in depth (1 request each; `?read=0` is the whole topic's l
 `?read=N&part=papers&page=1, 2, ...` (all its papers with abstracts, most central first). Everything comes in pages of
 ~16-20k tokens, never cut: each answer says what to call next (the map too: `?page=2`). You can hold
 hundreds of abstracts: read them, and answer organised by group, citing what you read.
-For a thorough review of a whole field, add `scope=field`: every paper of the field (often 10-50k, including classics
-without abstracts found through the field's citations), in groups and pre-split subgroups. The first request starts
-a ~15-40 minute background job (HTTP 202 with progress); ask again later, then it is instant.
+For a thorough review of a whole field, add `scope=field`: every paper of the field (from thousands to a few million,
+including classics without abstracts found through the field's citations), in groups and pre-split subgroups (big
+subgroups split once more). The first request starts a background job (HTTP 202 with progress: 15-30 minutes for most
+topics, hours for the biggest); ask again later, then it is instant. Too broad: HTTP 422, and
+`/fields/suggest?q=...&narrower=true` gives five narrower parts to map instead.
 
 ## As MCP tools instead
 
