@@ -402,9 +402,15 @@ class FieldStore:
             if st.get("status") != "done" and st.get("kind") != "map":   # a map being rebuilt (new map code) stays listed
                 continue
             req, summ = st.get("request") or {}, st.get("summary") or {}
-            out.append({"key": p.parent.name, "topic": req.get("q"), "definition": req.get("definition"),
-                        "papers": summ.get("papers"), "groups": summ.get("groups"), "made": st.get("finished"),
-                        "credit": self.credit(p.parent.name)})
+            row = {"key": p.parent.name, "topic": req.get("q"), "definition": req.get("definition"),
+                   "papers": summ.get("papers"), "groups": summ.get("groups"), "made": st.get("finished"),
+                   "credit": self.credit(p.parent.name)}
+            chk = _read(p.parent / "check.json")           # experiments/bigfields/check.py: a larger model's samples
+            if chk and chk.get("estimate"):
+                r = chk["samples"]["map, random"]
+                row["checked"] = {"by": chk.get("judge"), "judged": r["judged"], "on_topic": r["on_topic"],
+                                  "found": chk["estimate"].get("recall_of_candidates")}
+            out.append(row)
         return sorted(out, key=lambda r: r.get("made") or "", reverse=True)
 
     def remove(self, key: str, reason: str) -> None:

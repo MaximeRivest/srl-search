@@ -679,7 +679,9 @@ def fields_made(q: str | None = Query(None, max_length=500, description="Words o
                 limit: int = Query(50, ge=1, le=500)):
     """Every whole-field map made so far (public: anyone can open them with /topics?scope=field and the same topic
     and definition), newest first, or the maps that cover q: of the 50 studies closest in meaning to q, the share
-    each map holds (`score`; "direct preference optimization" -> LLM post-training 0.6+, an unrelated subject 0)."""
+    each map holds (`score`; "direct preference optimization" -> LLM post-training 0.6+, an unrelated subject 0).
+    `checked`, when present: a larger model (Kimi K3) judged a random sample of the map's papers (`on_topic` of
+    `judged`), and `found` estimates the share of the on-topic candidates the map kept."""
     store = topics_service().field_store()
     rows = store.made()
     if q and rows:
