@@ -13,11 +13,14 @@ way.
 """
 from __future__ import annotations
 
+import gzip
 import json
+import os
 import re
 import threading
 import time
 import unicodedata
+import urllib.parse
 from collections import OrderedDict
 from pathlib import Path
 
@@ -32,6 +35,9 @@ MAX_DOTS = 1200            # papers placed on the map (the most cited and the ne
 MAX_COAUTHOR_PAPER = 100   # papers listing more authors than this don't count for co-authors (consortia)
 WORD = re.compile(r"[^\W\d_]+", re.UNICODE)
 PAPER_LISTS = ("cited", "newest", "first")
+CACHE_FROM = 5000          # papers: profiles this big are kept on disk (computed once per snapshot; see warm())
+LIST_TITLES = {"cited": "Most cited", "newest": "Newest", "first": "As first author", "coauthors": "Co-authors",
+               "people": "People", "partners": "Partner organisations"}
 
 
 def fold(s: str) -> str:
@@ -54,9 +60,19 @@ def gather(off: np.ndarray, nodes: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
 
 
 class People:
-    def __init__(self, api, cit, names_index: Path | None, inst_index: Path | None = None):
+    def __init__(self, api, cit, names_index: Path | None, inst_index: Path | None = None, cache_root: Path | None = None):
         self.api = api
         self.cit = cit
+        # profiles of big units on disk: raw (lists as nodes) per snapshot; the page itself per snapshot + atlas
+        atlas = getattr(getattr(api, "ATLAS", None), "id", None) or "noatlas"
+        self.cache_raw = cache_root / cit.generation / "raw" if cache_root else None
+        self.cache_page = cache_root / f"{cit.generation}-{atlas}" if cache_root else None
+        if cache_root:
+            Path(cache_root).mkdir(parents=True, exist_ok=True)
+            for d in Path(cache_root).iterdir():          # other snapshots' answers are stale
+                if d.is_dir() and d.name not in (cit.generation, f"{cit.generation}-{atlas}"):
+                    import shutil
+                    shutil.rmtree(d, ignore_errors=True)
         self.au = cit.authors
         self.inst = getattr(cit, "institutions", None)
         self.ok = self.au is not None and getattr(self.au, "by", False)
@@ -113,6 +129,40 @@ class People:
         return [self.inst.describe(int(r)) for r in self.inst.of_paper(nd)]
 
     # ------------------------------------------------------------------ the profile
+    def size_of(self, kind: str, row: int) -> int:
+        """How many papers (any type) the unit has: known before computing anything."""
+        if kind == "author":
+            return int(self.au.by_off[row + 1] - self.au.by_off[row])
+        return int(self.inst.i_off[row + 1] - self.inst.i_off[row])
+
+    def ident(self, kind: str, row: int) -> str:
+        return self.au.openalex_id(row) if kind == "author" else self.inst.openalex_id(row)
+
+    def _cached(self, root: Path | None, kind: str, row: int) -> Path | None:
+        if root is None or self.size_of(kind, row) < CACHE_FROM:
+            return None
+        return root / kind / f"{self.ident(kind, row)}.json.gz"
+
+    @staticmethod
+    def _read(path: Path | None) -> dict | None:
+        if path and path.exists():
+            try:
+                with gzip.open(path, "rt", encoding="utf-8") as fh:
+                    return json.load(fh)
+            except (OSError, ValueError):
+                return None
+        return None
+
+    @staticmethod
+    def _write(path: Path | None, d: dict) -> None:
+        if path is None:
+            return
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_suffix(f".{os.getpid()}.tmp")
+        with gzip.open(tmp, "wt", encoding="utf-8", compresslevel=6) as fh:
+            json.dump(d, fh, separators=(",", ":"))
+        os.replace(tmp, path)
+
     def raw(self, kind: str, row: int) -> dict:
         key = (kind, row)
         with self.lock:
@@ -120,7 +170,13 @@ class People:
             if hit is not None:
                 self.recent.move_to_end(key)
                 return hit
-        out = self._raw_author(row) if kind == "author" else self._raw_institution(row)
+        path = self._cached(self.cache_raw, kind, row)
+        out = self._read(path)
+        if out is None:
+            out = self._raw_author(row) if kind == "author" else self._raw_institution(row)
+            out.pop("_years", None)
+            out.pop("_cites", None)
+            self._write(path, out)
         with self.lock:
             self.recent[key] = out
             while len(self.recent) > 64:
@@ -140,7 +196,9 @@ class People:
         listed = np.asarray(au.nauth[nodes])[owner] if len(owner) else owner
         co = np.asarray(au.auth[at]).astype(np.int64) if len(at) else at
         keep = (co != row) & (listed <= MAX_COAUTHOR_PAPER)
-        people = (owner[keep], co[keep])
+        merged = self._merge_namesakes(co[keep])
+        pair = np.unique((owner[keep] << 32) | merged)          # one count per paper once two records became one
+        people = (pair >> 32, pair & 0xFFFFFFFF)
         out = self._raw(nodes, pos, people)
         person = {"id": au.openalex_id(row), "name": au.name(row), "works": int(au.works[row]),
                   "citations": int(au.cites[row]), "h": int(au.h[row]),
@@ -153,6 +211,23 @@ class People:
         out["person"] = person
         out["kind"] = "author"
         return out
+
+    def _merge_namesakes(self, co: np.ndarray) -> np.ndarray:
+        """Among one author's co-authors, records with the same name are one person (OpenAlex sometimes splits a
+        person in two; two different people with one name among one author's collaborators is rare). The same
+        rule as the topic maps' experts. The record with the most publications stands for the others."""
+        if not len(co):
+            return co
+        u = np.unique(co)
+        names = [fold(re.sub(r"[^\w]", "", self.au.name(int(r)))) for r in u]
+        best: dict[str, int] = {}
+        for r, nm in zip(u.tolist(), names):
+            if nm and (nm not in best or int(self.au.works[r]) > int(self.au.works[best[nm]])):
+                best[nm] = r
+        canon = np.array([best.get(nm, r) for r, nm in zip(u.tolist(), names)], np.int64)
+        if np.array_equal(canon, u):
+            return co
+        return canon[np.searchsorted(u, co)]
 
     def _raw_institution(self, row: int) -> dict:
         ins, au = self.inst, self.au
@@ -331,6 +406,17 @@ class People:
 
     # ------------------------------------------------------------------ what the site gets
     def profile(self, kind: str, row: int) -> dict:
+        path = self._cached(self.cache_page, kind, row)
+        out = self._read(path)
+        if out is None:
+            out = self._profile(kind, row)
+            self._write(path, out)
+            out["cached"] = False
+        else:
+            out["cached"] = True
+        return out
+
+    def _profile(self, kind: str, row: int) -> dict:
         from srl_search.topic_service import resolve
         raw = self.raw(kind, row)
         cit = self.cit
@@ -460,6 +546,193 @@ class People:
         return {"q": q, "results": out, "how": how, "timing": {"ms": round((time.perf_counter() - t0) * 1000, 1)}}
 
 
+# ---------------------------------------------------------------------------------------------------- as text
+def _n(n: int, one: str = "paper") -> str:
+    return f"{n:,} {one}" + ("" if n == 1 else "s")
+
+
+def _paper_line(p: dict, note: str = "") -> str:
+    who = "; ".join(p.get("authors") or [])
+    if (p.get("authors_count") or 0) > len(p.get("authors") or []):
+        who += f"; et al. ({p['authors_count']} authors)"
+    facts = [str(p.get("year") or "n.d."), p.get("venue") or "", who,
+             f"cited {p['citations']:,} times" if p.get("citations") else ""]
+    link = f"https://doi.org/{p['doi']}" if p.get("doi") else f"https://openalex.org/{p['id']}"
+    return f"- **{p.get('title') or '(no title)'}** · " + " · ".join(f for f in facts if f) + f" · {p['id']} · {link}" + \
+        (f" · {note}" if note else "")
+
+
+def _person_line(it: dict, base: str, k: str) -> str:
+    if it.get("author"):
+        ref = f"{base}/authors/{it['author']}"
+        who = f"**{it['name']}** ({it['author']}, {_n(it.get('works', 0))} in all)"
+    else:
+        ref = f"{base}/institutions/{it['institution']}"
+        who = f"**{it['name']}**" + (f" ({it['country']})" if it.get("country") else "") + f" ({it['institution']})"
+    here = "together" if k == "coauthors" else "here"
+    top = it.get("top") or {}
+    return (f"- {who}: {_n(it['n'])} {here}, {it['years'][0]}–{it['years'][1]}; most cited {here}: "
+            f"{top.get('title', '')} ({top.get('year', 'n.d.')}, {top.get('id', '')}) · {ref}")
+
+
+def _unit_text(u: dict, base: str, ref: str, at: str, head: int) -> list[str]:
+    lines = []
+    total = u["lenses"].get("_total") or {}
+    for k, title in LIST_TITLES.items():
+        items = (u["lenses"].get(k) or [])[:head]
+        if not items:
+            continue
+        lines += [f"### {title}" + (f" ({total[k]} in all)" if total.get(k) else ""), ""]
+        for it in items:
+            lines.append(_person_line(it, base, k) if isinstance(it, dict) and ("author" in it or "institution" in it)
+                         else _paper_line(it))
+        if total.get(k, 0) > len(items):
+            q = urllib.parse.urlencode({"read": at, "list": k, "offset": len(items), "limit": 25})
+            lines.append(f"  … the next 25: {base}/{ref}?{q}")
+        lines.append("")
+    return lines
+
+
+def profile_text(d: dict, base: str) -> str:
+    """A profile as Markdown for a model: the figures, the fields at a glance, then every field's lists."""
+    p, kind = d["person"], d["kind"]
+    ref = f"{'authors' if kind == 'author' else 'institutions'}/{p['id']}"
+    yrs = f"{p['years'][0]}–{p['years'][1]}" if p.get("years") else ""
+    facts = [_n(p['works'], "publication"), _n(p['authors'], "author") if p.get("authors") else "",
+             f"cited {p['citations']:,} times", f"h-index {p['h']}", yrs]
+    lines = [f"# {p['name']} ({p['id']})", " · ".join(f for f in facts if f)]
+    if kind == "author":
+        if p.get("topic"):
+            lines.append(f"Commonest topic: {p['topic']['name']} ({p['topic']['subfield']}, {p['topic']['field']})")
+        if p.get("institutions"):
+            lines.append("Has published from: " + "; ".join(
+                f"{i['name']} ({i['papers']} papers" + (f", {i['years'][0]}–{i['years'][1]}" if i.get("years") else "") + f", {base}/institutions/{i['id']})"
+                for i in p["institutions"][:5]))
+        pos = p.get("positions") or {}
+        lines.append(f"Position on papers: first author on {pos.get('first', 0)}, second on {pos.get('second', 0)}, other on {pos.get('other', 0)}.")
+    else:
+        lines.append(" · ".join(x for x in (p.get("kind"), p.get("country"), p.get("ror")) if x))
+    lines += [f"On ScienceMadeReadable: https://sciencemadereadable.com/?{'author' if kind == 'author' else 'institution'}={p['id']} · "
+              f"OpenAlex: https://openalex.org/{p['id']}", "",
+              f"Caveat: this is one OpenAlex {'author' if kind == 'author' else 'institution'} record. "
+              + ("A person can be split across several records, and about a quarter of author names on recent papers are "
+                 "tied to no record, so some of their work can be missing; two different people with one name are rarely "
+                 "merged. Co-authors on papers with over 100 authors are not counted."
+                 if kind == "author" else
+                 "Papers count for it when OpenAlex matched an author's affiliation to it (most recent papers, far fewer "
+                 "old ones): counts are lower bounds."), ""]
+    level = d.get("level", "fields")
+    lines += [f"## Its {level} ({d['coverage']['in_groups']:,} papers in {len(d['groups'])} {level}; "
+              f"{d['coverage']['other']:,} unlabelled or in {level} too small to list)", ""]
+    for g in d["groups"]:
+        yrs = g.get("years")
+        subs = g.get("subgroups") or []
+        lines.append(f"{g['id']}. **{g['name']}**: {_n(g['size'])}" + (f", mostly {yrs[0]}–{yrs[2]}" if yrs else "") +
+                     (" — " + "; ".join(f"{g['id']}.{x['id']} {x['name']} ({x['size']:,})" for x in subs[:12]) +
+                      (f"; … {len(subs)} in all" if len(subs) > 12 else "") if subs else ""))
+    lines += ["", "## All its work" if kind == "institution" else "## All their work", ""]
+    lines += _unit_text(d["overall"], base, ref, "", HEAD)
+    for g in d["groups"]:
+        lines += [f"## {g['id']}. {g['name']} ({_n(g['size'])})", ""]
+        lines += _unit_text(g, base, ref, str(g["id"]), HEAD)
+        for x in g.get("subgroups") or []:
+            lines += [f"### {g['id']}.{x['id']} {x['name']} ({_n(x['size'])})", ""]
+            lines += _unit_text(x, base, ref, f"{g['id']}.{x['id']}", HEAD_SUB)
+    return "\n".join(lines)
+
+
+def search_text(d: dict, base: str, kind: str) -> str:
+    """Name-search results as Markdown."""
+    lines = [f"# {'Authors' if kind == 'author' else 'Institutions'} named “{d['q']}” ({len(d['results'])} found, the most published first)", ""]
+    if d.get("how") == "fuzzy":
+        lines += ["No name holds every word exactly; these are one letter off.", ""]
+    for r in d["results"]:
+        yrs = f"{r['years'][0]}–{r['years'][1]}" if r.get("years") else ""
+        if kind == "author":
+            facts = [f"{r['works']:,} papers", f"cited {r['citations']:,} times" if r.get("citations") else "", f"h {r['h']}" if r.get("h") else "", yrs,
+                     r["topic"]["name"] if r.get("topic") else "", r["institution"]["name"] if r.get("institution") else ""]
+            lines.append(f"- **{r['name']}** ({r['id']}): " + " · ".join(f for f in facts if f) + f" · {base}/authors/{r['id']}")
+        else:
+            facts = [f"{r['works']:,} papers", r.get("kind") or "", r.get("country") or ""]
+            lines.append(f"- **{r['name']}** ({r['id']}): " + " · ".join(f for f in facts if f) + f" · {base}/institutions/{r['id']}")
+    if not d["results"]:
+        lines.append("Nobody by that name. Try the surname alone, without initials or accents.")
+    lines += ["", "Records are OpenAlex's: the same person can appear under several; tell them apart by field, years and institution."]
+    return "\n".join(lines)
+
+
+def more_text(d: dict, name: str, base: str, ref: str, at: str, offset: int) -> str:
+    lines = [f"# {LIST_TITLES.get(name, name)}: items {offset + 1}–{offset + len(d['items'])} of {d['total']}", ""]
+    for it in d["items"]:
+        lines.append(_person_line(it, base, name) if isinstance(it, dict) and ("author" in it or "institution" in it) else _paper_line(it))
+    if offset + len(d["items"]) < d["total"]:
+        q = urllib.parse.urlencode({"read": at, "list": name, "offset": offset + len(d["items"]), "limit": 25})
+        lines += ["", f"Next: {base}/{ref}?{q}"]
+    return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------------------------------- warming
+def warm(api_base: str, cit_root: Path, min_inst: int = 10000, min_author: int = 2000, cache_root: Path | None = None) -> None:
+    """Ask the running API for every big institution's and author's page, so the first visitor finds it on disk
+    (python -m srl_search.people warm). Skips the ones already there; idempotent, so it can run every night."""
+    import urllib.request
+    cit_root = Path(cit_root)
+    gen = json.loads((cit_root / "meta.json").read_text())["generation"]
+    jobs = []
+    if (cit_root / "institutions" / "i_off.npy").exists():
+        n = np.diff(np.load(cit_root / "institutions" / "i_off.npy")).astype(np.int64)
+        ids = np.load(cit_root / "institutions" / "inst_in.npy", mmap_mode="r")
+        rows = np.flatnonzero(n >= min_inst)
+        jobs += [("institutions", f"I{int(ids[r])}", int(n[r])) for r in rows[np.argsort(-n[rows])]]
+    if (cit_root / "authors" / "a_works.npy").exists():
+        w = np.load(cit_root / "authors" / "a_works.npy").astype(np.int64)
+        an = np.load(cit_root / "authors" / "author_an.npy", mmap_mode="r")
+        rows = np.flatnonzero(w >= min_author)
+        jobs += [("authors", f"A{int(an[r])}", int(w[r])) for r in rows[np.argsort(-w[rows])]]
+    done = skipped = failed = 0
+    t0 = time.time()
+    print(f"{time.strftime('%H:%M:%S')} warming {len(jobs)} pages for {gen} through {api_base}", flush=True)
+    for i, (kind, ident, n) in enumerate(jobs, 1):
+        if cache_root:
+            atlas_dirs = [d for d in Path(cache_root).glob(f"{gen}-*") if d.is_dir()]
+            sub = "author" if kind == "authors" else "institution"
+            if any((d / sub / f"{ident}.json.gz").exists() for d in atlas_dirs):
+                skipped += 1
+                continue
+        try:
+            t = time.time()
+            with urllib.request.urlopen(f"{api_base}/{kind}/{ident}", timeout=600) as r:
+                r.read()
+            done += 1
+            if done % 50 == 0 or time.time() - t > 20:
+                print(f"{time.strftime('%H:%M:%S')} {i}/{len(jobs)} {kind}/{ident} ({n:,} papers) {time.time() - t:.1f}s", flush=True)
+        except Exception as e:  # noqa: BLE001
+            failed += 1
+            print(f"{time.strftime('%H:%M:%S')} {kind}/{ident}: {type(e).__name__} {e}", flush=True)
+            time.sleep(5)
+        time.sleep(0.2)                                   # the public API keeps first claim
+    print(f"{time.strftime('%H:%M:%S')} warmed {done}, {skipped} already there, {failed} failed, {(time.time() - t0) / 60:.0f} min", flush=True)
+
+
+def main(argv: list[str] | None = None) -> None:
+    import argparse
+    ap = argparse.ArgumentParser(description="python -m srl_search.people warm: cache the big institutions' and authors' pages")
+    sub = ap.add_subparsers(dest="cmd", required=True)
+    w = sub.add_parser("warm")
+    w.add_argument("--api", default="http://127.0.0.1:8810")
+    w.add_argument("--citations", type=Path, default=None, help="default: the current release's")
+    w.add_argument("--cache", type=Path, default=Path("/mnt/fast/scholarsreadinglist/search/people-cache"))
+    w.add_argument("--min-institution", type=int, default=10000)
+    w.add_argument("--min-author", type=int, default=2000)
+    a = ap.parse_args(argv)
+    cit = a.citations
+    if cit is None:
+        rel = json.loads(Path("/mnt/fast/scholarsreadinglist/release/current/manifest.json").read_text())
+        cit = Path(rel["paths"]["citations"])
+    warm(a.api, cit, a.min_institution, a.min_author, a.cache)
+
+
+
 class NameIndex:
     """Names in tantivy (search/build_names_index.py): every token of the query must match (one-letter tokens as
     initials: a prefix), results ordered by the count in the "works" field; when nothing matches, each token is
@@ -506,3 +779,7 @@ def schema(tantivy):
     sb.add_integer_field("works", stored=False, indexed=True, fast=True)
     sb.add_integer_field("row", stored=True, fast=True)
     return sb.build()
+
+
+if __name__ == "__main__":
+    main()

@@ -12,6 +12,9 @@ Tools (read-only, Markdown answers written for a model to read and cite):
     citation_walk        what the papers sharing its references cite that it does not
     map_topic            the research groups inside a topic, named, with every reading list of every group
     read_topic_group     one group in depth: its reading lists with abstracts, then all its papers, page by page
+    find_people          authors or institutions by name, with ids, to tell namesakes apart
+    get_profile          an author's or institution's profile: figures, fields, most cited, newest, co-authors
+                         or people and partner organisations; one list read further
 Also: the guide (llms.txt) as a resource, and three prompts (field overview, literature review, check a claim).
 
 Why Markdown and not structured JSON: the answers go into a model's context, and the spec asks a tool that
@@ -382,6 +385,58 @@ How to search well:
             return await call(go)
         except Pending as e:
             return pending_text(e.status, topic, PUBLIC_BASE)
+
+    @server.tool(title="Find authors or institutions by name", annotations=READ_ONLY, structured_output=False)
+    async def find_people(
+        name: Annotated[str, Field(min_length=1, max_length=200, description=(
+            "A person's or organisation's name, or part of it: 'Larivière', 'V Larivière', 'wang wei', 'McGill'. "
+            "Accents and case do not matter; a one-letter word is an initial."))],
+        kind: Annotated[Literal["author", "institution"], Field(description="Who to look for.")] = "author",
+        limit: Annotated[int, Field(ge=1, le=50, description="How many (default 10).")] = 10,
+    ) -> str:
+        """Authors (OpenAlex author records) or institutions (universities, hospitals, companies, agencies) whose
+        name holds every word given, the most published first, each with its id (A… or I…) for get_profile and the
+        facts that tell namesakes apart: papers, citations, h-index, years, commonest topic, main institution.
+        One person can have several records, and about a quarter of author names on recent papers have none."""
+        from srl_search.people import search_text
+        svc = api.people_service()
+        out = await call(svc.search if kind == "author" else svc.search_institutions, name, limit)
+        return search_text(out, PUBLIC_BASE, kind)
+
+    @server.tool(title="Profile of an author or institution", annotations=READ_ONLY, structured_output=False)
+    async def get_profile(
+        id: Annotated[str, Field(min_length=2, max_length=40, description=(
+            "An OpenAlex author id (A5068542997) or institution id (I70931966), from find_people."))],
+        group: Annotated[str | None, Field(max_length=8, description=(
+            "With `list`: which part to read further: a field's number from the profile (\"3\"), a subfield's "
+            "(\"3.2\"), or empty for all their work."))] = None,
+        list: Annotated[Literal["cited", "newest", "first", "coauthors", "people", "partners"] | None, Field(description=(
+            "Read one list further (25 items a call, from `offset`) instead of the whole profile: cited (most "
+            "cited), newest, first (as first author; authors only), coauthors (authors only), people and partners "
+            "(institutions only)."))] = None,
+        offset: Annotated[int, Field(ge=0, le=5000, description="With `list`: the first item to return.")] = 0,
+    ) -> str:
+        """An author's or institution's profile: publications, citations, h-index, years, where they have published
+        from (authors) or country and kind (institutions); their work in fields (OpenAlex's label on each paper,
+        with subfields inside), and for all their work and for each field the most cited papers, the newest, the
+        papers as first author, and the people they publish with most (institutions: their most prolific authors and
+        the organisations they work with). Each list shows its first items and says how many there are: read one
+        further with `list` (and `group`). Records are OpenAlex's: a person split across records has several
+        profiles; counts are lower bounds."""
+        from srl_search.people import more_text, profile_text
+        svc = api.people_service()
+        ref = id.strip().rsplit("/", 1)[-1]
+        kind = "author" if ref[:1] in "Aa" else "institution"
+        row = await call(svc.row if kind == "author" else svc.inst_row, ref)
+        if row is None:
+            raise ToolError(f"{id} is not an id we know: an OpenAlex A-number (author) or I-number (institution), from find_people")
+        if list is not None:
+            if kind == "author" and list in ("people", "partners") or kind == "institution" and list in ("first", "coauthors"):
+                raise ToolError(f"{list} is not a list of an {kind}'s profile")
+            out = await call(svc.more, kind, row, group or "", list, offset, 25)
+            return more_text(out, list, PUBLIC_BASE, f"{'authors' if kind == 'author' else 'institutions'}/{svc.ident(kind, row)}", group or "", offset)
+        out = await call(svc.profile, kind, row)
+        return profile_text(out, PUBLIC_BASE)
 
     @server.resource(f"{PUBLIC_BASE}/llms.txt", name="guide", title="Search API guide",
                      description="Every call, what is covered today, result fields, limits and how to search well.",

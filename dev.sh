@@ -44,6 +44,7 @@ case "${1:-status}" in
       -p WorkingDirectory="$WT" -p CPUWeight=100 -p IOWeight=100 -p MemoryMax=40G -p LimitNOFILE=262144 \
       -E TOKENIZERS_PARALLELISM=false -E SRL_TOPICS_CACHE=/mnt/fast/scholarsreadinglist/search/topics-cache-dev \
       -E SRL_FIELDS=/mnt/fast/scholarsreadinglist/search/fields-dev \
+      -E SRL_PEOPLE_CACHE=/mnt/fast/scholarsreadinglist/search/people-cache-dev \
       -E SRL_SMR=/mnt/fast/scholarsreadinglist/search/smr-2026-10-08 \
       -E SRL_CORPUS=/mnt/fast/scholarsreadinglist/search/corpus-2026-10-05 \
       -E SRL_ATLAS=/mnt/fast/science-atlas/build/20261008T131030-tsne \

@@ -63,7 +63,7 @@ from srl_search.citations import Citations
 from srl_search.field import Pending, pending_text
 from srl_search.engine import EMBEDDING_PLAN, JUNK_PENALTY, Engine, ExactEngine
 from srl_search.keyword import KeywordIndex, looks_boolean
-from srl_search.people import People
+from srl_search.people import People, more_text, profile_text, search_text as people_search_text
 from srl_search.public import PUBLIC_BASE, PUBLIC_ROUTES
 from srl_search.quality import Quality
 from srl_search.topic_service import TopicService, as_text as topic_text, read_text as topic_read_text
@@ -765,7 +765,8 @@ def topics_text(q: str,
 # way round (srl_search/people.py). The names index is built by search/build_names_index.py.
 NAMES_INDEX = Path(os.environ.get("SRL_NAMES_INDEX", ROOT / "names-index"))
 PEOPLE = People(sys.modules[__name__], CITATIONS, NAMES_INDEX / CITATIONS.generation if CITATIONS is not None else None,
-                NAMES_INDEX / f"{CITATIONS.generation}-institutions" if CITATIONS is not None else None) \
+                NAMES_INDEX / f"{CITATIONS.generation}-institutions" if CITATIONS is not None else None,
+                Path(os.environ.get("SRL_PEOPLE_CACHE", ROOT / "people-cache"))) \
     if CITATIONS is not None and CITATIONS.authors is not None and getattr(CITATIONS.authors, "by", False) else None
 
 
@@ -775,16 +776,20 @@ def people_service() -> People:
     return PEOPLE
 
 
+D_FORMAT = "text: the answer as Markdown for a model to read (the same facts)."
+
+
 @app.get("/authors")
 def authors(q: str = Query(..., min_length=1, max_length=200, description="A name, or part of one: 'Larivière', "
                            "'V Larivière', 'wang wei'. Accents and case do not matter; one-letter words are initials."),
-            k: int = Query(10, ge=1, le=50)):
+            k: int = Query(10, ge=1, le=50), format: str = Query("json", pattern="^(json|text)$", description=D_FORMAT)):
     """Authors by name: those whose display name holds every word of q (initials as prefixes), the most published
     first; if no name matches, each word is tried with one letter of difference ("how" says which). Each result
     carries its publication count, citations, h-index, years, commonest topic and (when known) main institution,
     and "match": "full" when every word of q is in the name. Authors are OpenAlex's author records: a person
     can have several, and about a quarter of recent author listings have none."""
-    return people_service().search(q, k)
+    out = people_service().search(q, k)
+    return PlainTextResponse(people_search_text(out, PUBLIC_BASE, "author")) if format == "text" else out
 
 
 @app.get("/authors/{ref}")
@@ -793,7 +798,8 @@ def author(ref: str,
                                     "list to read further: empty (all their work), a group (\"3\"), a subgroup (\"3.2\")."),
            lens: str | None = Query(None, alias="list", pattern="^(cited|newest|first|coauthors)$",
                                     description="With read: which list."),
-           offset: int = Query(8, ge=0, le=5000), limit: int = Query(25, ge=1, le=50)):
+           offset: int = Query(8, ge=0, le=5000), limit: int = Query(25, ge=1, le=50),
+           format: str = Query("json", pattern="^(json|text)$", description=D_FORMAT)):
     """One author's profile, shaped like a topic map (/topics): their publications in groups by field (OpenAlex's
     field of each paper's primary topic; subfields inside; or subfields with topics inside when most of their work
     is in one field), each with reading lists (cited: most cited; newest; first: as first author) and map
@@ -806,24 +812,29 @@ def author(ref: str,
     if row is None:
         raise HTTPException(404, f"{ref} is not an author we know (an OpenAlex A-number)")
     if lens is not None:
-        return svc.more("author", row, read or "", lens, offset, limit)
-    return svc.profile("author", row)
+        out = svc.more("author", row, read or "", lens, offset, limit)
+        return PlainTextResponse(more_text(out, lens, PUBLIC_BASE, f"authors/{svc.ident('author', row)}", read or "", offset)) \
+            if format == "text" else out
+    out = svc.profile("author", row)
+    return PlainTextResponse(profile_text(out, PUBLIC_BASE)) if format == "text" else out
 
 
 @app.get("/institutions")
 def institutions(q: str = Query(..., min_length=2, max_length=200, description="An organisation's name, or part of it."),
-                 k: int = Query(10, ge=1, le=50)):
+                 k: int = Query(10, ge=1, le=50), format: str = Query("json", pattern="^(json|text)$", description=D_FORMAT)):
     """Institutions (universities, hospitals, companies, agencies: OpenAlex's I-records) by name: those whose name
     holds every word of q, the most published first; "works" is their paper count. Only organisations OpenAlex
     could match from affiliation strings: on recent papers that is 60-90 % of them."""
-    return people_service().search_institutions(q, k)
+    out = people_service().search_institutions(q, k)
+    return PlainTextResponse(people_search_text(out, PUBLIC_BASE, "institution")) if format == "text" else out
 
 
 @app.get("/institutions/{ref}")
 def institution(ref: str,
                 read: str | None = Query(None, pattern=r"^(\d{1,3}(\.\d{1,3})?)?$", description="As for /authors/{ref}."),
                 lens: str | None = Query(None, alias="list", pattern="^(cited|newest|people|partners)$"),
-                offset: int = Query(8, ge=0, le=5000), limit: int = Query(25, ge=1, le=50)):
+                offset: int = Query(8, ge=0, le=5000), limit: int = Query(25, ge=1, le=50),
+                format: str = Query("json", pattern="^(json|text)$", description=D_FORMAT)):
     """One institution's profile, shaped like /authors/{ref}: its papers in groups by field, each with lists cited,
     newest, people (its authors on the most of those papers, with the most cited one) and partners (the other
     organisations on its papers: who it works with); "overall" the same for all its work; "person" the figures
@@ -834,8 +845,11 @@ def institution(ref: str,
     if row is None:
         raise HTTPException(404, f"{ref} is not an institution we know (an OpenAlex I-number)")
     if lens is not None:
-        return svc.more("institution", row, read or "", lens, offset, limit)
-    return svc.profile("institution", row)
+        out = svc.more("institution", row, read or "", lens, offset, limit)
+        return PlainTextResponse(more_text(out, lens, PUBLIC_BASE, f"institutions/{svc.ident('institution', row)}", read or "", offset)) \
+            if format == "text" else out
+    out = svc.profile("institution", row)
+    return PlainTextResponse(profile_text(out, PUBLIC_BASE)) if format == "text" else out
 
 
 # Last, once every function above exists: the MCP tools call them.

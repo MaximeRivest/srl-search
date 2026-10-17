@@ -99,6 +99,7 @@ class FakeInstitutions:
 
 class FakeCitations:
     types = TYPES
+    generation = "gen1"
 
     def __init__(self, tmp: Path):
         self.root = tmp
@@ -211,3 +212,40 @@ def test_name_index_finds_people(tmp_path):
     assert ni.search("larivier", 10) == ([0, 1, 2], "fuzzy")           # one letter off, when nothing matches
     assert ni.search("nobody here", 10) == ([], "none")
     assert ni.search("...", 10) == ([], "empty")
+
+
+def test_big_profiles_are_kept_on_disk(tmp_path, monkeypatch):
+    monkeypatch.setattr(P, "CACHE_FROM", 2)
+    cit = FakeCitations(tmp_path)
+    api = SimpleNamespace(**FAKE_API.__dict__, ATLAS=SimpleNamespace(id="atlas1"))
+    svc = P.People(api, cit, None, cache_root=tmp_path / "cache")
+    d = svc.profile("author", 0)
+    assert d["cached"] is False
+    assert (tmp_path / "cache" / "gen1" / "raw" / "author" / "A101.json.gz").exists()
+    assert (tmp_path / "cache" / "gen1-atlas1" / "author" / "A101.json.gz").exists()
+    svc2 = P.People(api, cit, None, cache_root=tmp_path / "cache")   # a new process finds both
+    d2 = svc2.profile("author", 0)
+    assert d2["cached"] is True and d2["groups"] == d["groups"]
+    assert svc2.more("author", 0, "", "cited", 1, 2)["total"] == 4   # the raw lists came from disk
+    (tmp_path / "cache" / "old-gen").mkdir()
+    P.People(api, cit, None, cache_root=tmp_path / "cache")           # other snapshots' answers are cleared
+    assert not (tmp_path / "cache" / "old-gen").exists()
+
+
+def test_profile_text_reads_as_markdown(tmp_path):
+    svc = P.People(FAKE_API, FakeCitations(tmp_path), None)
+    out = P.profile_text(svc.profile("author", 0), "https://x/api")
+    assert out.startswith("# Ann Reef (A101)\n4 publications · cited 100 times · h-index 3 · 2010–2024")
+    assert "## Its subfields (3 papers in 1 subfields; 1 unlabelled" in out
+    assert "### Co-authors" in out and "**Bo Fish** (A102, 3 papers in all): 2 papers together" in out
+    out = P.profile_text(svc.profile("institution", 0), "https://x/api")
+    assert "# Reef University (I7)" in out and "### Partner organisations" in out and "**Sea Lab** (AU) (I9)" in out
+
+
+def test_namesake_coauthor_records_are_one_person(tmp_path):
+    cit = FakeCitations(tmp_path)
+    au = cit.authors
+    au._names[2] = "Bo Fish"                                  # Cy Sea's record is now a second "Bo Fish"
+    svc = P.People(FAKE_API, cit, None)
+    co = svc._raw_author(0)["overall"]["lenses"]["coauthors"]
+    assert [(c["name"], c["n"], c["author"]) for c in co] == [("Bo Fish", 3, "A102")]   # papers 0, 1 (once), 2

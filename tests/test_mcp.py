@@ -78,7 +78,25 @@ def fake_api():
 
     def topic_read_text(r, base):
         return f"# Group {r['group']} of “{r['question']}” · {r['part']} · abstracts {r['abstracts']}"
+    PERSON = {"id": "A1", "name": "Ann Reef", "works": 4, "citations": 100, "h": 3, "years": [2010, 2024],
+              "topic": {"name": "Coral Bleaching", "subfield": "Marine Biology", "field": "Agricultural and Biological Sciences"},
+              "institutions": [{"id": "I7", "name": "Reef University", "papers": 3, "years": [2010, 2024]}],
+              "positions": {"first": 3, "second": 1, "other": 0}}
+    TP = {"id": "W1000", "title": "Paper 0", "year": 2010, "authors": ["Ann Reef", "Bo Fish"], "authors_count": 2, "citations": 40}
+    CO = {"author": "A2", "name": "Bo Fish", "n": 2, "years": [2010, 2015], "works": 3, "top": TP}
+    unit = {"size": 4, "years": [2010, 2015, 2024], "lenses": {"cited": [TP], "newest": [TP], "first": [TP], "coauthors": [CO], "_total": {"cited": 40}}}
+    profile = {"kind": "author", "person": PERSON, "level": "subfields", "mode": "author", "question": "Ann Reef",
+               "groups": [dict(unit, id=1, name="Marine Biology", subgroups=[dict(unit, id=1, name="Coral Bleaching")])],
+               "overall": unit, "coverage": {"papers": 4, "in_groups": 3, "other": 1}}
+    people = SimpleNamespace(
+        search=lambda q, k: {"q": q, "results": [dict(PERSON, match="full", institution={"id": "I7", "name": "Reef University"})][:k], "how": "exact"},
+        search_institutions=lambda q, k: {"q": q, "results": [{"id": "I7", "name": "Reef University", "works": 4, "country": "AU", "kind": "education", "match": "full"}], "how": "exact"},
+        row=lambda ref: 0 if ref == "A1" else None, inst_row=lambda ref: 0 if ref == "I7" else None,
+        ident=lambda kind, row: "A1" if kind == "author" else "I7",
+        profile=lambda kind, row: profile,
+        more=lambda kind, row, at, name, offset, limit: {"items": [TP] * 2, "total": 40})
     api = SimpleNamespace(
+        people_service=lambda: people,
         SEMANTIC={"all": SimpleNamespace(manifest={"papers": 124_892_915, "min_date": "1800-01-01"})},
         KEYWORDS=SimpleNamespace(num_docs=203_543_614), app=SimpleNamespace(version="0.3"),
         search=search, similar=similar, work=work, walk=walk, engine=engine, NPROBE=128, DEPTH=300,
@@ -99,7 +117,8 @@ def test_tools_answer_in_markdown_the_model_can_cite():
     async def go():
         async with Client(server) as c:
             tools = {t.name: t for t in (await c.list_tools()).tools}
-            assert set(tools) == {"search_papers", "get_papers", "find_similar_papers", "citation_walk", "map_topic", "read_topic_group"}
+            assert set(tools) == {"search_papers", "get_papers", "find_similar_papers", "citation_walk", "map_topic", "read_topic_group",
+                                  "find_people", "get_profile"}
             assert all(t.annotations.read_only_hint for t in tools.values())
             assert "review" in str(tools["search_papers"].input_schema)        # the type list reaches the model
 
@@ -151,6 +170,25 @@ def test_tools_answer_in_markdown_the_model_can_cite():
             tools = {t.name: t for t in (await c.list_tools()).tools}
             assert "map_topic first" in tools["map_topic"].description or "first" in tools["map_topic"].description
 
+            r = await c.call_tool("find_people", {"name": "reef"})
+            assert not r.is_error and "**Ann Reef** (A1): 4 papers · cited 100 times · h 3 · 2010–2024 · Coral Bleaching · Reef University" in text(r)
+            r = await c.call_tool("find_people", {"name": "reef", "kind": "institution"})
+            assert "**Reef University** (I7): 4 papers · education · AU" in text(r)
+            r = await c.call_tool("get_profile", {"id": "A1"})
+            out = text(r)
+            assert out.startswith("# Ann Reef (A1)\n4 publications · cited 100 times · h-index 3 · 2010–2024")
+            assert "Has published from: Reef University (3 papers, 2010–2024" in out
+            assert "1. **Marine Biology**: 4 papers, mostly 2010–2024 — 1.1 Coral Bleaching (4)" in out
+            assert "### Most cited (40 in all)" in out and "**Paper 0** · 2010 · Ann Reef; Bo Fish · cited 40 times · W1000" in out
+            assert "- **Bo Fish** (A2, 3 papers in all): 2 papers together, 2010–2015; most cited together: Paper 0" in out
+            assert "/authors/A1?read=1&list=cited&offset=1&limit=25" in out
+            r = await c.call_tool("get_profile", {"id": "A1", "list": "cited", "group": "1", "offset": 8})
+            assert text(r).startswith("# Most cited: items 9–10 of 40") and "read=1&list=cited&offset=10" in text(r)
+            r = await c.call_tool("get_profile", {"id": "A1", "list": "partners"})
+            assert r.is_error and "not a list of an author" in text(r)
+            r = await c.call_tool("get_profile", {"id": "X9"})
+            assert r.is_error and "find_people" in text(r)
+
             prompts = {p.name for p in (await c.list_prompts()).prompts}
             assert prompts == {"field_overview", "literature_review", "check_claim"}
             p = await c.get_prompt("field_overview", {"topic": "microplastics"})
@@ -186,7 +224,7 @@ def test_over_http_in_every_protocol_era(url, mode):
     async def go():
         async with Client(url, mode=mode) as c:
             assert c.protocol_version == ("2025-11-25" if mode == "legacy" else "2026-07-28")
-            assert len((await c.list_tools()).tools) == 6
+            assert len((await c.list_tools()).tools) == 8
             if mode != "2026-07-28":   # (a pinned version skips discovery, so has no capabilities to read)
                 caps = c.session.server_capabilities   # nothing to listen for: no open-ended subscriptions/listen
                 assert caps.tools is not None and not caps.tools.list_changed and not caps.resources.subscribe
