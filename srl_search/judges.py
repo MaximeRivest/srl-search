@@ -432,7 +432,10 @@ def _student(d: Path, epochs: int = 2) -> None:
     tok = AutoTokenizer.from_pretrained(STUDENT_BASE)
     lens = sorted(len(tok(r["text"])["input_ids"]) for r in train[:2000])
     maxlen = min(512, 64 * math.ceil(lens[int(.95 * len(lens))] / 64))
-    enc = lambda ts: [tok(t, truncation=True, max_length=maxlen)["input_ids"] for t in ts]
+    # in batches, on every core (one text at a time took 35 min for 2.2M papers of a big field, the GPU idle)
+    os.environ["TOKENIZERS_PARALLELISM"] = "true"
+    enc = lambda ts: [ids for s0 in range(0, len(ts), 20_000)
+                      for ids in tok(ts[s0:s0 + 20_000], truncation=True, max_length=maxlen)["input_ids"]]
     X = enc([r["text"] for r in train])
     # soft targets: the decider's probabilities as they are (distillation), the teacher's answers as 0/1. No class
     # weights: they shift every probability towards "yes", and most candidates are not on topic
