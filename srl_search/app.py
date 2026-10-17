@@ -502,6 +502,40 @@ def work_authors(ref: str):
     return {"id": f"W{w}", "authors": svc.authors_of_work(w)}
 
 
+def workpage_service():
+    if WORKPAGE is None:
+        raise HTTPException(503, "a paper's surroundings need the citation index, which this release does not have")
+    return WORKPAGE
+
+
+@app.get("/works/{ref:path}/context")
+def work_context(ref: str):
+    """Everything around one paper, for its page: its authors in order with ids, publication counts and h-index;
+    its organisations, and which author signed from which ("affiliations": "exact", from OpenAlex's authorships;
+    "none" while that index is missing: then the organisations are the paper's, not tied to authors); its references
+    and the papers citing it (counts, counts per year, the most cited, the newest citing ones, and up to 400 of each as
+    [year, citations, W-number] to draw a timeline); and the whole-field maps that hold it, with its group and
+    subgroup there (most specific map first). Links count only papers in the snapshot."""
+    w = engine.resolve(ref)
+    if w is None:
+        raise HTTPException(404, f"{ref} is not in the corpus")
+    return workpage_service().context(int(w))
+
+
+@app.get("/works/{ref:path}/links")
+def work_links(ref: str,
+               direction: str = Query("cited_by", pattern="^(references|cited_by)$",
+                                      description="references (what it cites) or cited_by (what cites it)."),
+               sort: str = Query("cited", pattern="^(cited|newest|oldest)$", description="Most cited first, newest or oldest."),
+               offset: int = Query(0, ge=0), limit: int = Query(25, ge=1, le=100)):
+    """One paper's references or citing papers, a page at a time (title, year, citations, first author, map position,
+    readable on the site), with the list's total."""
+    w = engine.resolve(ref)
+    if w is None:
+        raise HTTPException(404, f"{ref} is not in the corpus")
+    return workpage_service().links(int(w), direction, sort, offset, limit)
+
+
 @app.get("/works/{ref:path}")
 def work(ref: str):
     """One paper's full record. ref: W2782456798, https://openalex.org/W..., a DOI (10.1038/..., https://doi.org/...,
@@ -598,7 +632,8 @@ D_READ = ("Read this group of the map in depth, with abstracts: its reading list
           "call /topics first). read=0: the whole topic's reading lists (lists only). Counts as 1 request, not 5.")
 D_PART = ("With read: lists (its reading lists) or papers (all its papers, page by page); more: one reading list "
           "further than the map gives (list=, offset=, limit=), its items as in the map's lenses, with the list's "
-          "total length.")
+          "total length; word: the group's papers that use one word of its cloud (word=, limit=), most central first, "
+          "read among its 3,000 most central papers.")
 D_LIST = ("With part=more: which reading list (core, start_here, rising, distinctive, foundations, bridges, newest, "
           "experts).")
 D_SCOPE = ("closest (default): the papers closest to the question, mapped in seconds. field: the whole research field "
@@ -615,6 +650,13 @@ D_PAGE = ("Which page: of the map itself (as text), or with read of the group's 
           "how many pages there are and what to call next.")
 
 
+# A paper's page: its authors and organisations, references, citing papers and the field maps holding it
+# (srl_search/workpage.py; read-only, beside the topic maps' code, not part of their version).
+from srl_search.field import ROOT as FIELDS_ROOT  # noqa: E402
+from srl_search.workpage import WorkPage  # noqa: E402
+WORKPAGE = WorkPage(sys.modules[__name__], CITATIONS, FIELDS_ROOT) if CITATIONS is not None else None
+
+
 def topics_service() -> TopicService:
     if TOPICS is None:
         raise HTTPException(503, "topic maps need the citation index, which this release does not have")
@@ -629,7 +671,7 @@ def topics(q: str = Query(..., min_length=2, max_length=2000, description=D_TOPI
            year_to: int | None = Query(None, description=D_YEAR_TO),
            group: int | None = Query(None, ge=1, le=50, description=D_GROUP),
            read: int | None = Query(None, ge=0, le=50, description=D_READ),
-           part: str = Query("lists", pattern="^(lists|papers|more)$", description=D_PART),
+           part: str = Query("lists", pattern="^(lists|papers|more|word)$", description=D_PART),
            page: int = Query(1, ge=1, le=100, description=D_PAGE),
            abstracts: str = Query("full", pattern="^(full|short|none)$",
                                   description="With read: full abstracts, their first sentences, or none."),
@@ -638,7 +680,9 @@ def topics(q: str = Query(..., min_length=2, max_length=2000, description=D_TOPI
            lens: str | None = Query(None, alias="list", pattern="^(core|start_here|rising|distinctive|foundations|bridges|newest|experts)$",
                                     description=D_LIST),
            offset: int = Query(8, ge=0, le=5000, description="With part=more: the first item (0: the list's start)."),
-           limit: int = Query(25, ge=1, le=50, description="With part=more: how many items.")):
+           limit: int = Query(25, ge=1, le=50, description="With part=more: how many items."),
+           word: str | None = Query(None, min_length=1, max_length=100,
+                                    description="With part=word: a word or phrase of the group's word cloud.")):
     """The research groups inside a topic, and what to read in each. The papers (closest in meaning, or exact-word
     matches) are grouped by the works they cite and the words they use; each group gets a name (the phrases most
     over-represented in it) and reading lists computed from its own papers' citations: core (most cited by the
@@ -664,6 +708,12 @@ def topics(q: str = Query(..., min_length=2, max_length=2000, description=D_TOPI
         if read is None or lens is None:
             raise HTTPException(400, "part=more reads one reading list further: give read=N (0: the whole map) and list=")
         return svc.more(out, read, lens, offset, limit)
+    if part == "word":
+        if read is None or not word:
+            raise HTTPException(400, "part=word lists a group's papers that use a word of its cloud: give read=N "
+                                     "(0: the whole map) and word=")
+        from srl_search.workpage import word_papers
+        return word_papers(svc, out, read, word, limit)
     return svc.read(out, read, part, page, abstracts) if read is not None else out
 
 

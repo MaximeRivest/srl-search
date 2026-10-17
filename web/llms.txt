@@ -92,6 +92,17 @@ Papers closest in meaning to one paper. `ref` = W-number, DOI or PMCID. Same `k`
 One paper's full record (fields below). `ref` = `W2782456798`, `https://openalex.org/W...`, a DOI
 (`10.1126/science.aan8048`, `https://doi.org/...`, `doi:...`) or a PMCID (`PMC1234567`). 404 if unknown.
 
+### GET /works/{ref}/context   ·   GET /works/{ref}/links
+Everything around one paper, in one call (what a paper's page shows; ~20-300 ms): `authors` in order (id, name,
+position, `works`, `h`), `institutions`, and `affiliations`: `"exact"` when each author's `at` lists the indexes of
+the institutions they signed from on this paper (OpenAlex's authorships), `"none"` when only the paper's
+institutions are known; `references` and `cited_by`: `count`, `years` (count per year), `top` (most cited), `newest`
+(cited_by), `plot` (up to 400 as `[year, citations, W-number]`); `references_listed` (what the paper lists, linked
+or not); `maps`: the whole-field maps holding it, most specific first, each with `topic`, `group` and `sub` (`id`,
+`name`, AI-written `about`, `size`) and `via` (`topic`: on topic; `cited`: in the map because the field cites it).
+`/links?direction=references|cited_by&sort=cited|newest|oldest&offset=0&limit=25` pages through either list (up to
+100 at a time) with its `total`. Links count only papers in the OpenAlex snapshot (see coverage).
+
 ### GET /walk?id=...
 A citation walk from one paper (W-number or DOI): the papers that cite most of the same references (`k`
 of them, default 30) and, among what *they* cite, what the starting paper does not: `answers` (W-numbers)
@@ -137,6 +148,9 @@ each paper with its abstract; `part=papers&page=1, 2, …` gives *all* of its pa
 first (most linked to the rest of the group). `read=0` gives the whole topic's reading lists the same way (lists
 only). Add `group=M` to read a group of the split of group M.
 As text: `/topics/{question}?read=N&part=lists` (`abstracts=full|short|none`).
+**A word of a cloud** (1 request): `read=N&part=word&word=corridors` gives group N's papers that use that word or
+phrase (matched as the clouds count words: stemmed, in the title or abstract), most central first, read among its
+3,000 most central papers (`scanned`, `matched`, `total`); `read=0` the whole map, `group=G&read=S` a subgroup.
 **A reading list further** (1 request): the map gives each list's first 8; `read=N&part=more&list=core&offset=8&limit=25`
 (any list: `core`, `start_here`, `rising`, `distinctive`, `foundations`, `bridges`, `newest`, `experts`; `read=0`: the
 whole map; a subgroup: `group=G&read=S`) gives the next items, as in the map, with `total`, the list's length (up to
