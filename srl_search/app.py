@@ -639,15 +639,16 @@ def fields_queue():
     return JSONResponse(topics_service().field_store().queue_view(), headers={"Cache-Control": "no-store"})
 
 
-_FIELD_PAPERS: dict[str, tuple[float, frozenset]] = {}
+_FIELD_PAPERS: dict[str, tuple[float, np.ndarray]] = {}
 
 
-def _field_papers(store, key: str) -> frozenset:
-    """The work numbers of one whole-field map (kept in memory; reread when its field.json changes)."""
+def _field_papers(store, key: str) -> np.ndarray:
+    """The work numbers of one whole-field map, sorted (kept in memory, 8 bytes a paper: a 2M-paper field is 16 MB;
+    reread when its field.json changes)."""
     f = store.root / key / "field.json"
     m = f.stat().st_mtime
     if key not in _FIELD_PAPERS or _FIELD_PAPERS[key][0] != m:
-        _FIELD_PAPERS[key] = (m, frozenset(int(w) for w in json.loads(f.read_text())["papers"]))
+        _FIELD_PAPERS[key] = (m, np.sort(np.fromiter((int(w) for w in json.loads(f.read_text())["papers"]), np.int64)))
     return _FIELD_PAPERS[key][1]
 
 
@@ -681,7 +682,7 @@ def fields_made(q: str | None = Query(None, max_length=500, description="Words o
         near = [int(r["id"][1:]) for r in engine.search(q, k=50, abstracts=False)["results"]]
         for r in rows:
             papers = _field_papers(store, r["key"])
-            r["score"] = round(sum(w in papers for w in near) / max(1, len(near)), 3)
+            r["score"] = round(float(np.isin(np.array(near, np.int64), papers).sum()) / max(1, len(near)), 3)
         rows.sort(key=lambda r: -r["score"])
     return JSONResponse({"maps": rows[:limit], "total": len(rows)}, headers={"Cache-Control": "no-store"})
 

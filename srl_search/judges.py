@@ -468,8 +468,53 @@ def _student(d: Path, epochs: int = 2) -> None:
     (d / "scores.json").write_text(json.dumps([round(float(x), 4) for x in p]))
 
 
+def _knn(d: Path, k: int) -> None:
+    """Exact k nearest neighbours by cosine of the unit rows in d/vectors.npy (float16), on the GPU: d/knn.npz."""
+    import torch
+    V = torch.from_numpy(np.load(d / "vectors.npy")).cuda()
+    m = V.shape[0]
+    nn = torch.empty((m, k), dtype=torch.int64)
+    sim = torch.empty((m, k), dtype=torch.float32)
+    block = max(256, min(8192, int(2 * 2**30 // (m * 2))))      # ~2 GB of scores at a time
+    with torch.no_grad():
+        for s0 in range(0, m, block):
+            S = V[s0:s0 + block] @ V.T                             # fp16 inputs, fp32 accumulation
+            S[torch.arange(S.shape[0]), torch.arange(s0, s0 + S.shape[0])] = -float("inf")
+            v, i = torch.topk(S.float(), k, dim=1)
+            nn[s0:s0 + len(i)], sim[s0:s0 + len(i)] = i.cpu(), v.cpu()
+    np.savez(d / "knn.npz", nn=nn.numpy(), d=(1 - sim.numpy()).astype(np.float64))
+
+
+def knn_on_gpu(V: np.ndarray, k: int, work: Path, wait_s: int = 1800, say=lambda s: None) -> tuple[np.ndarray, np.ndarray] | None:
+    """Exact neighbours on the field GPU (a 2M-paper field: ~1-2 min), or None when it stays busy for wait_s."""
+    work.mkdir(parents=True, exist_ok=True)
+    need = int(V.shape[0] * V.shape[1] * 2 / 2**20) + 4000
+    t0 = time.time()
+    np.save(work / "vectors.npy", V.astype(np.float16))
+    try:
+        while True:                             # a household service can take the memory between check and start
+            try:
+                wait_for_gpu(need, say, timeout_s=max(0, int(wait_s - (time.time() - t0))))
+            except RuntimeError:
+                return None
+            try:
+                run([sys.executable, "-m", "srl_search.judges", "knn", str(work), str(k)], work / "log.txt")
+                z = np.load(work / "knn.npz")
+                return z["nn"], z["d"]
+            except RuntimeError:
+                if time.time() - t0 > wait_s:
+                    return None
+                say("the GPU filled up; trying the neighbours again in a minute")
+                time.sleep(60)
+    finally:
+        (work / "vectors.npy").unlink(missing_ok=True)
+        (work / "knn.npz").unlink(missing_ok=True)
+
+
 if __name__ == "__main__":
-    if sys.argv[1] == "decider-train":
+    if sys.argv[1] == "knn":
+        _knn(Path(sys.argv[2]), int(sys.argv[3]))
+    elif sys.argv[1] == "decider-train":
         _decider_train(Path(sys.argv[2]))
     elif sys.argv[1] == "student":
         _student(Path(sys.argv[2]))

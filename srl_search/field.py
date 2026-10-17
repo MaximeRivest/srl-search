@@ -7,13 +7,19 @@ AI judgment below is made by the general judge (srl_search/judges.py, LocalJudge
 GPU 1): no paid AI. SRL_FIELD_JUDGE=paid restores v5, described here, for ~$1 of AI answers: Kimi K3 teaches small
 models (its providers allow training on its answers); Jev only checks papers and teaches nothing:
 
-  1 teacher      the 300k papers closest in meaning to the topic; Kimi K3 judges 272 papers spread from nearest
-                 to farthest, a quarter of them works the nearest papers cite (many with a title only)
-  2 candidates   a classifier on meaning vectors trained on those answers searches a second 300k along its own
-                 direction; the topic's exact phrase; works cited >= 3 times by the likely field. Kimi K3 then
-                 judges 128 more where that classifier is unsure (active learning): 400 answers, ~$0.49
+  1 teacher      the 300k papers closest in meaning to the topic (searched in the whole index); Kimi K3 judges
+                 272 papers spread from nearest to farthest, a quarter of them works the nearest papers cite (many
+                 with a title only). While the farthest are still mostly on topic, the field goes on: the teacher
+                 judges 96 more in a ring 4x as deep, again and again (up to 20M deep). Each depth stratum's share on
+                 topic times its size estimates the field's size: a field too big to map is refused now, not after
+                 20 minutes of judging
+  2 candidates   a classifier on meaning vectors trained on those answers searches the whole index along its own
+                 direction, ~3x the estimated size deep (300k at least, 8M at most); the topic's exact phrase; works
+                 cited >= 3 times by the likely field. Kimi K3 then judges 128 more where that classifier is unsure
+                 (active learning): 400+ answers, ~$0.49
   3 decider      Qwen3.5-0.8B learns all 400 answers (yes/no head, LoRA, ~1.5 min on GPU 1)
-  4 decider labels  it judges 10,000 candidates (vLLM, ~2.5 min)
+  4 decider labels  it judges 10,000 candidates (vLLM, ~2.5 min); a field estimated at more than 500k papers gets
+                 more, up to 30,000 (broad fields are more varied)
   5 students     a classifier on meaning vectors and Ettin-17M on text learn the decider's probabilities; Ettin
                  judges papers with a title only, those the vector student is unsure about, and the teacher's
   6 judging      a combiner (student score + citation signals, fitted on the teacher's answers) scores every
@@ -21,7 +27,10 @@ models (its providers allow training on its answers); Jev only checks papers and
                  expected from those probabilities; then Jev checks the well-cited papers near the cut-off
                  (scores 0.1-0.7, cited 20+ times; ~20k papers, ~$0.55): its answers decide them, nothing learns
                  from them (the classics in older words, and the neighbours that would top reading lists)
-  7 map          the topic map of all of it (srl_search/topics.py; Leiden runs on 24 cores)
+  7 map          the topic map of all of it (srl_search/topics.py; Leiden runs on 24 cores). Big maps: exact text
+                 neighbours on GPU 1, the most cited references left out of coupling past a work budget, 2 Leiden
+                 iterations a run past 50k papers, groups found on a 500k sample past that (the rest placed by their
+                 links), words from a 300k sample; past 100k papers the JSON lists a sample, every paper in a .npz
   8 subgroups    every group of 300+ papers split into its own groups
 
 The search API only reads results and queues jobs (FieldStore); the worker (`python -m srl_search.field worker`,
@@ -56,7 +65,8 @@ import numpy as np
 from fastapi import HTTPException
 
 ROOT = Path(os.environ.get("SRL_FIELDS", "/mnt/fast/scholarsreadinglist/search/fields"))
-SELECTION_VERSION = "6"                  # 6: the general 0.8B judge does the teacher's, decider's and check's work: no
+SELECTION_VERSION = "7"                  # 7: no 300k ceiling: the teacher looks in rings 4x deeper while the edge is on topic,
+                                         #    candidates searched in the whole index ~3x the estimated size deep; 6: the general 0.8B judge does the teacher's, decider's and check's work: no
                                          #    paid AI (SRL_FIELD_JUDGE=paid: v5); 5: + Jev checks well-cited papers near the cut-off; 4: 400 teacher answers in two rounds (active learning), students learn
                                          #    probabilities, citation combiner, expected-F1 cut-off; 3: held-back
                                          #    cut-offs; 2: first no-Jev recipe; 1: Jev
@@ -76,13 +86,24 @@ FREE_PER_DAY = int(os.environ.get("SRL_FIELD_FREE_PER_DAY", "40"))  # free maps 
                                          #   AI; ~15-25 min of GPU 1 each, shared with the household services)
 FREE_MAX_QUEUED = 60                     # maps waiting in the free line
 PER_ASKER = 2                            # free maps one reader (the door's per-address code) may have waiting
-POOL = 300_000
+POOL = 300_000                           # the closest by meaning: the teacher's first ring, and in the candidates
+RING_GROWTH = 4                          # a field that goes on past a ring: the next ring is 4x as deep
+GATHER_MAX = int(os.environ.get("SRL_FIELD_GATHER_MAX", "20000000"))   # deepest ring (~16% of the corpus)
+RING_SAMPLE = 96                         # papers drawn per stratum of a further ring; the first 32 usable are judged
+UNIVERSE_FACTOR = 3                      # candidates by meaning: ~3x the field's estimated size (300k at least)
+UNIVERSE_MAX = int(os.environ.get("SRL_FIELD_UNIVERSE_MAX", "8000000"))
+CHECK_MAX = 25_000                       # well-cited papers near the cut-off checked, most cited first
 MIN_ON_TOPIC = 15                        # teacher's on-topic answers needed to go on
 CITED_K = 3
 EXPANSION_MAX = 300_000
 BAND = (0.1, 0.9)                        # the vector student is unsure here: the text student judges too
 TOO_BROAD_TAIL = 0.30                    # share on topic among the farthest of the 300k: the field goes on beyond
-TOO_BROAD_PAPERS = 150_000
+TOO_BROAD_PAPERS = int(os.environ.get("SRL_FIELD_MAX_PAPERS", "150000"))   # largest field mapped
+EARLY_MARGIN = 0.7                       # refused at once when even 70% of the first estimate is over the limit
+DISPLAY_MAX = 25_000                     # papers listed in a map's JSON; a bigger map keeps every one in a .npz beside
+                                         #   it (the page draws ~4,000 dots; 2M papers in JSON would be ~100 MB)
+BIG_MAP = 50_000                         # maps larger than this use 2 Leiden iterations a run (topics.Options): 100k
+                                         #   papers: same groups (ARI 0.97 at one seed), 1/20 of the time
 SPLIT_MIN = 300                          # groups at least this big get their own subgroups
 LEIDEN_WORKERS = int(os.environ.get("SRL_FIELDS_WORKERS", "24"))
 LENS_MIN_SCORE = 0.5     # reading lists: papers of the field the judge scores at least this (topics.Options)
@@ -322,14 +343,19 @@ class FieldStore:
 
     def _serve(self, key: str, dirm: Path, group: int | None) -> dict:
         main = dirm / "main.json"
+
+        def src(m: dict) -> dict:                      # a big map's every paper: where read=N&part=papers finds them
+            if m.get("papers_shown"):
+                m["papers_shown"]["source"] = str((dirm / m["papers_shown"]["file"]).relative_to(self.root))
+            return m
         if group is None:
-            out = _read(main)
+            out = src(_read(main))
             if self.credit(key):
                 out["field"] = {**out.get("field", {}), "credit": self.credit(key)}
             return out
         sub = dirm / f"group-{group}.json"
         if sub.exists():
-            return _read(sub)
+            return src(_read(sub))
         m = _read(main)
         n = len(m.get("groups", []))
         if not 1 <= group <= n:
@@ -448,6 +474,33 @@ class Ctx:
         self.xy = np.load(P["tiles"] / "xy.npy", mmap_mode="r") if (P["tiles"] / "xy.npy").exists() else None
         self.readable_rows = np.load(P["rows"] / "smr.npy", mmap_mode="r") if (P["rows"] / "smr.npy").exists() else None
         self.RELEASE, self.ATLAS = self.release, None
+        self._sorted_ids = None
+
+    def positions(self, ws) -> np.ndarray:
+        """Index row of each work number, -1 when it has no vector (vectorised; the sorted ids, ~1.6 GB, are read once)."""
+        if self._sorted_ids is None:
+            by = np.asarray(self.engine.by_work)
+            self._sorted_ids = np.asarray(self.engine.work_ids)[by]
+            self._by_work = by
+        w = np.asarray(ws, np.int64)
+        if not len(w):
+            return np.zeros(0, np.int64)
+        i = np.minimum(np.searchsorted(self._sorted_ids, w), len(self._sorted_ids) - 1)
+        return np.where(self._sorted_ids[i] == w, self._by_work[i].astype(np.int64), -1)
+
+    def ranked(self, v: np.ndarray, k: int) -> tuple[np.ndarray, np.ndarray]:
+        """The k rows of the whole index highest along v (every list scanned; approximate scores, best first): one
+        query, so the scan is split across the lists (all 125M papers in ~2 s for 300k, ~13 s for 3M)."""
+        import faiss
+        ivf = faiss.extract_index_ivf(self.engine.index)
+        mode, ivf.parallel_mode = ivf.parallel_mode, 1
+        try:
+            D, I = self.engine.index.search(np.asarray(v, np.float32).reshape(1, -1), int(k),
+                                            params=faiss.SearchParametersIVF(nprobe=ivf.nlist))
+        finally:
+            ivf.parallel_mode = mode
+        ok = I[0] >= 0
+        return I[0][ok], D[0][ok]
 
     # the few things topic_service.finish() asks of "api"
     def place_work(self, w: int):
@@ -490,20 +543,54 @@ class Job:
 
 
 def _details(ctx: Ctx, ws) -> dict:
-    out = {}
-    ws = [int(w) for w in ws]
-    for s in range(0, len(ws), 5000):
-        out.update(ctx.engine.details(ws[s:s + 5000]))
+    """Every column of each work (sqlite3.Row-like dicts), by W-number."""
+    return _rows(ctx, ws, "*")
+
+
+def _rows(ctx: Ctx, ws, cols: str, chunk: int = 2000, threads: int = 16) -> dict[int, dict]:
+    """A few columns of many works, by W-number: ids sorted (the table is stored in id order), 16 threads, the base
+    corpus then the daily updates'. ~40k works a second, ~5x _details() (all columns, one thread)."""
+    ws = np.unique(np.asarray(ws, np.int64))
+    names = ["*"] if cols.strip() == "*" else ["id"] + [c.strip() for c in cols.split(",") if c.strip() != "id"]
+    sel = ", ".join(names)
+
+    def one(s0: int) -> list:
+        left, got = ws[s0:s0 + chunk].tolist(), []
+        for c in ctx.engine.dbs():
+            if not left:
+                break
+            cur = c.execute(f"SELECT {sel} FROM works WHERE id IN ({','.join('?' * len(left))})", left)
+            cols_ = [d[0] for d in cur.description]
+            rows = cur.fetchall()
+            got += [(cols_, r) for r in rows]
+            seen = {r[cols_.index("id")] for r in rows}
+            left = [w for w in left if w not in seen]
+        return got
+    out: dict[int, dict] = {}
+    with ThreadPoolExecutor(threads) as ex:
+        for rows in ex.map(one, range(0, len(ws), chunk)):
+            for cols_, r in rows:
+                d = dict(zip(cols_, tuple(r)))
+                out[d["id"]] = d
     return out
 
 
 def _vectors(ctx: Ctx, ws) -> tuple[np.ndarray, np.ndarray]:
-    pos = [ctx.engine.position_of(int(w)) for w in ws]
-    has = np.array([p is not None for p in pos], bool)
-    V = np.zeros((len(ws), 768), np.float32)
+    pos = ctx.positions(ws) if hasattr(ctx, "positions") else \
+        np.array([-1 if (p := ctx.engine.position_of(int(w))) is None else p for w in ws], np.int64)
+    has = pos >= 0
+    V = np.zeros((len(pos), 768), np.float32)
     if has.any():
-        V[has] = unit(ctx.engine.vectors.get(np.array([p for p in pos if p is not None], np.int64)))
+        V[has] = unit(ctx.engine.vectors.get(pos[has]))
     return V, has
+
+
+def _score(model, V: np.ndarray, chunk: int = 200_000) -> np.ndarray:
+    """P(yes) of a fitted logistic regression for many rows (float16 is fine), a chunk at a time (sklearn would
+    copy them all to float64)."""
+    w, b = model.coef_[0].astype(np.float32), float(model.intercept_[0])
+    return np.concatenate([_sigmoid(np.asarray(V[s:s + chunk], np.float32) @ w + b) for s in range(0, len(V), chunk)]) \
+        if len(V) else np.zeros(0)
 
 
 def _plugin_cut(p: np.ndarray) -> tuple[float, float]:
@@ -525,12 +612,12 @@ def _sigmoid(z):
 
 
 def select_field(ctx: Ctx, job: Job, q: str, definition: str | None, keywords: str | None) -> dict:
-    import faiss
     from scipy.optimize import brentq
     from sklearn.linear_model import LogisticRegression
     from srl_search import judges as J
     from srl_search.engine import passes
     from srl_search.scope import NON_PUBLICATION_TYPES
+    import faiss
     eng, cit = ctx.engine, ctx.cit
     faiss.omp_set_num_threads(16)
     local = J.LOCAL                                # the general judge: no paid AI (srl_search/judges.py)
@@ -545,7 +632,7 @@ def select_field(ctx: Ctx, job: Job, q: str, definition: str | None, keywords: s
     bad_types = [i for i, tn in enumerate(cit.types) if tn in NON_PUBLICATION_TYPES]
 
     def texts_of(ws) -> list[str]:
-        det = _details(ctx, ws)
+        det = _rows(ctx, ws, "title, abstract")
         out = []
         for w in ws:
             d = det.get(int(w))
@@ -557,7 +644,7 @@ def select_field(ctx: Ctx, job: Job, q: str, definition: str | None, keywords: s
         return out
 
     def pairs_of(ws) -> list[tuple[str, str | None]]:
-        det = _details(ctx, ws)
+        det = _rows(ctx, ws, "title, abstract")
         out = []
         for w in ws:
             d = det.get(int(w))
@@ -569,7 +656,7 @@ def select_field(ctx: Ctx, job: Job, q: str, definition: str | None, keywords: s
         return out
 
     def publications(ws) -> np.ndarray:
-        det = _details(ctx, ws)
+        det = _rows(ctx, ws, "title, type, is_retracted")
         ok = []
         for w in ws:
             d = det.get(int(w))
@@ -580,12 +667,12 @@ def select_field(ctx: Ctx, job: Job, q: str, definition: str | None, keywords: s
                 ok.append(nd >= 0 and int(cit.kind[nd]) not in bad_types and len(cit.title(nd)) >= 10)
         return np.array(ok, bool)
 
-    def cited_by(ws, k=CITED_K):
+    def cited_by(ws, k=CITED_K, cap=EXPANSION_MAX):
         nodes = cit.nodes(np.unique(np.asarray(ws, np.int64)))
         nodes = nodes[nodes >= 0]
         allrefs = np.concatenate([cit.refs(int(x)) for x in nodes]) if len(nodes) else np.zeros(0, np.uint32)
         u, cnt = np.unique(allrefs, return_counts=True)
-        while (cnt >= k).sum() > EXPANSION_MAX:
+        while (cnt >= k).sum() > cap:
             k += 1
         cn = u[cnt >= k]
         cn = cn[~np.isin(np.asarray(cit.kind[cn]), bad_types)]
@@ -606,20 +693,23 @@ def select_field(ctx: Ctx, job: Job, q: str, definition: str | None, keywords: s
         return LogisticRegression(C=2.0, max_iter=4000).fit(np.concatenate([X, X]), np.r_[np.ones(len(X)), np.zeros(len(X))],
                                                              sample_weight=np.r_[p, 1 - p])
 
-    def proba(model, ws) -> tuple[np.ndarray, np.ndarray]:
+    def proba(model, ws, chunk=250_000) -> tuple[np.ndarray, np.ndarray]:
         out = np.full(len(ws), np.nan)
-        X, has = _vectors(ctx, ws)
-        if has.any():
-            out[has] = model.predict_proba(X[has])[:, 1]
-        return out, has
+        pos = ctx.positions(ws)
+        idx = np.flatnonzero(pos >= 0)
+        for s in range(0, len(idx), chunk):
+            out[idx[s:s + chunk]] = _score(model, unit(eng.vectors.get_many(pos[idx[s:s + chunk]]).astype(np.float32)))
+        return out, pos >= 0
 
     # 1 the teacher, first round: papers spread from the nearest to the farthest of the 300k closest to the topic, and a
-    #   quarter from the works the nearest papers cite (many have only a title: the decider must learn those too)
+    #   quarter from the works the nearest papers cite (many have only a title: the decider must learn those too).
+    #   Each depth stratum's share on topic, times its size, estimates the field's size. A field still going on at
+    #   the edge goes on further: the teacher looks at a ring 4x as deep, again and again (whole index, ~2-60 s a
+    #   search), until the edge is mostly off topic
     t = time.time()
-    job.stage(0, f"gathering the {POOL:,} papers closest to the topic")
+    job.stage(0, f"searching all papers for the {POOL:,} closest to the topic")
     qv = eng.encoder.encode(f"{q}: {definition}" if definition else q)[0]     # "LLM" alone is also a law degree
-    _, ca = eng.index.search(qv.reshape(1, -1), POOL, params=faiss.SearchParametersIVF(nprobe=2048))
-    rows_a = ca[0][ca[0] >= 0]
+    rows_a, _ = ctx.ranked(qv, POOL)
     VA = unit(eng.vectors.get(rows_a))
     wa = np.asarray(eng.work_ids[rows_a], dtype=np.int64)
     o = np.argsort(-(VA @ qv), kind="stable")
@@ -631,19 +721,24 @@ def select_field(ctx: Ctx, job: Job, q: str, definition: str | None, keywords: s
     edges = sorted({0, *[int(n * f) for f in (.002, .004, .007, .01, .017, .025, .035, .05, .07, .1, .14, .2, .27, .4,
                                                 .55, .75)], n})
     per = math.ceil((TEACHER_R1 - n_cited) * 1.25 / (len(edges) - 1))
-    sample, bucket = [], []
+    sample, bucket, strata = [], [], []
     for bi, (lo, hi) in enumerate(zip(edges, edges[1:])):
         if hi > lo:
             pick = rng.choice(np.arange(lo, hi), size=min(per, hi - lo), replace=False)
             sample += idxA[pick].tolist()
             bucket += [bi] * len(pick)
+            strata.append({"ring": 0, "from": lo, "to": hi, "rows": hi - lo})
     sw = wa[sample]
     ok = publications(sw)
+    bucket = np.array(bucket)
+    for bi, st_ in enumerate(strata):
+        m = bucket == bi
+        st_["valid"] = float(ok[m].mean()) if m.any() else 0.0
     keep = rng.choice(np.flatnonzero(ok), size=min(TEACHER_R1 - n_cited, int(ok.sum())), replace=False)
-    sw_pool, bucket = sw[np.sort(keep)], np.array(bucket)[np.sort(keep)]
+    sw_pool, bucket = sw[np.sort(keep)], bucket[np.sort(keep)]
     pre, _ = cited_by(wa[idxA[:5000]])
     pre = np.setdiff1d(pre, wa)
-    _, hv = _vectors(ctx, pre)
+    hv = ctx.positions(pre) >= 0
     title_only, with_vec = pre[~hv], pre[hv]
     pick = list(rng.choice(title_only, size=min(len(title_only), n_cited * 2), replace=False)) + \
         list(rng.choice(with_vec, size=min(len(with_vec), n_cited), replace=False))
@@ -655,7 +750,7 @@ def select_field(ctx: Ctx, job: Job, q: str, definition: str | None, keywords: s
     t_only_set = set(t_only)
     sw_cit = np.array(t_only + [w for w in pick if w not in t_only_set][:n_t - len(t_only)], np.int64)
     sw = np.concatenate([sw_pool, sw_cit])
-    job.stage(0, f"the teacher (Kimi K3) judges {len(sw)} papers")
+    job.stage(0, f"the teacher judges {len(sw)} papers")
     teacher = J.LocalJudge(work / "judge-teacher", say) if local else J.Teacher(TEACHER_USD)
     texts_sw = texts_of(sw)
     t_label = time.time()
@@ -665,44 +760,103 @@ def select_field(ctx: Ctx, job: Job, q: str, definition: str | None, keywords: s
     _spend(job.dir.parent, spent, job.st.get("lane", "free"))
     labels = {int(w): float(x) for w, x in zip(sw, lab) if not math.isnan(x)}
     on_pool = np.nan_to_num(lab[:len(sw_pool)]) >= 0.5
+    for bi, st_ in enumerate(strata):
+        m = bucket == bi
+        st_["on_topic"] = round(float(on_pool[m].mean()), 3) if m.any() else 0.0
+        st_["judged"] = int(m.sum())
     last = bucket == bucket.max()
     tail = float(on_pool[last].mean()) if last.any() else 0.0
     if int(on_pool.sum()) < MIN_ON_TOPIC:
         raise FinalError(f"Only {int(on_pool.sum())} of {len(sw_pool)} papers judged near “{q}” are about it: too few to "
                          "find the field. Phrase the topic as papers about it would, or give a definition.")
+    depth = len(rows_a)
+    ring_w = []
+    while tail > TOO_BROAD_TAIL and depth < GATHER_MAX:
+        nd = min(depth * RING_GROWTH, GATHER_MAX)
+        job.stage(0, f"the field goes on past the {depth:,} closest papers: looking {nd:,} deep")
+        rows, _ = ctx.ranked(qv, nd)
+        if len(rows) <= depth:
+            break
+        cuts = [depth, *[round(depth * (len(rows) / depth) ** (f / 3)) for f in (1, 2)], len(rows)]
+        ring_s, ring_b = [], []
+        for lo, hi in zip(cuts, cuts[1:]):
+            r = rows[np.sort(rng.choice(np.arange(lo, hi), size=min(hi - lo, RING_SAMPLE), replace=False))]
+            ws_ = np.asarray(eng.work_ids[r], dtype=np.int64)
+            ok_ = (ctx.quality.junk(ws_, unit(eng.vectors.get(r))) < 0.5) & publications(ws_)
+            strata.append({"ring": len({s_["ring"] for s_ in strata}), "from": lo, "to": hi, "rows": hi - lo,
+                           "valid": round(float(ok_.mean()), 3)})
+            got = ws_[ok_][:RING_SAMPLE // 3]
+            ring_s += got.tolist()
+            ring_b += [len(strata) - 1] * len(got)
+        del rows
+        ring_s, ring_b = np.array(ring_s, np.int64), np.array(ring_b)
+        t_label = time.time()
+        lab_r = teacher.label(texts_of(ring_s), q, definition)
+        secs.append(round(time.time() - t_label, 1))
+        _spend(job.dir.parent, teacher.usd - spent, job.st.get("lane", "free"))
+        spent = teacher.usd
+        labels.update({int(w): float(x) for w, x in zip(ring_s, lab_r) if not math.isnan(x)})
+        on_r = np.nan_to_num(lab_r) >= 0.5
+        for bi in sorted(set(ring_b.tolist())):
+            m = ring_b == bi
+            strata[bi]["on_topic"] = round(float(on_r[m].mean()), 3)
+            strata[bi]["judged"] = int(m.sum())
+        ring_w += ring_s.tolist()
+        tail = strata[-1].get("on_topic", 0.0)
+        depth = nd
+    sw = np.concatenate([sw, np.array(ring_w, np.int64)])
+    estimate = round(sum(st_["rows"] * st_["valid"] * st_.get("on_topic", 0.0) for st_ in strata))
+    report["gathering"] = {"depth": int(depth), "estimated_papers": int(estimate), "strata": strata}
+    say(f"about {estimate:,} papers by meaning, judging from {len(labels)} answers")
     if tail > TOO_BROAD_TAIL:
-        raise FinalError(f"“{q}” is broader than a whole-field map can hold today: {round(100 * tail)}% of the papers at "
-                         f"the edge of the {POOL:,} closest are still about it. Map a narrower topic, or use the "
-                         "1,000-paper map.")
+        raise FinalError(f"“{q}” is broader than a whole-field map can hold: {round(100 * tail)}% of the papers "
+                         f"{depth:,} deep in meaning are still about it. Map a narrower topic, or use the 1,000-paper map.")
+    if estimate * EARLY_MARGIN > TOO_BROAD_PAPERS:     # said now, not after 20 minutes of judging
+        raise FinalError(f"“{q}” has about {estimate:,} papers: too broad for a whole-field map today (at most "
+                         f"{TOO_BROAD_PAPERS:,}). Map a narrower topic.")
     job.done_stage(0, t)
 
-    # 2 candidates: a classifier on meaning searches a second pool along its direction; the exact phrase; what the
-    #   likely field cites. Then the teacher's second round (active learning): papers this classifier is unsure about,
-    #   where the field's neighbours are (measured: +0.07 F1 for the decider over spreading the same answers)
+    # 2 candidates: a classifier on meaning searches all papers along its direction, as deep as ~3x the field's
+    #   estimated size; the exact phrase; what the likely field cites. Then the teacher's second round (active
+    #   learning): papers this classifier is unsure about, where the field's neighbours are (measured: +0.07 F1 for the
+    #   decider over spreading the same answers)
     t = time.time()
-    job.stage(1, "searching along a first classifier; following citations")
     lr0 = lr_hard(labels)
     wdir = unit(lr0.coef_.astype(np.float32))[0]
-    _, cb = eng.index.search(wdir.reshape(1, -1), POOL, params=faiss.SearchParametersIVF(nprobe=2048))
-    rows_b = np.setdiff1d(cb[0][cb[0] >= 0], rows_a)
-    VB = unit(eng.vectors.get(rows_b)) if len(rows_b) else np.zeros((0, 768), np.float32)
+    k_b = int(min(max(POOL, UNIVERSE_FACTOR * estimate), UNIVERSE_MAX))
+    job.stage(1, f"searching all papers along a first classifier ({k_b:,} deep); following citations")
+    cb, _ = ctx.ranked(wdir, k_b)
+    rows_b = np.setdiff1d(cb, rows_a)
+    del cb
     wb = np.asarray(eng.work_ids[rows_b], dtype=np.int64)
-    okB = ctx.quality.junk(wb, VB) < 0.5 if len(wb) else np.zeros(0, bool)
+    m_a = int(okA.sum())
+    U_V = np.empty((m_a + len(rows_b), 768), np.float16)  # unit vectors of every candidate by meaning, float16
+    U_V[:m_a] = VA[okA]
+    okB = np.zeros(len(rows_b), bool)
+    m = m_a
+    for s0 in range(0, len(rows_b), 250_000):
+        V = unit(eng.vectors.get_many(rows_b[s0:s0 + 250_000]).astype(np.float32))
+        kb = ctx.quality.junk(wb[s0:s0 + 250_000], V) < 0.5
+        okB[s0:s0 + 250_000] = kb
+        U_V[m:m + int(kb.sum())] = V[kb]
+        m += int(kb.sum())
+    U_V = U_V[:m]
     U_w = np.concatenate([wa[okA], wb[okB]])
-    U_V = np.concatenate([VA[okA], VB[okB]])
-    del VA, VB
-    p0 = lr0.predict_proba(U_V)[:, 1]
+    del VA, wb, okB, rows_b
+    p0 = _score(lr0, U_V)
     phrase = keywords or (f'"{q}"' if len(q.split()) <= 6 and not re.search(r'["()*:]|\b(AND|OR|NOT)\b', q) else None)
     H = np.zeros(0, np.int64)
     if phrase:
-        hits, matches, _ = ctx.keywords.search(phrase, 200_000, {}, "all")
+        hits, matches, _ = ctx.keywords.search(phrase, min(max(200_000, k_b // 2), 3_000_000), {}, "all")
         H = np.setdiff1d(np.array([h[0] for h in hits], np.int64), U_w)
+        del hits
         report["phrases"] = {"query": phrase, "matches": int(matches), "outside_pool": int(len(H))}
-    C, k = cited_by(np.concatenate([U_w[p0 >= 0.5], H]))
+    C, k = cited_by(np.concatenate([U_w[p0 >= 0.5], H]), cap=min(max(EXPANSION_MAX, k_b // 2), 3_000_000))
     C = np.setdiff1d(C, np.concatenate([U_w, H]))
     pH0, hH = proba(lr0, H)
     pC0, hC = proba(lr0, C)
-    report["candidates"] = {"pool": int(len(U_w)), "likely_by_first_classifier": int((p0 >= 0.5).sum()),
+    report["candidates"] = {"pool": int(len(U_w)), "searched_along_classifier": k_b,
+                            "likely_by_first_classifier": int((p0 >= 0.5).sum()),
                             "phrase_outside_pool": int(len(H)), "cited_at_least": k, "cited_candidates": int(len(C)),
                             "cited_title_only": int((~hC).sum())}
     vec_w = np.concatenate([U_w, H[hH], C[hC]])
@@ -743,7 +897,8 @@ def select_field(ctx: Ctx, job: Job, q: str, definition: str | None, keywords: s
 
     # 4 the decider judges a balanced set for the students: likely papers, unsure ones, a spread, and cited works
     t = time.time()
-    job.stage(3, f"the decider judges {DECIDER_N:,} papers")
+    dn = int(min(3 * DECIDER_N, max(DECIDER_N, estimate / 50)))   # broad fields are more varied: up to 30k
+    job.stage(3, f"the decider judges {dn:,} papers")
     taken: set[int] = set(labels)
 
     def take(cands, m):
@@ -751,8 +906,8 @@ def select_field(ctx: Ctx, job: Job, q: str, definition: str | None, keywords: s
         out = [cands[i] for i in rng.choice(len(cands), size=min(m, len(cands)), replace=False)] if cands else []
         taken.update(out)
         return out
-    dws = take(U_w[p0 >= 0.5], int(DECIDER_N * .30)) + take(U_w[(p0 > 0.1) & (p0 < 0.9)], int(DECIDER_N * .25)) \
-        + take(U_w, int(DECIDER_N * .15)) + take(C[~hC], int(DECIDER_N * .20)) + take(C[hC], int(DECIDER_N * .10))
+    dws = take(U_w[p0 >= 0.5], int(dn * .30)) + take(U_w[(p0 > 0.1) & (p0 < 0.9)], int(dn * .25)) \
+        + take(U_w, int(dn * .15)) + take(C[~hC], int(dn * .20)) + take(C[hC], int(dn * .10))
     dp = (J.LocalJudge(work / "judge-decider", say).label(texts_of(dws), q, definition) if local
           else J.decider_scores(work / "decider", texts_of(dws), say))
     decided = dict(zip(dws, dp.tolist()))
@@ -767,7 +922,7 @@ def select_field(ctx: Ctx, job: Job, q: str, definition: str | None, keywords: s
     univ = np.concatenate([U_w, H, C])
     lr1 = lr_soft(decided)
     pv = np.full(len(univ), np.nan)
-    pv[:len(U_w)] = lr1.predict_proba(U_V)[:, 1]
+    pv[:len(U_w)] = _score(lr1, U_V)
     pv[len(U_w):len(U_w) + len(H)] = proba(lr1, H)[0]
     pv[len(U_w) + len(H):] = proba(lr1, C)[0]
     del U_V
@@ -819,7 +974,7 @@ def select_field(ctx: Ctx, job: Job, q: str, definition: str | None, keywords: s
     nd_u = cit.nodes(univ)
     cites[nd_u >= 0] = np.asarray(cit.cites)[nd_u[nd_u >= 0]]
     chk = np.flatnonzero((final >= CHECK_BAND[0]) & (final < CHECK_BAND[1]) & (cites >= CHECK_CITES) & ~is_teacher)
-    chk = chk[np.argsort(-cites[chk], kind="stable")]
+    chk = chk[np.argsort(-cites[chk], kind="stable")][:CHECK_MAX]
     job.stage(5, f"Jev checks {len(chk):,} well-cited papers near the cut-off")
     jev = (J.LocalJudge(work / "judge-check", say) if local
            else J.Jev(min(CHECK_USD, max(0.0, BUDGET_USD - FieldStore(job.dir.parent).spent_today()))))
@@ -891,6 +1046,31 @@ class FinalError(Exception):
     """The topic cannot be mapped as a whole field (too broad, too unclear): asking again will not help."""
 
 
+def _lean(m: dict, dirm: Path, name: str) -> dict:
+    """The map to write: as it is up to DISPLAY_MAX papers. Bigger: every paper's group, subgroup, centrality,
+    'between' and position go to dirm/<name>.npz (read=N&part=papers pages through them), and the JSON lists a
+    random sample of each group, in proportion to its size (the dots keep each group's shape and density)."""
+    P = m["papers"]
+    n = len(P["id"])
+    if n <= DISPLAY_MAX:
+        return m
+    num = lambda v: np.array([np.nan if x is None else x for x in v], np.float32)
+    np.savez(dirm / f"{name}.npz", w=np.array([int(x[1:]) for x in P["id"]], np.int64),
+             group=np.array(P["group"], np.int16), sub=np.array(P.get("sub") or [0] * n, np.int16),
+             centrality=np.array(P["centrality"], np.float32), between=np.array(P["between"], bool),
+             x=num(P["x"]), y=num(P["y"]))
+    rng = np.random.default_rng(0)
+    g = np.array(P["group"])
+    keep = np.sort(np.concatenate([rng.choice(ix, size=max(1, round(DISPLAY_MAX * len(ix) / n)), replace=False)
+                                   for ix in (np.flatnonzero(g == v) for v in np.unique(g))]))
+    kl = keep.tolist()
+    lean = {**m, "papers": {k: ([v[i] for i in kl] if isinstance(v, list) and len(v) == n else v) for k, v in P.items()},
+            "papers_shown": {"shown": len(kl), "of": n, "file": f"{name}.npz",
+                             "how": "a random sample of each group, in proportion to its size; every paper of a group: "
+                                    "read=N&part=papers"}}
+    return lean
+
+
 def build_maps(ctx: Ctx, job: Job, sel: dict, version: str) -> dict:
     from srl_search import topics as T
     from srl_search.topic_service import embed_splits, finish
@@ -916,11 +1096,14 @@ def build_maps(ctx: Ctx, job: Job, sel: dict, version: str) -> dict:
         details.append(d)
     score = np.array([sel["papers"][str(int(w))].get("p") or 0.5 for w in ws], np.float32)
     seed = T.Seed(ws, V, has, details, score)
+    T.KNN_WORK.update({"dir": str(job.dir / "work" / "knn"), "say": lambda s_: job.stage(6, s_)})
     seed = seed.subset(T.collapse_versions(seed, cit))
     q = sel["topic"]
     T.PARALLEL_MIN = 1500                              # the worker owns its cores: Leiden runs side by side
+    big_its = 2 if len(seed.wids) > BIG_MAP else -1    # Leiden until nothing changes only on maps that can afford it
     background = ctx.keywords.phrase_counts if ctx.keywords is not None else None
-    raw = T.build(seed, cit, q, T.Options(refs_top=30, workers=LEIDEN_WORKERS, lens_min_score=LENS_MIN_SCORE), background=background)
+    raw = T.build(seed, cit, q, T.Options(refs_top=30, workers=LEIDEN_WORKERS, lens_min_score=LENS_MIN_SCORE,
+                                         iterations=big_its), background=background)
     out = finish(ctx, cit, raw, seed, ctx.release["id"])
     via = sel["papers"]
     out["papers"]["via"] = [via.get(pid[1:], {}).get("via", "") for pid in out["papers"]["id"]]
@@ -940,18 +1123,22 @@ def build_maps(ctx: Ctx, job: Job, sel: dict, version: str) -> dict:
         job.stage(7, f"splitting group {g['id']} ({g['size']:,} papers), {j + 1} of {len(big)}")
         members = [by_w[int(pid[1:])] for pid, gg in zip(out["papers"]["id"], out["papers"]["group"]) if gg == g["id"]]
         sub_seed = seed.subset(np.array(members))
-        sub = T.build(sub_seed, cit, q, T.Options(refs_top=30, min_size=max(8, len(members) // 25), min_groups=2, lens_min_score=LENS_MIN_SCORE,
-                                                  max_groups=8, workers=LEIDEN_WORKERS), background=background)
+        sub = T.build(sub_seed, cit, q, T.Options(refs_top=30, min_size=max(8, len(members) // 25), min_groups=2,
+                                                  lens_min_score=LENS_MIN_SCORE, max_groups=8, workers=LEIDEN_WORKERS,
+                                                  terms_max=100_000, iterations=2 if len(members) > BIG_MAP else -1),
+                      background=background)
         sub = finish(ctx, cit, sub, sub_seed, ctx.release["id"])
         sub["papers"]["via"] = [via.get(pid[1:], {}).get("via", "") for pid in sub["papers"]["id"]]
         sub.update({"question": q, "mode": "field", "filters": {}, "asked_papers": len(members),
                     "parent": {"group": g["id"], "name": g["name"], "label": g.get("label"), "size": g["size"]}})
         usd += label_maps(field_name, sub, parent=(g.get("label") or {}).get("name") or g["name"])
-        _write(dirm / f"group-{g['id']}.json", sub)
+        dirm.mkdir(parents=True, exist_ok=True)
+        _write(dirm / f"group-{g['id']}.json", _lean(sub, dirm, f"papers-group-{g['id']}"))
         splits[g["id"]] = sub
     embed_splits(out, splits)
     out["field"]["labels_usd"] = round(usd, 4)
-    _write(dirm / "main.json", out)                    # last: a version with its main map is complete
+    dirm.mkdir(parents=True, exist_ok=True)
+    _write(dirm / "main.json", _lean(out, dirm, "papers"))   # last: a version with its main map is complete
     job.done_stage(7, t)
     return out
 

@@ -35,6 +35,7 @@ from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from datetime import date
 from functools import lru_cache
+from pathlib import Path
 
 import igraph
 import numpy as np
@@ -43,6 +44,14 @@ from scipy import sparse
 YEAR_NOW = date.today().year
 SURVEY = re.compile(r"\b(survey|review|overview|tutorial|primer)\b", re.I)
 BLOCK = 2000          # rows per block for the big products (memory stays ~linear in n: whole fields are 50k+ papers)
+KNN_EXACT_MAX = 200_000   # exact text neighbours on the CPU up to here (~n^2: 300k papers took 10 min, 2M would take
+                          #   ~7 h); beyond, exact on the field worker's GPU (2M: ~4.5 min), else an inverted-file
+                          #   index (0.97 of the exact neighbours at 300k)
+KNN_NPROBE = 32
+KNN_GPU_MIN = 30_000      # the whole-field worker (KNN_WORK set) uses its GPU from here (112k papers: 90 s -> ~5 s)
+TERMS_MAX = 300_000       # papers whose words name the groups and make the clouds (a random sample beyond)
+PAIR_BUDGET = 2_000_000_000   # paper pairs that coupling may go through (sum over references of cited-by-in-set^2);
+                              #   300k papers needed ~1e9 (45 s). Beyond, the most cited references are left out
 # References that are not reading material: left out of the lenses (they still link papers in the graph).
 NOT_READING = frozenset({"dataset", "paratext", "supplementary-materials", "software", "peer-review", "libguides",
                          "erratum", "retraction"})
@@ -57,6 +66,13 @@ igraph.set_random_number_generator(_RNG)
 @dataclass
 class Options:
     links: str = "hybrid"          # hybrid | refs | text
+    cluster_sample: int = 500_000  # more papers than this: groups found on a random sample of this many (the graph
+                                   #   among them), every other paper joins the group its links weigh most toward.
+                                   #   A 2.2M-paper map's 35 runs took 4 min each; 500k: ~4 s each
+    terms_max: int = TERMS_MAX     # papers whose words name the groups (a random sample beyond)
+    iterations: int = -1           # Leiden iterations per run; -1: until nothing changes. On a 100k-paper field 2
+                                   #   iterations gave the same groups as -1 (ARI 0.97, modularity -0.001) in 1/20 of
+                                   #   the time; two seeds differ far more (ARI 0.54), which the consensus handles
     idf: bool = True               # weight shared references by their rarity in the set
     refs_top: int = 0              # keep each paper's strongest coupling links only (0 = all)
     k_text: int = 15               # neighbours per paper in the text graph
@@ -119,7 +135,13 @@ def collapse_versions(seed: "Seed", cit, threshold: float = 0.95) -> np.ndarray:
         return np.arange(n)
     V = seed.vecs
     pairs = []
-    for start in range(0, n, BLOCK):                  # block by block: never the full n x n matrix
+    if n > KNN_EXACT_MAX:                             # n x n is hours here: copies are among each other's neighbours
+        idx = np.flatnonzero(seed.has_vec)
+        nn, d = knn(np.ascontiguousarray(V[idx], dtype=np.float32), 8)
+        r, c = np.nonzero(1 - d >= threshold)
+        a, b = idx[r], idx[nn[r, c]]
+        pairs = sorted({(int(min(x, y)), int(max(x, y))) for x, y in zip(a.tolist(), b.tolist()) if x != y})
+    for start in range(0, n if n <= KNN_EXACT_MAX else 0, BLOCK):   # block by block: never the full n x n matrix
         B = V[start:start + BLOCK] @ V.T
         r, c = np.nonzero(B >= threshold)
         r = r + start
@@ -176,12 +198,23 @@ def coupling(A: sparse.csr_matrix, idf: bool, top: int = 0) -> sparse.csr_matrix
     if A.shape[1] == 0:
         return sparse.csr_matrix((n, n), dtype=np.float64)
     X = _ref_vectors(A, idf)
+    c = np.diff(A.tocsc().indptr).astype(np.int64)            # papers in the set citing each reference
+    if top and int((c * c).sum()) > PAIR_BUDGET:
+        # the work grows with the square of how many papers share a reference: a field of 2M papers has references
+        # cited by 10^4-10^5 of them. Those carry the least about who works with whom (idf weighs them least), so the
+        # most cited are left out until the budget holds; their papers keep their other references and text links
+        o = np.sort(c)[::-1]
+        excess = np.cumsum((o * o)[::-1])[::-1]                # pairs from this reference and all less cited ones
+        cap = int(o[np.argmax(excess <= PAIR_BUDGET)]) if (excess <= PAIR_BUDGET).any() else 1
+        X = X @ sparse.diags((c <= cap).astype(np.float64))
+        X.eliminate_zeros()
+        COUPLING_INFO.update({"references_left_out": int((c > cap).sum()), "cited_by_more_than": cap})
     if not top:
         S = (X @ X.T).tocsr()
         S.setdiag(0)
         S.eliminate_zeros()
         return S
-    XT = X.T.tocsc()
+    XT = X.T.tocsr()                                   # csr: scipy would convert a csc one for every block
     rows, cols, vals = [], [], []
     for start in range(0, n, BLOCK):
         B = (X[start:start + BLOCK] @ XT).tocsr()
@@ -201,6 +234,52 @@ def coupling(A: sparse.csr_matrix, idf: bool, top: int = 0) -> sparse.csr_matrix
     return K.maximum(K.T).tocsr()
 
 
+COUPLING_INFO: dict = {}
+KNN_WORK: dict = {}       # {"dir": a scratch folder, "say": progress} lets big maps use the GPU (srl_search/field.py)
+
+
+def knn(V: np.ndarray, k: int) -> tuple[np.ndarray, np.ndarray]:
+    """Each row's k nearest other rows by cosine (unit rows): (neighbours, distances). Exact in blocks up to
+    KNN_EXACT_MAX rows; beyond, an inverted-file index with exact distances in the lists probed (~0.95+ of the exact
+    neighbours, measured)."""
+    m = len(V)
+    if KNN_WORK.get("dir") and m >= KNN_GPU_MIN:              # the whole-field worker: exact, on its GPU
+        from srl_search.judges import knn_on_gpu
+        got = knn_on_gpu(V, k, Path(KNN_WORK["dir"]), say=KNN_WORK.get("say", lambda s: None))
+        if got is not None:
+            KNN_WORK["used"] = "gpu-exact"
+            return got
+    nn = np.empty((m, k), np.int64)
+    d = np.empty((m, k), np.float64)
+    if m <= KNN_EXACT_MAX:
+        for start in range(0, m, BLOCK):
+            D = 1 - V[start:start + BLOCK] @ V.T
+            D[np.arange(D.shape[0]), start + np.arange(D.shape[0])] = np.inf
+            part = np.argpartition(D, k, axis=1)[:, :k]
+            nn[start:start + BLOCK] = part
+            d[start:start + BLOCK] = np.take_along_axis(D, part, 1)
+        return nn, d
+    KNN_WORK["used"] = f"ivf-nprobe{KNN_NPROBE}"
+    import faiss
+    nlist = int(4 * math.sqrt(m))
+    ix = faiss.IndexIVFFlat(faiss.IndexFlatIP(V.shape[1]), V.shape[1], nlist, faiss.METRIC_INNER_PRODUCT)
+    rng = np.random.default_rng(0)
+    ix.train(V[np.sort(rng.choice(m, size=min(m, 64 * nlist), replace=False))])
+    ix.add(V)
+    ix.nprobe = KNN_NPROBE
+    for start in range(0, m, 100_000):
+        S, I = ix.search(V[start:start + 100_000], k + 1)
+        own = I == (start + np.arange(len(I)))[:, None]
+        S[own | (I < 0)] = -np.inf                              # itself (and empty slots) last
+        o = np.argsort(-S, axis=1)[:, :k]
+        nn[start:start + len(I)] = np.take_along_axis(I, o, 1)
+        d[start:start + len(I)] = 1 - np.take_along_axis(S, o, 1)
+    bad = nn < 0
+    if bad.any():                                               # too few in the lists probed: a far stand-in
+        nn[bad], d[bad] = np.nonzero(bad)[0], 2.0
+    return nn, d
+
+
 def text_graph(vecs: np.ndarray, has_vec: np.ndarray, k: int) -> sparse.csr_matrix:
     """UMAP's fuzzy k-nearest-neighbour graph over cosine distance, symmetrized (a + b - ab). Exact neighbours,
     computed in blocks of rows (never the full n x n matrix)."""
@@ -211,14 +290,7 @@ def text_graph(vecs: np.ndarray, has_vec: np.ndarray, k: int) -> sparse.csr_matr
         return sparse.csr_matrix((n, n), dtype=np.float64)
     k = min(k, m - 1)
     V = np.ascontiguousarray(vecs[idx], dtype=np.float32)
-    nn = np.empty((m, k), np.int64)
-    d = np.empty((m, k), np.float64)
-    for start in range(0, m, BLOCK):
-        D = 1 - V[start:start + BLOCK] @ V.T
-        D[np.arange(D.shape[0]), start + np.arange(D.shape[0])] = np.inf
-        part = np.argpartition(D, k, axis=1)[:, :k]
-        nn[start:start + BLOCK] = part
-        d[start:start + BLOCK] = np.take_along_axis(D, part, 1)
+    nn, d = knn(V, k)
     rho = d.min(1)
     target = math.log2(k)
     lo, hi = np.full(m, 1e-6), np.full(m, 10.0)
@@ -253,16 +325,23 @@ def build_graph(cit, seed: Seed, opt: Options) -> Graph:
 
 
 # ------------------------------------------------------------------------------------------------ grouping
+def _graph(n: int, E: np.ndarray, w: np.ndarray) -> igraph.Graph:
+    g = igraph.Graph(n=n, edges=E, directed=False)         # an (m, 2) array: no Python list of m pairs
+    g.es["weight"] = w
+    return g
+
+
 def _igraph(W: sparse.csr_matrix) -> igraph.Graph:
     U = sparse.triu(W, k=1).tocoo()
-    g = igraph.Graph(n=W.shape[0], edges=np.column_stack([U.row, U.col]).tolist(), directed=False)
-    g.es["weight"] = U.data.tolist()
-    return g
+    return _graph(W.shape[0], np.column_stack([U.row, U.col]).astype(np.int64), U.data.astype(np.float64))
+
+
+_ITERATIONS = -1                     # set by cluster() for its runs (forked children inherit it)
 
 
 def _leiden(g: igraph.Graph, res: float) -> np.ndarray:
     return np.array(g.community_leiden(objective_function="modularity", weights="weight", resolution=res,
-                                       n_iterations=-1).membership)
+                                       n_iterations=_ITERATIONS).membership)
 
 
 # Leiden runs, each with its own seed (so the result is the same run in sequence or side by side). Big maps (the
@@ -278,7 +357,12 @@ def _seeded_run(args) -> np.ndarray:
     return _leiden(_SHARED["g"], res)
 
 
+RUN_BYTES_PER_EDGE = 60            # a Leiden run's own memory, measured; side-by-side runs are limited to RUN_MEMORY
+RUN_MEMORY = 48 * 2**30
+
+
 def _runs(g: igraph.Graph, jobs: list[tuple[float, int]], workers: int) -> list[np.ndarray]:
+    workers = min(workers, max(1, RUN_MEMORY // max(1, RUN_BYTES_PER_EDGE * (g.ecount() + g.vcount()))))
     if workers <= 1 or g.vcount() < PARALLEL_MIN:
         return [_seeded_run_on(g, r, sd) for r, sd in jobs]
     import multiprocessing as mp
@@ -309,9 +393,56 @@ def cluster(W: sparse.csr_matrix, opt: Options, min_size: int) -> tuple[np.ndarr
     """(group of each paper, 0..G-1 by size, -1 = other papers; agreement of each paper with its group across the
     consensus runs, 0-1; facts about the choice)."""
     n = W.shape[0]
-    g = _igraph(W)
+    if opt.cluster_sample and n > opt.cluster_sample:
+        return _cluster_sampled(W, opt, min_size)
+    return _cluster(W, opt, min_size)
+
+
+def _cluster_sampled(W: sparse.csr_matrix, opt: Options, min_size: int) -> tuple[np.ndarray, np.ndarray, dict]:
+    """Groups of a random sample (the graph among its papers: each keeps ~sample/n of its links, ~20 of ~90 at 2M),
+    then every other paper joins the group its links weigh most toward, twice (the second time counting papers placed
+    the first). Agreement of a placed paper: the share of its link weight going to its group."""
+    n = W.shape[0]
+    rng = np.random.default_rng(opt.seed)
+    S = np.sort(rng.choice(n, size=opt.cluster_sample, replace=False))
+    gs, ags, info = _cluster(W[S][:, S].tocsr(), opt, max(2, round(min_size * len(S) / n)))
+    G = int(gs.max()) + 1 if (gs >= 0).any() else 0
+    group = np.full(n, -1, np.int64)
+    agree = np.zeros(n)
+    group[S], agree[S] = gs, ags
+    rest = np.setdiff1d(np.arange(n), S)
+    if G:
+        for _ in range(2):
+            known = np.flatnonzero(group >= 0)
+            onehot = sparse.csr_matrix((np.ones(len(known)), (known, group[known])), shape=(n, G))
+            V = (W[rest] @ onehot).toarray()
+            tot = V.sum(1)
+            best = V.argmax(1)
+            ok = tot > 0
+            group[rest] = np.where(ok, best, -1)
+            agree[rest] = np.where(ok, V[np.arange(len(rest)), best] / np.maximum(tot, 1e-12), 0.0)
+    # groups by size again, the small ones ("other papers") as in _cluster
+    sizes = Counter(group[group >= 0].tolist())
+    order = [c for c, s_ in sorted(sizes.items(), key=lambda x: (-x[1], x[0])) if s_ >= min_size]
+    remap = np.full(max(G, 1), -1, np.int64)
+    remap[order] = np.arange(len(order))
+    group = np.where(group >= 0, remap[np.maximum(group, 0)], -1)
+    info = {**info, "sample": int(len(S)), "placed_by_links": int((group[rest] >= 0).sum()),
+            "consensus_agreement": round(float(agree[group >= 0].mean()), 3) if (group >= 0).any() else None}
+    return group, agree, info
+
+
+def _cluster(W: sparse.csr_matrix, opt: Options, min_size: int) -> tuple[np.ndarray, np.ndarray, dict]:
+    global _ITERATIONS
+    n = W.shape[0]
+    U = sparse.triu(W, k=1).tocoo()
+    E = np.column_stack([U.row, U.col]).astype(np.int64)
+    w = U.data.astype(np.float64)
+    del U
+    g = _graph(n, E, w)
     workers = opt.workers
     with _CLUSTER_LOCK:
+        _ITERATIONS = opt.iterations
         _RNG.seed(opt.seed)
         scan = []
         jobs = [(res, opt.seed * 1000 + 10 * i + k) for i, res in enumerate(opt.resolutions) for k in range(opt.scan_runs)]
@@ -325,8 +456,6 @@ def cluster(W: sparse.csr_matrix, opt: Options, min_size: int) -> tuple[np.ndarr
         # (measured: choosing by it made the groups depend on the random seed, ARI 0.50 between seeds).
         pick = min(scan, key=lambda s: (abs(s["groups"] - opt.target_groups), s["resolution"]))
         ri = list(opt.resolutions).index(pick["resolution"])
-        E = np.array(g.get_edgelist(), dtype=np.int64).reshape(-1, 2)
-        w = np.asarray(g.es["weight"], dtype=np.float64)
         while True:
             res = opt.resolutions[ri]
             runs = _runs(g, [(res, opt.seed * 1000 + 500 + 50 * ri + k) for k in range(opt.runs)], workers)
@@ -335,27 +464,28 @@ def cluster(W: sparse.csr_matrix, opt: Options, min_size: int) -> tuple[np.ndarr
                 together += m[E[:, 0]] == m[E[:, 1]]
             frac = together / len(runs)
             keep = frac >= 0.5
-            h = igraph.Graph(n=n, edges=E[keep].tolist(), directed=False)
-            h.es["weight"] = (frac[keep] * w[keep]).tolist()
+            h = _graph(n, E[keep], frac[keep] * w[keep])
             final = _seeded_run_on(h, res, opt.seed * 1000 + 999)
             if _big(final, min_size) <= opt.max_groups or ri == 0:
                 break
             ri -= 1                                  # too many groups for one screen: one step coarser
         pick = next(s for s in scan if s["resolution"] == res)
+        _ITERATIONS = -1
     sizes = Counter(final.tolist())
     order = [c for c, s in sorted(sizes.items(), key=lambda x: (-x[1], x[0])) if s >= min_size]
     remap = {c: i for i, c in enumerate(order)}
     group = np.array([remap.get(c, -1) for c in final.tolist()])
     # agreement: in how many runs the paper sat in the run-cluster that holds most of its final group
     agree = np.zeros(n)
+    G_ = int(group.max()) + 1 if (group >= 0).any() else 0
     for m in runs:
-        best_of = {}
-        for c in set(group.tolist()) - {-1}:
+        best_of = np.full(max(G_, 1), -1, np.int64)
+        for c in range(G_):
             vals, cnt = np.unique(m[group == c], return_counts=True)
             best_of[c] = vals[np.argmax(cnt)]
-        agree += np.array([group[i] >= 0 and m[i] == best_of[group[i]] for i in range(n)])
+        agree += (group >= 0) & (m == best_of[np.maximum(group, 0)])
     agree /= len(runs)
-    info = {"resolution": res, "scan": scan, "runs": opt.runs, "seed": opt.seed,
+    info = {"resolution": res, "scan": scan, "runs": opt.runs, "seed": opt.seed, "iterations": opt.iterations,
             "stability": pick["stability"], "consensus_agreement": round(float(agree[group >= 0].mean()), 3) if (group >= 0).any() else None}
     return group, agree, info
 
@@ -861,10 +991,14 @@ def build(seed: Seed, cit, query: str = "", opt: Options | None = None, backgrou
 
     t = time.perf_counter()
     surfaces: dict = {}
-    terms = [doc_terms(d.get("title"), d.get("abstract"), surfaces) for d in seed.details]
-    counts = group_counts(terms, group, G)
-    names = name_groups(terms, group, G, query, surfaces, counts)
-    clouds = group_clouds(terms, group, G, query, surfaces, counts)
+    # the words of up to TERMS_MAX papers (a random sample beyond: shares of 300k papers are as good as of 2M,
+    #   and reading every abstract of 2M papers takes ~15 min on one core)
+    ti = np.arange(n) if n <= opt.terms_max else np.sort(np.random.default_rng(opt.seed).choice(n, opt.terms_max, replace=False))
+    terms = [doc_terms(seed.details[i].get("title"), seed.details[i].get("abstract"), surfaces) for i in ti]
+    gt = group[ti]
+    counts = group_counts(terms, gt, G)
+    names = name_groups(terms, gt, G, query, surfaces, counts)
+    clouds = group_clouds(terms, gt, G, query, surfaces, counts)
     timing["names_ms"] = round((time.perf_counter() - t) * 1000)
     t = time.perf_counter()
     cloud = topic_cloud(terms, query, surfaces, counts[0], background)

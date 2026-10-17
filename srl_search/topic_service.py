@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import os
 import re
 import shutil
@@ -374,18 +375,49 @@ class TopicService:
                 lenses.setdefault(k, []).append(q)
             res.update({"page": page, "pages": len(pages), "lenses": lenses})
             return res
-        P = out["papers"]
-        members = [i for i, gg in enumerate(P["group"]) if gg == group]
-        cen = P.get("centrality") or [0] * len(P["id"])
-        members.sort(key=lambda i: (-cen[i], i))
-        det = eng.details([int(P["id"][i][1:]) for i in members])
-        rows = [{**self._paper(int(P["id"][i][1:]), det, abstracts), "centrality": cen[i], "between": P["between"][i],
-                 "rank": n} for n, i in enumerate(members, 1) if int(P["id"][i][1:]) in det]
-        pages = paginate([size_of(r) for r in rows])
-        if not 1 <= page <= len(pages):
-            raise HTTPException(404, f"group {group} has {len(pages)} pages of papers")
-        res.update({"page": page, "pages": len(pages), "total": len(rows),
-                    "papers": [rows[i] for i in pages[page - 1]]})
+        shown = out.get("papers_shown") or {}
+        if shown.get("source"):                        # a big whole-field map: every paper is in its .npz
+            z = np.load(self.field_store().root / shown["source"])
+            wids, cen_a, btw_a = z["w"], z["centrality"], z["between"]
+            members = np.flatnonzero(z["group"] == group)
+            members = members[np.lexsort((members, -cen_a[members]))].tolist()
+            wid, cen, btw = (lambda i: int(wids[i])), (lambda i: float(cen_a[i])), (lambda i: bool(btw_a[i]))
+        else:
+            P = out["papers"]
+            members = [i for i, gg in enumerate(P["group"]) if gg == group]
+            cen_l = P.get("centrality") or [0] * len(P["id"])
+            members.sort(key=lambda i: (-cen_l[i], i))
+            wid, cen, btw = (lambda i: int(P["id"][i][1:])), (lambda i: cen_l[i]), (lambda i: P["between"][i])
+        # pages filled in order (as paginate), the details read 500 papers at a time and only as far as the page
+        # asked for: a group of a big map has hundreds of thousands
+        done, cur, used, rank, n_rows, finished = [], [], 0, 0, 0, True
+        for s0 in range(0, len(members), 500):
+            chunk = members[s0:s0 + 500]
+            det = eng.details([wid(i) for i in chunk])
+            for i in chunk:
+                rank += 1
+                if wid(i) not in det:
+                    continue
+                r = {**self._paper(wid(i), det, abstracts), "centrality": cen(i), "between": btw(i), "rank": rank}
+                sz = size_of(r)
+                if cur and used + sz > PAGE_CHARS:
+                    done.append(cur)
+                    cur, used = [], 0
+                cur.append(r)
+                used += sz
+                n_rows += 1
+            if len(done) >= page and s0 + 500 < len(members):
+                finished = False
+                break
+        if cur or not done:
+            done.append(cur)
+        pages = len(done) if finished else max(page + 1, math.ceil(len(members) / max(1, n_rows / len(done))))
+        if not 1 <= page <= len(done):
+            raise HTTPException(404, f"group {group} has {pages} pages of papers")
+        res.update({"page": page, "pages": pages, "total": n_rows if finished else len(members),
+                    "papers": done[page - 1]})
+        if not finished:
+            res["pages_estimated"] = True
         return res
 
     def _paper(self, w: int, det: dict, abstracts: str = "full") -> dict:
