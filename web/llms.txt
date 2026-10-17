@@ -149,9 +149,9 @@ reaches classics without abstracts), judged by our own small AI model (one 0.8B 
 85,000 judgments by larger models over ~660 topic families) and fast classifiers it teaches for the topic, with
 citation signals; the model rechecks the well-cited papers they are unsure about; then mapped into groups and
 subgroups (groups of 300+ papers are pre-split: `group=N&scope=field`, and inside those, subgroups of 1,500+
-papers are split once more, in each subgroup's `subgroups`). Any size up to a few million papers: the search looks
-as deep as the field goes. Give a `definition` when the words are ambiguous ("LLM" is also a law degree). Made once
-by a background job (15-30 minutes for most topics; ~1 hour for 200-600k papers; a few hours for ~2 million), then
+papers are split once more, in each subgroup's `subgroups`). Any size up to 1,000,000 papers: the search looks as
+deep as the field goes. Give a `definition` when the words are ambiguous ("LLM" is also a law degree). Made once
+by a background job (15-30 minutes for most topics; ~1 hour for 200-600k papers; up to ~2 hours near the limit), then
 kept across data updates and instant for everyone. Maps of more than 25,000 papers list a random sample of each
 group in `papers` (`papers_shown` says how many of how many); every paper of a group is in
 `read=N&part=papers`; while it waits or is being made the answer is **HTTP 202** with `progress`
