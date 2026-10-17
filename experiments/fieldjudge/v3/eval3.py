@@ -198,7 +198,7 @@ def main(name, model, legacy=False):
     if not dst.exists():
         new = [r for r in rows if "legacy_system" not in r]
         src.write_text("".join(json.dumps({"user": r["user"], "answers": r["answers"]}) + "\n" for r in new))
-        J.wait_for_gpu(9000, print)
+        J.wait_for_gpu(int(os.environ.get("FJ3_GATE", "9000")), print)
         J.run([VPY, str(HERE / "vllm_classify.py"), str(model), str(src), str(dst), J.GPU], OUT / f"{name}.log",
               env={"HF_HUB_OFFLINE": "1"})
         if legacy:                                         # round-2 yes/no in its own prompt

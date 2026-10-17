@@ -12,7 +12,7 @@ for size in ${FJ3_SIZES:-0.8B 2B}; do
  out="$OUT/$size"
  [ -f "$out/DONE.json" ] && continue
  while true; do
-  "$PY" ../gate.py 10000
+  "$PY" ../gate.py "${FJ3_GATE:-9000}"
   code=0
   "$PY" train3.py --base "$D/v2/models/$size/merged" --out "$out" || code=$?
   case "$code" in
