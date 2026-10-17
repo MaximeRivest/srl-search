@@ -307,7 +307,9 @@ LOCAL = os.environ.get("SRL_FIELD_JUDGE", "local") != "paid" and (JUDGE_MODEL / 
 def _vllm(model: Path, rows_file: Path, out: Path, log: Path, say) -> np.ndarray:
     vpy = os.environ.get("SRL_VLLM_PYTHON") or "python"
     args = [vpy, str(Path(__file__).with_name("vllm_decider.py")), str(model), str(rows_file), str(out), GPU]
-    wait_for_gpu(10000, say)
+    # 9 GB: the household services on GPU 1 hold ~14.4 of 24 GB since 2026-10-16, leaving 9.5-10.3; vLLM then takes
+    # ~20% of the card (measured: 3,000 papers in 74 s with start-up). 10 GB made maps wait for hours
+    wait_for_gpu(9000, say)
     try:
         run(args, log)
     except RuntimeError:                        # a household service grew under it: once more, smaller

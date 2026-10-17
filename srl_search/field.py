@@ -99,6 +99,8 @@ EXPANSION_MAX = 300_000
 BAND = (0.1, 0.9)                        # the vector student is unsure here: the text student judges too
 TOO_BROAD_TAIL = 0.30                    # share on topic among the farthest of the 300k: the field goes on beyond
 TOO_BROAD_PAPERS = int(os.environ.get("SRL_FIELD_MAX_PAPERS", "150000"))   # largest field mapped
+BIG_FIELD = 300_000                      # estimated papers: a big field waits until the smaller free maps are made
+SECONDS_PER_PAPER = 0.005                # a big field's extra time (measured: 190k ~40 min, 637k ~70 min)
 EARLY_MARGIN = 0.7                       # refused at once when even 70% of the first estimate is over the limit
 DISPLAY_MAX = 25_000                     # papers listed in a map's JSON; a bigger map keeps every one in a .npz beside
                                          #   it (the page draws ~4,000 dots; 2M papers in JSON would be ~100 MB)
@@ -232,7 +234,9 @@ class FieldStore:
             elif st.get("status") == "queued":
                 waiting.append({"key": k, "st": st, "lane": self.lane(k, st)})
         prio = {"paid": 0, "rebuild": 1, "free": 1}
-        waiting.sort(key=lambda j: (prio[j["lane"]], _ts((self.paid(j["key"]) or {}).get("paid_at"))
+        # big free fields go after the smaller free maps (one would hold the line for hours)
+        waiting.sort(key=lambda j: (prio[j["lane"]], j["lane"] == "free" and bool(j["st"].get("big")),
+                                    _ts((self.paid(j["key"]) or {}).get("paid_at"))
                                     if j["lane"] == "paid" else _ts(j["st"].get("created"))))
         t = now + (running["left"] if running else 60)       # a worker starting loads ~15 GB first (~1 min)
         from srl_search import judges as J
@@ -251,7 +255,7 @@ class FieldStore:
             todo.remove(pick)
             if pick["lane"] == "free":
                 free_left -= unit
-            dur = job_seconds(pick["st"].get("kind"))
+            dur = job_seconds(pick["st"].get("kind"), pick["st"].get("big"))
             out.append({**pick, "start": t, "ready": t + dur})
             t += dur
         paid_ahead = sum(job_seconds(j["st"].get("kind")) for j in out if j["lane"] == "paid")
@@ -413,9 +417,11 @@ class FieldStore:
 STAGES_TOTAL = sum(s for _, s in STAGES)
 
 
-def job_seconds(kind: str | None) -> int:
-    """Typical length: a new field runs every stage; a map job (the field kept, the map code changed) the last two."""
-    return sum(s for _, s in STAGES[6:]) if kind == "map" else STAGES_TOTAL
+def job_seconds(kind: str | None, big: int | None = None) -> int:
+    """Typical length: a new field runs every stage; a map job (the field kept, the map code changed) the last two.
+    big: the estimated papers of a big field (job.json "big"), which takes longer."""
+    base = sum(s for _, s in STAGES[6:]) if kind == "map" else STAGES_TOTAL
+    return round(base + SECONDS_PER_PAPER * (big or 0))
 
 
 def pending_text(st: dict, q: str, base: str) -> str:
@@ -531,8 +537,9 @@ class Job:
 
     def stage(self, i: int, detail: str = "") -> None:
         name, _ = STAGES[i]
+        scale = job_seconds(self.st.get("kind"), self.st.get("big")) / job_seconds(self.st.get("kind"))
         self.st.update({"status": "running", "stage": name, "stage_index": i, "detail": detail,
-                        "eta_s": sum(s for _, s in STAGES[i:]), "updated": _now()})
+                        "eta_s": round(scale * sum(s for _, s in STAGES[i:])), "updated": _now()})
         self.st.setdefault("started", _now())
         self.st.setdefault("stage_seconds", {})
         _write(self.dir / "job.json", self.st)
@@ -814,6 +821,15 @@ def select_field(ctx: Ctx, job: Job, q: str, definition: str | None, keywords: s
     if estimate * EARLY_MARGIN > TOO_BROAD_PAPERS:     # said now, not after 20 minutes of judging
         raise FinalError(f"“{q}” has about {estimate:,} papers: too broad for a whole-field map today (at most "
                          f"{TOO_BROAD_PAPERS:,}). Map a narrower topic.")
+    if estimate > BIG_FIELD and not job.st.get("big"):
+        job.st["big"] = int(estimate)
+        _write(job.dir / "job.json", job.st)
+        if job.st.get("lane", "free") == "free":
+            others = [k for k in FieldStore(job.dir.parent).queued() if k != job.key and
+                      (_read(job.dir.parent / k / "job.json") or {}).get("status") == "queued" and
+                      not (_read(job.dir.parent / k / "job.json") or {}).get("big")]
+            if others:
+                raise Deferred(estimate)
     job.done_stage(0, t)
 
     # 2 candidates: a classifier on meaning searches all papers along its direction, as deep as ~3x the field's
@@ -1042,6 +1058,10 @@ def _citation_features(cit, univ: np.ndarray, score: np.ndarray, student_logit: 
                             (nref == 0).astype(float)])
 
 
+class Deferred(Exception):
+    """A big field found while smaller free maps wait: it goes back in the line, after them (~2 min were spent)."""
+
+
 class FinalError(Exception):
     """The topic cannot be mapped as a whole field (too broad, too unclear): asking again will not help."""
 
@@ -1069,6 +1089,90 @@ def _lean(m: dict, dirm: Path, name: str) -> dict:
                              "how": "a random sample of each group, in proportion to its size; every paper of a group: "
                                     "read=N&part=papers"}}
     return lean
+
+
+SPLIT_PARALLEL = int(os.environ.get("SRL_FIELDS_SPLIT_PARALLEL", "3"))   # groups split side by side (forked)
+SPLIT3_MIN = 1500                        # a subgroup this big is split once more: its own groups show inside it on
+                                         #   the group's page (a third level; 2M papers: 19 groups, ~150 subgroups)
+
+
+def _memory_ok(n: int) -> bool:
+    """Room for one more forked split of n papers: ~6 GB + 40 KB a paper (measured peaks), in the machine and in
+    this service's memory limit."""
+    need = 6 * 2**30 + 40_000 * n
+    try:
+        avail = int(next(l for l in open("/proc/meminfo") if l.startswith("MemAvailable")).split()[1]) * 1024
+    except (OSError, StopIteration, ValueError):
+        avail = 0
+    ok = avail - need > 20 * 2**30                    # the household's services keep 20 GB
+    try:
+        cg = Path("/sys/fs/cgroup") / open("/proc/self/cgroup").read().strip().split("::")[-1].lstrip("/")
+        mx = (cg / "memory.max").read_text().strip()
+        if mx != "max":
+            cur = int((cg / "memory.current").read_text())
+            stat = dict(l.split() for l in (cg / "memory.stat").read_text().splitlines())
+            used = cur - int(stat.get("inactive_file", 0)) - int(stat.get("active_file", 0)) // 2
+            ok = ok and used + need < int(mx) * 0.9
+    except (OSError, ValueError, IndexError):
+        pass
+    return ok
+
+
+def _after_fork(ctx: Ctx) -> None:
+    """A forked child cannot use the parent's thread pools (their threads do not exist in it) or its SQLite
+    connections (shared file state); OpenMP after fork can hang, so faiss gets one thread."""
+    import faiss
+    import threading as th
+    from concurrent.futures import ThreadPoolExecutor as TPE
+    faiss.omp_set_num_threads(1)
+    ctx.engine.local = th.local()
+    ctx.engine.vectors._pool = TPE(32)
+
+
+def _split_group(sc: dict, g: dict, rows: np.ndarray, workers: int) -> None:
+    """Group g of the map split into its own groups, and each of those of SPLIT3_MIN+ papers once more (embedded in
+    it). Writes the map (dirm/group-N.json, lean), and for the parent the groups and every paper's subgroup
+    (scratch/split-N.json, .npz)."""
+    from srl_search import topics as T
+    from srl_search.topic_service import embed_splits, finish
+    ctx, cit, q, via = sc["ctx"], sc["ctx"].cit, sc["q"], sc["via"]
+    if T.KNN_WORK.get("dir"):                          # its own scratch folder for the GPU neighbours
+        T.KNN_WORK["dir"] = str(Path(T.KNN_WORK["dir"]).parent / f"knn-group-{g['id']}")
+        T.KNN_WORK["say"] = lambda s_: None
+    seed = sc["seed"].subset(rows)
+    n = len(rows)
+
+    def sub_map(sd, min_size, parent, name_parent):
+        m = T.build(sd, cit, q, T.Options(refs_top=30, min_size=min_size, min_groups=2, lens_min_score=LENS_MIN_SCORE,
+                                          max_groups=8, workers=workers, terms_max=100_000,
+                                          iterations=2 if len(sd.wids) > BIG_MAP else -1), background=sc["background"])
+        m = finish(ctx, cit, m, sd, ctx.release["id"])
+        m["papers"]["via"] = [via.get(pid[1:], {}).get("via", "") for pid in m["papers"]["id"]]
+        m.update({"question": q, "mode": "field", "filters": {}, "asked_papers": len(sd.wids), "parent": parent})
+        return m, label_maps(sc["field_name"], m, parent=name_parent)
+    name = (g.get("label") or {}).get("name") or g["name"]
+    sub, usd = sub_map(seed, max(8, n // 25), {"group": g["id"], "name": g["name"], "label": g.get("label"),
+                                               "size": g["size"]}, name)
+    by_w = {int(w): i for i, w in enumerate(seed.wids)}
+    sg = np.array(sub["papers"]["group"])
+    third = {}
+    for s_ in sub["groups"]:
+        if s_["size"] < SPLIT3_MIN:
+            continue
+        members = np.array([by_w[int(pid[1:])] for pid, gg in zip(sub["papers"]["id"], sg) if gg == s_["id"]])
+        sname = (s_.get("label") or {}).get("name") or s_["name"]
+        m3, u3 = sub_map(seed.subset(members), max(8, len(members) // 20),
+                         {"group": s_["id"], "name": s_["name"], "label": s_.get("label"), "size": s_["size"]},
+                         f"{name} › {sname}")
+        usd += u3
+        third[s_["id"]] = m3
+    embed_splits(sub, third)
+    _write(sc["dirm"] / f"group-{g['id']}.json", _lean(sub, sc["dirm"], f"papers-group-{g['id']}"))
+    np.savez(sc["scratch"] / f"split-{g['id']}.npz", w=np.array([int(x[1:]) for x in sub["papers"]["id"]], np.int64),
+             group=np.array(sub["papers"]["group"], np.int16))
+    from srl_search.topic_service import SUB_KEYS
+    _write(sc["scratch"] / f"split-{g['id']}.json", {"groups": [{k: x.get(k) for k in SUB_KEYS} for x in sub["groups"]],
+                                                     "coverage": {"other": sub["coverage"]["other"]}, "usd": usd})
 
 
 def build_maps(ctx: Ctx, job: Job, sel: dict, version: str) -> dict:
@@ -1116,25 +1220,59 @@ def build_maps(ctx: Ctx, job: Job, sel: dict, version: str) -> dict:
     job.done_stage(6, t)
 
     t = time.time()
-    big = [g for g in out["groups"] if g["size"] >= SPLIT_MIN]
-    splits = {}
+    big = sorted([g for g in out["groups"] if g["size"] >= SPLIT_MIN], key=lambda g: -g["size"])
     by_w = {int(w): i for i, w in enumerate(seed.wids)}
-    for j, g in enumerate(big):
-        job.stage(7, f"splitting group {g['id']} ({g['size']:,} papers), {j + 1} of {len(big)}")
-        members = [by_w[int(pid[1:])] for pid, gg in zip(out["papers"]["id"], out["papers"]["group"]) if gg == g["id"]]
-        sub_seed = seed.subset(np.array(members))
-        sub = T.build(sub_seed, cit, q, T.Options(refs_top=30, min_size=max(8, len(members) // 25), min_groups=2,
-                                                  lens_min_score=LENS_MIN_SCORE, max_groups=8, workers=LEIDEN_WORKERS,
-                                                  terms_max=100_000, iterations=2 if len(members) > BIG_MAP else -1),
-                      background=background)
-        sub = finish(ctx, cit, sub, sub_seed, ctx.release["id"])
-        sub["papers"]["via"] = [via.get(pid[1:], {}).get("via", "") for pid in sub["papers"]["id"]]
-        sub.update({"question": q, "mode": "field", "filters": {}, "asked_papers": len(members),
-                    "parent": {"group": g["id"], "name": g["name"], "label": g.get("label"), "size": g["size"]}})
-        usd += label_maps(field_name, sub, parent=(g.get("label") or {}).get("name") or g["name"])
-        dirm.mkdir(parents=True, exist_ok=True)
-        _write(dirm / f"group-{g['id']}.json", _lean(sub, dirm, f"papers-group-{g['id']}"))
-        splits[g["id"]] = sub
+    gid = np.array(out["papers"]["group"])
+    rows_of = {g["id"]: np.array([by_w[int(pid[1:])] for pid, gg in zip(out["papers"]["id"], gid) if gg == g["id"]])
+               for g in big}
+    dirm.mkdir(parents=True, exist_ok=True)
+    scratch = job.dir / "work" / "splits"
+    scratch.mkdir(parents=True, exist_ok=True)
+    ctx_split = {"ctx": ctx, "seed": seed, "q": q, "via": via, "field_name": field_name, "background": background,
+                 "dirm": dirm, "scratch": scratch}
+    done: dict[int, dict] = {}
+    left = [g for g in big]
+    running: dict[int, tuple] = {}                     # pid -> (group, started)
+    par = SPLIT_PARALLEL if len(big) > 1 else 1
+    while left or running:
+        while left and len(running) < par and (not running or _memory_ok(len(rows_of[left[0]["id"]]))):
+            g = left.pop(0)
+            if par == 1:
+                _split_group(ctx_split, g, rows_of[g["id"]], LEIDEN_WORKERS)
+                done[g["id"]] = _read(scratch / f"split-{g['id']}.json")
+                continue
+            pid = os.fork()
+            if pid == 0:                               # the child: one group's submap, then it leaves at once
+                code = 1
+                try:
+                    _after_fork(ctx)
+                    _split_group(ctx_split, g, rows_of[g["id"]], max(4, LEIDEN_WORKERS // par))
+                    code = 0
+                except BaseException:  # noqa: BLE001
+                    traceback.print_exc()
+                finally:
+                    os._exit(code)
+            running[pid] = (g, time.time())
+        job.stage(7, f"splitting groups: {len(done)} of {len(big)} done"
+                     + (", now " + ", ".join(f"group {g['id']} ({g['size']:,})" for g, _ in running.values()) if running else ""))
+        if running:
+            pid, status = os.wait()
+            g, _ = running.pop(pid, (None, None))
+            if g is None:
+                continue
+            res = _read(scratch / f"split-{g['id']}.json") if os.waitstatus_to_exitcode(status) == 0 else None
+            if res is None:                            # killed (memory) or failed: once more, alone, in this process
+                print(f"split of group {g['id']} failed in a child; again here", flush=True)
+                _split_group(ctx_split, g, rows_of[g["id"]], LEIDEN_WORKERS)
+                res = _read(scratch / f"split-{g['id']}.json")
+            done[g["id"]] = res
+    splits = {}
+    for g in big:
+        res = done[g["id"]]
+        z = np.load(scratch / f"split-{g['id']}.npz")
+        splits[g["id"]] = {"groups": res["groups"], "coverage": res["coverage"],
+                           "papers": {"id": [f"W{w}" for w in z["w"].tolist()], "group": z["group"].tolist()}}
+        usd += res["usd"]
     embed_splits(out, splits)
     out["field"]["labels_usd"] = round(usd, 4)
     dirm.mkdir(parents=True, exist_ok=True)
@@ -1195,6 +1333,9 @@ def run_job(ctx: Ctx, store: Path, key: str) -> None:
         job.st.update({"status": "done", "finished": _now(), "eta_s": 0, "detail": "",
                        "summary": {"papers": sel["report"]["papers"], "groups": len(out["groups"]),
                                    "usd": sel["report"].get("usd", sel["report"].get("teacher_usd", sel["report"].get("jev", {}).get("usd")))}})
+    except Deferred as e:
+        job.st.update({"status": "queued", "stage": None, "stage_index": 0, "eta_s": job_seconds("full", job.st["big"]),
+                       "detail": f"a big field (about {int(e.args[0]):,} papers): made after the smaller maps waiting"})
     except FinalError as e:
         job.st.update({"status": "failed", "final": True, "error": str(e), "finished": _now()})
     except Exception as e:  # noqa: BLE001
@@ -1248,7 +1389,7 @@ def worker(store: Path = ROOT) -> None:
                 print(f"job {key}: paid, failed ({st.get('error')}); once more", flush=True)
                 st.update({"status": "queued", "retried": True, "error": None})
                 _write(store / key / "job.json", st)
-            else:
+            elif st.get("status") != "queued":         # queued again: a big field deferred (Deferred)
                 (store / "queue" / f"{key}.job").unlink(missing_ok=True)
 
 

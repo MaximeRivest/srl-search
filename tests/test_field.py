@@ -218,3 +218,40 @@ def test_general_judge_quota_counts_free_maps_made_today(tmp_path, monkeypatch):
     monkeypatch.setattr(F, "FREE_PER_DAY", 3)
     pl = st.plan()
     assert pl["waiting"][0]["start"] - pl["now"] < 120
+
+
+def test_a_big_free_field_goes_after_the_smaller_maps_and_says_how_long(tmp_path, monkeypatch):
+    from srl_search import judges as J
+    monkeypatch.setattr(J, "LOCAL", True)
+    st = F.FieldStore(tmp_path)
+    for q in ("big topic", "small topic"):
+        _ask(st, q)
+    kb = F.field_key("big topic")
+    j = json.loads((tmp_path / kb / "job.json").read_text())
+    j["big"] = 2_000_000                                        # found by its selection, then deferred
+    (tmp_path / kb / "job.json").write_text(json.dumps(j))
+    pl = st.plan()
+    assert [w["key"] for w in pl["waiting"]] == [F.field_key("small topic"), kb]
+    big = pl["waiting"][1]
+    assert big["ready"] - big["start"] == F.job_seconds("full", 2_000_000) > 2 * F.job_seconds("full")
+
+
+def test_worker_keeps_a_deferred_field_in_the_line(tmp_path, monkeypatch):
+    st = F.FieldStore(tmp_path)
+    for q in ("big topic", "small topic"):
+        _ask(st, q)
+    kb, ks = F.field_key("big topic"), F.field_key("small topic")
+    runs = []
+
+    def fake_run(ctx, store, k):
+        runs.append(k)
+        j = json.loads((store / k / "job.json").read_text())
+        if k == kb and not j.get("big"):                       # as run_job does on Deferred
+            j.update({"status": "queued", "big": 900_000})
+        else:
+            j.update({"status": "done", "finished": F._now()})
+        (store / k / "job.json").write_text(json.dumps(j))
+    monkeypatch.setattr(F, "run_job", fake_run)
+    monkeypatch.setattr(F, "Ctx", lambda: object())
+    F.worker(tmp_path)
+    assert runs == [kb, ks, kb] and not list((tmp_path / "queue").glob("*.job"))
