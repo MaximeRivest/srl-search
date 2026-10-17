@@ -816,8 +816,9 @@ def select_field(ctx: Ctx, job: Job, q: str, definition: str | None, keywords: s
     report["gathering"] = {"depth": int(depth), "estimated_papers": int(estimate), "strata": strata}
     say(f"about {estimate:,} papers by meaning, judging from {len(labels)} answers")
     if tail > TOO_BROAD_TAIL:
-        raise FinalError(f"“{q}” is broader than a whole-field map can hold: {round(100 * tail)}% of the papers "
-                         f"{depth:,} deep in meaning are still about it. Map a narrower topic, or use the 1,000-paper map.")
+        raise FinalError(f"“{q}” is broader than a whole-field map can hold (more than {TOO_BROAD_PAPERS:,} papers: "
+                         f"{round(100 * tail)}% of the {depth:,} papers closest in meaning are still about it). Map a "
+                         "narrower topic, or use the 1,000-paper map.")
     if estimate * EARLY_MARGIN > TOO_BROAD_PAPERS:     # said now, not after 20 minutes of judging
         raise FinalError(f"“{q}” has about {estimate:,} papers: too broad for a whole-field map today (at most "
                          f"{TOO_BROAD_PAPERS:,}). Map a narrower topic.")

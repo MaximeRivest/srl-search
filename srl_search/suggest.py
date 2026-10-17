@@ -99,11 +99,20 @@ Answer with JSON only: [{"topic": "...", "definition": "...", "note": "2-6 words
 what you typed', 'narrower: only ...', 'if you meant ...'"}]"""
 
 
-def rewrites(q: str, definition: str | None = None) -> dict:
-    """Five versions of the topic someone typed: {"suggestions": [{topic, definition, note}], "cached": bool}."""
+NARROWER = """
+This topic is too broad to map whole (it has more papers than one map can hold). All 5 must be narrower: real,
+distinct parts of it with a literature of their own (its main subfields, approaches or applications), together
+covering what people most often mean by it. None may be the topic itself or broader. Notes say what part each is,
+e.g. 'narrower: only ...'."""
+
+
+def rewrites(q: str, definition: str | None = None, narrower: bool = False) -> dict:
+    """Five versions of the topic someone typed: {"suggestions": [{topic, definition, note}], "cached": bool}.
+    narrower: only parts of it (the topic was refused as too broad for a whole-field map)."""
     q = " ".join(q.split())[:300]
     definition = " ".join((definition or "").split())[:600] or None
-    key = hashlib.sha256(json.dumps([q.lower(), (definition or "").lower()]).encode()).hexdigest()[:24]
+    key = hashlib.sha256(json.dumps([q.lower(), (definition or "").lower()] + (["narrower"] if narrower else []))
+                         .encode()).hexdigest()[:24]
     cache = ROOT / "suggest-cache" / f"{key}.json"
     if cache.exists():
         return {**json.loads(cache.read_text()), "cached": True}
@@ -111,7 +120,7 @@ def rewrites(q: str, definition: str | None = None) -> dict:
         if _spent("suggest") >= SUGGEST_USD:
             raise Unavailable("today's topic suggestions are used up; your own wording works")
     user = f"They typed: {q}" + (f"\nThey described it as: {definition}" if definition else "")
-    text, usd = _kimi(REWRITE, user)
+    text, usd = _kimi(REWRITE + (NARROWER if narrower else ""), user)
     _spend("suggest", usd)
     out = []
     for it in _json(text) if text else []:
@@ -121,7 +130,9 @@ def rewrites(q: str, definition: str | None = None) -> dict:
             out.append({"topic": t, "definition": d[:400] or None, "note": " ".join(str(it.get("note") or "").split())[:60]})
     if not out:
         raise Unavailable("no usable suggestions this time; your own wording works")
-    result = {"query": q, "definition": definition, "suggestions": out[:5], "by": "Kimi K3"}
+    if narrower:                                      # never the refused topic itself
+        out = [o for o in out if o["topic"].lower() != q.lower()]
+    result = {"query": q, "definition": definition, "suggestions": out[:5], "by": "Kimi K3", "narrower": narrower}
     cache.parent.mkdir(parents=True, exist_ok=True)
     cache.write_text(json.dumps(result))
     return {**result, "cached": False}
