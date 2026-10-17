@@ -185,6 +185,24 @@ and every page of `part=papers`: hundreds of abstracts, which a large context ho
 lets you explain the field rather than repeat a ranked list. Split big or mixed groups (`group=N`), search inside
 a group with its own phrases, walk citations from its key papers, and answer organised by group.
 
+### GET /authors?q=...   ·   GET /authors/{id}   ·   GET /works/{ref}/authors   ·   GET /institutions?q=...   ·   GET /institutions/{id}
+People and organisations. `/authors?q=larivière` finds authors by name: every word of `q` must be in the name (accents and case
+do not matter; a one-letter word is an initial), the most published first; `match: "full"` when the whole
+name is there. Each result has `works`, `citations`, `h`, `years`, its commonest `topic` and (when known)
+its main `institution`. `/authors/A5017898742` is one author's profile, shaped like a topic map: `groups`
+are their fields (OpenAlex's label on each paper: a field with its subfields inside, or subfields with topics
+inside when most of their work is in one field), each with lists `cited` (most cited), `first` (as first
+author), `newest` and `coauthors`; `overall` has the same for all their work; `person` holds the figures
+(publications, citations, h-index, years, papers a year, positions on papers, institutions); `papers` has map
+positions. Lists hold 8 items; `read=3&list=cited&offset=8&limit=25` reads a group's (or `read=` empty: the
+whole's, `read=3.2`: a subgroup's) list further. `/works/{ref}/authors` gives a paper's authors with their ids.
+Authors are OpenAlex's author records: one person can be split across several, and about a quarter of
+author names on recent papers are tied to no record (so missing from every profile). `/institutions?q=mcgill`
+and `/institutions/I5023651 are the same for organisations (universities, hospitals, companies, agencies: OpenAlex's
+I-records, matched from affiliation strings), with lists `cited`, `newest`, `people` (its authors on the most of
+those papers) and `partners` (the other organisations on its papers), and in `person`: works, authors, citations,
+h-index, years, country, kind, ROR.
+
 ### GET /map/place?ids=W1,W2&q=...   ·   GET /map/regions   ·   GET /map/counts
 Positions on the map of science for up to 200 papers and/or a question; field names, colours and label
 positions; exact publication counts per year and subfield. Mostly for drawing maps.
@@ -270,6 +288,8 @@ as a resource.
 - `junk` is a model (trained on labels from an AI judge, validated on 60 test questions): it pushes
   junk down, but it also pushes down some real papers with thin records (no authors or references listed),
   and it does not judge whether a paper is *right* (crank papers can score clean).
+- Author profiles follow OpenAlex's author disambiguation, which is imperfect: a profile can miss papers
+  (listed under another record of the same person, or under no record) or, more rarely, mix two people.
 - Errors: 400/422 bad parameters (the body says which), 404 unknown paper or route, 429 too many requests,
   502/503 search briefly unavailable (e.g. during a nightly data update, ~1–3 minutes): retry later.
 
