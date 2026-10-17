@@ -96,7 +96,7 @@ def fake_api():
         profile=lambda kind, row: profile,
         more=lambda kind, row, at, name, offset, limit: {"items": [TP] * 2, "total": 40})
     api = SimpleNamespace(
-        people_service=lambda: people,
+        people_service=lambda: people, author_ref=lambda svc, row: "authors/A1",
         SEMANTIC={"all": SimpleNamespace(manifest={"papers": 124_892_915, "min_date": "1800-01-01"})},
         KEYWORDS=SimpleNamespace(num_docs=203_543_614), app=SimpleNamespace(version="0.3"),
         search=search, similar=similar, work=work, walk=walk, engine=engine, NPROBE=128, DEPTH=300,

@@ -49,10 +49,12 @@ def main():
     (out / 'index').mkdir(parents=True)
     t0 = time.time()
     works = np.diff(np.load(A / 'i_off.npy')).astype(np.int64) if args.institutions else np.load(A / 'a_works.npy')
+    # authors are found best known first (citations); institutions by size
+    cites = works if args.institutions else np.load(A / 'a_cites.npy')
     name_off = np.load(A / 'name_off.npy', mmap_mode='r')
     names = np.memmap(A / 'names.bin', np.uint8, 'r')
     rows = np.flatnonzero(works >= args.min_works)
-    rows = rows[np.argsort(-works[rows], kind='stable')]
+    rows = rows[np.argsort(-cites[rows].astype(np.int64), kind='stable')]
     if args.limit:
         rows = rows[: args.limit]
     log(f'{len(rows):,} authors with >= {args.min_works} publications')
@@ -65,12 +67,12 @@ def main():
         a, b = int(name_off[r]), int(name_off[r + 1])
         if b <= a:
             continue
-        writer.add_document(Doc(name=bytes(names[a:b]).decode('utf-8', 'replace'), works=int(works[r]), row=r))
+        writer.add_document(Doc(name=bytes(names[a:b]).decode('utf-8', 'replace'), works=int(works[r]), cites=int(cites[r]), row=r))
         if (k + 1) % 5_000_000 == 0:
             log(f'  {k + 1:,} added')
     writer.commit()
     writer.wait_merging_threads()
-    (out / 'meta.json').write_text(json.dumps(dict(generation=gen, authors=int(len(rows)), min_works=args.min_works,
+    (out / 'meta.json').write_text(json.dumps(dict(generation=gen, authors=int(len(rows)), min_works=args.min_works, order='works' if args.institutions else 'cites',
                                                    built_at=time.time()), indent=1))
     log(f'done: {len(rows):,} names in {(time.time() - t0) / 60:.1f} min, '
         f'{sum(f.stat().st_size for f in (out / "index").iterdir()) / 1e9:.1f} GB')

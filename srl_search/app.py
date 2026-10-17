@@ -770,6 +770,12 @@ PEOPLE = People(sys.modules[__name__], CITATIONS, NAMES_INDEX / CITATIONS.genera
     if CITATIONS is not None and CITATIONS.authors is not None and getattr(CITATIONS.authors, "by", False) else None
 
 
+def author_ref(svc: People, row) -> str:
+    """The address of an author page: one record, or several seen together (A1?with=A2,A3)."""
+    first, _, rest = svc.ident("author", row).partition(",")
+    return f"authors/{first}" + (f"?with={rest}" if rest else "")
+
+
 def people_service() -> People:
     if PEOPLE is None:
         raise HTTPException(503, "author pages need the authorship index, which this release does not have")
@@ -799,7 +805,11 @@ def author(ref: str,
            lens: str | None = Query(None, alias="list", pattern="^(cited|newest|first|coauthors)$",
                                     description="With read: which list."),
            offset: int = Query(8, ge=0, le=5000), limit: int = Query(25, ge=1, le=50),
-           format: str = Query("json", pattern="^(json|text)$", description=D_FORMAT)):
+           format: str = Query("json", pattern="^(json|text)$", description=D_FORMAT),
+           with_: str | None = Query(None, alias="with", max_length=400, description=(
+               "Other records of the same person, seen together on one page (comma-separated A-numbers, up to 19): "
+               "OpenAlex often splits one person, historical figures most of all; /authors/{id}/namesakes lists the "
+               "records with the same name."))):
     """One author's profile, shaped like a topic map (/topics): their publications in groups by field (OpenAlex's
     field of each paper's primary topic; subfields inside; or subfields with topics inside when most of their work
     is in one field), each with reading lists (cited: most cited; newest; first: as first author) and map
@@ -811,12 +821,31 @@ def author(ref: str,
     row = svc.row(ref)
     if row is None:
         raise HTTPException(404, f"{ref} is not an author we know (an OpenAlex A-number)")
+    if with_:
+        others = [svc.row(x) for x in with_.split(",") if x.strip()]
+        if None in others or len(others) >= 20:
+            raise HTTPException(404, "with= takes up to 19 OpenAlex A-numbers we know, comma-separated")
+        row = tuple(dict.fromkeys([row, *others]))
+        if len(row) == 1:
+            row = row[0]
     if lens is not None:
         out = svc.more("author", row, read or "", lens, offset, limit)
-        return PlainTextResponse(more_text(out, lens, PUBLIC_BASE, f"authors/{svc.ident('author', row)}", read or "", offset)) \
+        return PlainTextResponse(more_text(out, lens, PUBLIC_BASE, author_ref(svc, row), read or "", offset)) \
             if format == "text" else out
     out = svc.profile("author", row)
     return PlainTextResponse(profile_text(out, PUBLIC_BASE)) if format == "text" else out
+
+
+@app.get("/authors/{ref}/namesakes")
+def author_namesakes(ref: str, k: int = Query(50, ge=1, le=100)):
+    """Other author records with exactly the same name, the best known first, each with its papers, citations,
+    h-index, years, commonest topic, main institution and most cited paper: one person is often split across
+    several (historical figures most of all). Listed, not merged: see some together with /authors/{id}?with=."""
+    svc = people_service()
+    row = svc.row(ref)
+    if row is None:
+        raise HTTPException(404, f"{ref} is not an author we know (an OpenAlex A-number)")
+    return svc.namesakes(row, k)
 
 
 @app.get("/institutions")

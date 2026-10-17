@@ -196,7 +196,12 @@ author), `newest` and `coauthors`; `overall` has the same for all their work; `p
 (publications, citations, h-index, years, papers a year, positions on papers, institutions); `papers` has map
 positions. Lists hold 8 items; `read=3&list=cited&offset=8&limit=25` reads a group's (or `read=` empty: the
 whole's, `read=3.2`: a subgroup's) list further. `format=text` on any of these gives the same as Markdown for
-a model to read. Big universities' pages are computed once per snapshot and kept, so they open at once. `/works/{ref}/authors` gives a paper's authors with their ids.
+a model to read. Big universities' pages are computed once per snapshot and kept, so they open at once.
+One person is often split across several author records (historical figures most of all: reprints, letters,
+collected works): `/authors/{id}/namesakes` lists the other records with exactly the same name, each with its
+most cited paper, and `/authors/{id}?with=A2,A3` shows several as one page (your judgement: nothing is merged).
+Name search puts the best cited first, and for a one-word name, people with it as their surname. On author
+pages, editions of one work (the same title, reprints, chapters in collected works) are listed once. `/works/{ref}/authors` gives a paper's authors with their ids.
 Authors are OpenAlex's author records: one person can be split across several, and about a quarter of
 author names on recent papers are tied to no record (so missing from every profile). `/institutions?q=mcgill`
 and `/institutions/I5023651 are the same for organisations (universities, hospitals, companies, agencies: OpenAlex's
@@ -231,7 +236,7 @@ Other apps: add a remote MCP server with that address (setup for each: https://s
 | `map_topic` | /topics: `topic`, `papers` (default 1000), `group` (split one group), `year_from`, `year_to`, `page`, `scope` = closest / whole_field, `definition`. Every group, every reading list, every expert. Counts as 5 calls |
 | `read_topic_group` | /topics with `read`: `topic`, `group`, `part` = lists / papers, `page`, `abstracts` (full by default), `within` (a group of a split), `scope`. Counts as 1 call |
 | `find_people` | /authors or /institutions: `name`, `kind` = author / institution, `limit`. Ids and the facts that tell namesakes apart |
-| `get_profile` | /authors/{id} or /institutions/{id}: `id` (A… or I…); with `list` (cited, newest, first, coauthors, people, partners), `group` and `offset`, one list read further |
+| `get_profile` | /authors/{id} or /institutions/{id}: `id` (A… or I…), `together_with` (other records of the same person); with `list` (cited, newest, first, coauthors, people, partners), `group` and `offset`, one list read further |
 
 Also three prompts, `field_overview(topic)`, `literature_review(question)` and `check_claim(claim)`, and this guide
 as a resource.

@@ -235,7 +235,7 @@ def test_big_profiles_are_kept_on_disk(tmp_path, monkeypatch):
 def test_profile_text_reads_as_markdown(tmp_path):
     svc = P.People(FAKE_API, FakeCitations(tmp_path), None)
     out = P.profile_text(svc.profile("author", 0), "https://x/api")
-    assert out.startswith("# Ann Reef (A101)\n4 publications · cited 100 times · h-index 3 · 2010–2024")
+    assert out.startswith("# Ann Reef (A101)\n4 publications · cited 91 times · h-index 3 · 2010–2024")
     assert "## Its subfields (3 papers in 1 subfields; 1 unlabelled" in out
     assert "### Co-authors" in out and "**Bo Fish** (A102, 3 papers in all): 2 papers together" in out
     out = P.profile_text(svc.profile("institution", 0), "https://x/api")
@@ -249,3 +249,38 @@ def test_namesake_coauthor_records_are_one_person(tmp_path):
     svc = P.People(FAKE_API, cit, None)
     co = svc._raw_author(0)["overall"]["lenses"]["coauthors"]
     assert [(c["name"], c["n"], c["author"]) for c in co] == [("Bo Fish", 3, "A102")]   # papers 0, 1 (once), 2
+
+
+def test_records_seen_together_are_one_page(tmp_path):
+    svc = P.People(FAKE_API, FakeCitations(tmp_path), None)
+    raw = svc.raw("author", (0, 2))                           # Ann Reef with Cy Sea's record, as if one person
+    assert raw["n"] == 4                                      # papers 1 and 2 are on both: once each
+    p = raw["person"]
+    assert p["id"] == "A101,A103" and [r["id"] for r in p["records"]] == ["A101", "A103"]
+    assert p["works"] == 4 and p["citations"] == 91
+    assert [c["name"] for c in raw["overall"]["lenses"]["coauthors"]] == ["Bo Fish"]   # neither record is its own co-author
+    assert svc.ident("author", (0, 2)) == "A101,A103"
+    d = svc.profile("author", (0, 2))
+    t = P.profile_text(d, "https://x")
+    assert "?author=A101&with=A103" in t and "2 OpenAlex records seen together" in t
+
+
+def test_editions_of_one_work_are_listed_once(tmp_path):
+    cit = FakeCitations(tmp_path)
+    titles = {0: "Die Grundlage der allgemeinen Relativitätstheorie", 1: "Die Grundlage der allgemeinen Relativitatstheorie.",
+              2: "Short", 4: "Another quite different long title here"}
+    cit.title = lambda node: titles.get(node, f"Paper {node}")
+    svc = P.People(FAKE_API, cit, None)
+    raw = svc._raw_author(0)
+    assert raw["overall"]["lenses"]["cited"] == [0, 2, 4]    # paper 1 (less cited, same title folded) is an edition
+    assert raw["editions"] == {"0": 2}
+    assert raw["overall"]["size"] == 4                        # the page still counts every paper
+    d = svc.profile("author", 0)
+    assert d["overall"]["lenses"]["cited"][0]["editions"] == 2
+
+
+def test_cited_span_is_when_the_cited_work_was_done():
+    y = np.array([1905, 1916, 1935, 2020, 2025, 2025])
+    c = np.array([1000, 900, 800, 3, 0, 1])
+    assert P.People._cited_span(y, c) == [1905, 1935]
+    assert P.People._cited_span(y[:2], c[:2]) is None

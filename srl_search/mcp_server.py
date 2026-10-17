@@ -415,6 +415,10 @@ How to search well:
             "cited), newest, first (as first author; authors only), coauthors (authors only), people and partners "
             "(institutions only)."))] = None,
         offset: Annotated[int, Field(ge=0, le=5000, description="With `list`: the first item to return.")] = 0,
+        together_with: Annotated[list[str] | None, Field(max_length=19, description=(
+            "Authors only: other records of the same person to see as one (A-numbers). OpenAlex often splits one "
+            "person, historical figures most of all: find_people lists records with the same name; judge by their "
+            "most cited work before combining."))] = None,
     ) -> str:
         """An author's or institution's profile: publications, citations, h-index, years, where they have published
         from (authors) or country and kind (institutions); their work in fields (OpenAlex's label on each paper,
@@ -430,11 +434,18 @@ How to search well:
         row = await call(svc.row if kind == "author" else svc.inst_row, ref)
         if row is None:
             raise ToolError(f"{id} is not an id we know: an OpenAlex A-number (author) or I-number (institution), from find_people")
+        if together_with and kind == "author":
+            others = [svc.row(x.strip().rsplit("/", 1)[-1]) for x in together_with]
+            if None in others:
+                raise ToolError("together_with takes OpenAlex A-numbers we know (from find_people)")
+            row = tuple(dict.fromkeys([row, *others]))
+            row = row[0] if len(row) == 1 else row
         if list is not None:
             if kind == "author" and list in ("people", "partners") or kind == "institution" and list in ("first", "coauthors"):
                 raise ToolError(f"{list} is not a list of an {kind}'s profile")
             out = await call(svc.more, kind, row, group or "", list, offset, 25)
-            return more_text(out, list, PUBLIC_BASE, f"{'authors' if kind == 'author' else 'institutions'}/{svc.ident(kind, row)}", group or "", offset)
+            ref_ = api.author_ref(svc, row) if kind == "author" else f"institutions/{svc.ident(kind, row)}"
+            return more_text(out, list, PUBLIC_BASE, ref_, group or "", offset)
         out = await call(svc.profile, kind, row)
         return profile_text(out, PUBLIC_BASE)
 

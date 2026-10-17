@@ -35,9 +35,27 @@ MAX_DOTS = 1200            # papers placed on the map (the most cited and the ne
 MAX_COAUTHOR_PAPER = 100   # papers listing more authors than this don't count for co-authors (consortia)
 WORD = re.compile(r"[^\W\d_]+", re.UNICODE)
 PAPER_LISTS = ("cited", "newest", "first")
+EDITIONS_UP_TO = 20000     # papers: up to this, a page lists each work once (editions folded; titles read one by one)
+MAX_TOGETHER = 20          # author records seen together on one page
 CACHE_FROM = 5000          # papers: profiles this big are kept on disk (computed once per snapshot; see warm())
 LIST_TITLES = {"cited": "Most cited", "newest": "Newest", "first": "As first author", "coauthors": "Co-authors",
                "people": "People", "partners": "Partner organisations"}
+
+
+DATED = re.compile(r"[(\[]\s*(1[5-9]\d\d|20[0-2]\d)\s*[)\]]\s*\.?\s*$")
+NUMBERING = re.compile(r"^\s*((chapter|part|book|section)\s+)?([0-9]+|[ivxlc]+|[a-z]+(-[a-z]+)?)\s*[.:)]\s+", re.I)
+
+
+def edition_key(title: str) -> str:
+    """A title as editions share it: folded, without a leading chapter number ("18.", "TWENTY-EIGHT.", "CHAPTER
+    XII.") or a trailing year ("(1921)"); '' when too short to be telling."""
+    t = DATED.sub("", NUMBERING.sub("", title or ""))
+    k = re.sub(r"[^a-z0-9]+", " ", fold(t)).strip()
+    return k if len(k) >= 25 and len(k.split()) >= 4 else ""
+
+
+def rows_of(row) -> tuple[int, ...]:
+    return tuple(int(r) for r in row) if isinstance(row, (tuple, list)) else (int(row),)
 
 
 def fold(s: str) -> str:
@@ -129,19 +147,20 @@ class People:
         return [self.inst.describe(int(r)) for r in self.inst.of_paper(nd)]
 
     # ------------------------------------------------------------------ the profile
-    def size_of(self, kind: str, row: int) -> int:
-        """How many papers (any type) the unit has: known before computing anything."""
+    def size_of(self, kind: str, row) -> int:
+        """How many papers (any type) the unit has: known before computing anything. row: one record, or a tuple of
+        author records seen together."""
         if kind == "author":
-            return int(self.au.by_off[row + 1] - self.au.by_off[row])
+            return sum(int(self.au.by_off[r + 1] - self.au.by_off[r]) for r in rows_of(row))
         return int(self.inst.i_off[row + 1] - self.inst.i_off[row])
 
-    def ident(self, kind: str, row: int) -> str:
-        return self.au.openalex_id(row) if kind == "author" else self.inst.openalex_id(row)
+    def ident(self, kind: str, row) -> str:
+        return ",".join(self.au.openalex_id(r) for r in rows_of(row)) if kind == "author" else self.inst.openalex_id(row)
 
     def _cached(self, root: Path | None, kind: str, row: int) -> Path | None:
         if root is None or self.size_of(kind, row) < CACHE_FROM:
             return None
-        return root / kind / f"{self.ident(kind, row)}.json.gz"
+        return root / kind / f"{self.ident(kind, row).replace(',', '+')}.json.gz"
 
     @staticmethod
     def _read(path: Path | None) -> dict | None:
@@ -186,26 +205,50 @@ class People:
     def _publications(self, nodes: np.ndarray) -> np.ndarray:
         return self.is_pub[np.asarray(self.cit.kind[nodes])] if len(nodes) else np.zeros(0, bool)
 
-    def _raw_author(self, row: int) -> dict:
+    def _raw_author(self, row) -> dict:
         au = self.au
-        nodes, pos = au.papers(row)
+        rows = rows_of(row)
+        parts = [au.papers(r) for r in rows]
+        nodes = np.concatenate([x[0] for x in parts]).astype(np.int64)
+        pos = np.concatenate([x[1] for x in parts]).astype(np.int64)
+        if len(rows) > 1:                                   # records seen together: each paper once, oldest first
+            order = np.lexsort((pos, nodes))
+            nodes, pos = nodes[order], pos[order]
+            first = np.r_[True, nodes[1:] != nodes[:-1]] if len(nodes) else np.zeros(0, bool)
+            nodes, pos = nodes[first], pos[first]
+            order = np.lexsort((nodes, np.asarray(self.cit.year[nodes])))
+            nodes, pos = nodes[order], pos[order]
         pub = self._publications(nodes)
         nodes, pos = nodes[pub], pos[pub]
         # everyone on their papers but them: the co-authors (consortia papers left out)
         owner, at = gather(au.off, nodes)
         listed = np.asarray(au.nauth[nodes])[owner] if len(owner) else owner
         co = np.asarray(au.auth[at]).astype(np.int64) if len(at) else at
-        keep = (co != row) & (listed <= MAX_COAUTHOR_PAPER)
+        keep = ~np.isin(co, rows) & (listed <= MAX_COAUTHOR_PAPER)
         merged = self._merge_namesakes(co[keep])
         pair = np.unique((owner[keep] << 32) | merged)          # one count per paper once two records became one
         people = (pair >> 32, pair & 0xFFFFFFFF)
-        out = self._raw(nodes, pos, people)
-        person = {"id": au.openalex_id(row), "name": au.name(row), "works": int(au.works[row]),
-                  "citations": int(au.cites[row]), "h": int(au.h[row]),
-                  "years": self._first_last(out["_years"]), "topic": self._topic(int(au.topic[row]))}
+        out = self._raw(nodes, pos, people, editions=len(nodes) <= EDITIONS_UP_TO)
+        cites = out["_cites"]
+        main = rows[0]
+        person = {"id": self.ident("author", row), "name": au.name(main), "works": int(len(nodes)),
+                  "citations": int(cites.sum()), "h": self._h(cites),
+                  "years": self._first_last(out["_years"]), "cited_years": self._cited_span(out["_years"], cites),
+                  "topic": self._topic(int(au.topic[main])) if len(rows) == 1 else self._topic(out["_topic"])}
+        if len(rows) > 1:
+            person["records"] = [{"id": au.openalex_id(r), "name": au.name(r), "works": int(au.works[r]),
+                                  "citations": int(au.cites[r])} for r in rows]
         if self.inst is not None:
-            person["institutions"] = [dict(self.inst.describe(r), papers=k, years=[y0, y1] if y0 else None)
-                                      for r, k, y0, y1 in self.inst.of_author(row)[:8]]
+            where: dict[int, list] = {}
+            for r in rows:
+                for i, k, y0, y1 in self.inst.of_author(r):
+                    w = where.setdefault(i, [0, y0 or 9999, y1])
+                    w[0] += k
+                    w[1] = min(w[1], y0 or 9999)
+                    w[2] = max(w[2], y1)
+            top = sorted(where.items(), key=lambda kv: (-kv[1][0], -kv[1][2]))[:8]
+            person["institutions"] = [dict(self.inst.describe(i), papers=k, years=[y0, y1] if y0 < 9999 else None)
+                                      for i, (k, y0, y1) in top]
         hist = np.bincount(np.minimum(pos, 4).astype(np.int64), minlength=5) if len(pos) else np.zeros(5, np.int64)
         person["positions"] = {"first": int(hist[1]), "second": int(hist[2]), "other": int(hist[3] + hist[4])}
         out["person"] = person
@@ -255,6 +298,18 @@ class People:
         return out
 
     @staticmethod
+    def _cited_span(years: np.ndarray, cites: np.ndarray) -> list[int] | None:
+        """The years of the work that carries most of the citations (10th to 80th percentile, weighted by
+        citations: the top end left wide of later editions and papers wrongly attributed): for a historical figure, when they did it, not when it was last reprinted."""
+        m = (years > 0) & (cites > 0)
+        if m.sum() < 3:
+            return None
+        y, c = years[m], cites[m].astype(np.float64)
+        o = np.argsort(y, kind="stable")
+        y, cum = y[o], np.cumsum(c[o]) / c.sum()
+        return [int(y[np.searchsorted(cum, 0.1)]), int(y[min(len(y) - 1, np.searchsorted(cum, 0.8))])]
+
+    @staticmethod
     def _h(cites: np.ndarray) -> int:
         if not len(cites):
             return 0
@@ -266,7 +321,36 @@ class People:
         y = years[years > 0]
         return [int(y.min()), int(y.max())] if len(y) else None
 
-    def _raw(self, nodes: np.ndarray, pos: np.ndarray | None, people: tuple, partners: tuple | None = None) -> dict:
+    def _editions(self, nodes: np.ndarray, years: np.ndarray, cites: np.ndarray) -> tuple[np.ndarray, dict[int, int], np.ndarray]:
+        """Papers that are another edition of one on the same page: the same title (folded, chapter numbers and a
+        trailing year left out, 25+ characters, 4+ words) as one more cited (or as cited and older). A reprint, a
+        translation under the same title, a chapter in collected works. Returns (is another edition, node of the
+        kept one -> how many editions in all, is a reprint by its own title: kept in the lists, not among the newest)."""
+        titles = [self.cit.title(int(nd)) for nd in nodes]
+        keys = [edition_key(t) for t in titles]
+        # a title that dates itself well before the paper ("Geometry and Experience (1921)" printed in 2025): a reprint
+        reprint = np.array([bool((m := DATED.search(t)) and int(m.group(1)) <= y - 10) for t, y in zip(titles, years)], bool)
+        best: dict[str, int] = {}
+        count: dict[str, int] = {}
+        for i, k in enumerate(keys):
+            if not k:
+                continue
+            count[k] = count.get(k, 0) + 1
+            j = best.get(k)
+            if j is None or (cites[i], -years[i]) > (cites[j], -years[j]):
+                best[k] = i
+        other = np.zeros(len(nodes), bool)
+        kept: dict[int, int] = {}
+        for i, k in enumerate(keys):
+            if count.get(k, 0) > 1:
+                if best[k] == i:
+                    kept[int(nodes[i])] = count[k]
+                else:
+                    other[i] = True
+        return other, kept, reprint
+
+    def _raw(self, nodes: np.ndarray, pos: np.ndarray | None, people: tuple, partners: tuple | None = None,
+             editions: bool = False) -> dict:
         """The common part: a set of papers in groups by field, with lists and clouds, and the dots."""
         cit = self.cit
         t0 = time.perf_counter()
@@ -276,7 +360,8 @@ class People:
         tp = np.asarray(self.topic[nodes]).astype(np.int64) if self.topic is not None and n else np.full(n, -1)
         if pos is None:
             pos = np.zeros(n, np.int64)
-        ctx = dict(nodes=nodes, pos=pos, years=years, cites=cites, people=people, partners=partners)
+        other, kept, reprint = self._editions(nodes, years, cites) if editions and n else (np.zeros(n, bool), {}, np.zeros(n, bool))
+        ctx = dict(nodes=nodes, pos=pos, years=years, cites=cites, people=people, partners=partners, other=other, reprint=reprint)
 
         # ---- fields: OpenAlex field > subfield > topic of each paper. Boxes are fields with subfields inside when
         # the work spans fields; subfields with topics inside when most of it is in one field.
@@ -327,23 +412,30 @@ class People:
         dots = {"id": [f"W{cit.work(int(nodes[i]))}" for i in chosen], "group": gid[chosen].tolist(),
                 "sub": sid[chosen].tolist(), "node": nodes[chosen].tolist()}
         yu, yc = np.unique(years[years > 0], return_counts=True)
-        return {"level": level, "groups": groups, "overall": overall, "other": other, "dots": dots, "n": n,
+        tv = tp[tp >= 0]
+        return {"editions": {str(k): v for k, v in kept.items()}, "_topic": int(np.bincount(tv).argmax()) if len(tv) else -1,
+                "level": level, "groups": groups, "overall": overall, "other": other, "dots": dots, "n": n,
                 "per_year": {int(y): int(c) for y, c in zip(yu, yc)}, "_years": years, "_cites": cites,
                 "ms": round((time.perf_counter() - t0) * 1000, 1)}
 
     def _unit(self, idx: np.ndarray, ctx: dict, depth: int, **head) -> dict:
         """A group, subgroup or the whole: its size, years, lists (as nodes) and cloud."""
         nodes, pos, years, cites = ctx["nodes"], ctx["pos"], ctx["years"], ctx["cites"]
+        every = idx
         lenses: dict[str, list] = {}
+        if ctx.get("other") is not None and len(idx):
+            idx = idx[~ctx["other"][idx]] if ctx["other"][idx].any() else idx   # lists: one edition of each work
         if len(idx):
             c, y = cites[idx], years[idx]
             lenses["cited"] = [int(nodes[i]) for i in idx[np.lexsort((-y, -c))][:LIST_DEPTH]]
-            lenses["newest"] = [int(nodes[i]) for i in idx[np.lexsort((-c, -y))][:LIST_DEPTH]]
+            fresh = idx[~ctx["reprint"][idx]] if ctx.get("reprint") is not None else idx
+            lenses["newest"] = [int(nodes[i]) for i in fresh[np.lexsort((-cites[fresh], -years[fresh]))][:LIST_DEPTH]]
             fi = idx[pos[idx] == 1]
             if len(fi):
                 lenses["first"] = [int(nodes[i]) for i in fi[np.lexsort((-years[fi], -cites[fi]))][:LIST_DEPTH]]
         else:
             lenses["cited"] = lenses["newest"] = []
+        idx = every
         people = self._ranked(ctx["people"], idx, nodes, years, cites, depth)
         lenses["coauthors" if ctx["partners"] is None else "people"] = people
         if ctx["partners"] is not None:
@@ -420,6 +512,7 @@ class People:
         from srl_search.topic_service import resolve
         raw = self.raw(kind, row)
         cit = self.cit
+        eds = raw.get("editions") or {}
         blocks = [(g, HEAD) for g in raw["groups"] + [raw["overall"]]] + \
                  [(s, HEAD_SUB) for g in raw["groups"] for s in g.get("subgroups", [])]
         wanted = set()
@@ -437,6 +530,10 @@ class People:
         t = time.perf_counter()
         papers = resolve(self.api, cit, wanted)
         resolve_ms = round((time.perf_counter() - t) * 1000, 1)
+        for nd, k in eds.items():                         # "3 editions" where the same work was printed again
+            w = cit.work(int(nd))
+            if w in papers:
+                papers[w] = dict(papers[w], editions=k)
         def lists(g, head=HEAD):
             out = {}
             for name, items in g["lenses"].items():
@@ -503,7 +600,43 @@ class People:
             papers = resolve(self.api, cit, wanted)
             return {"items": [self._person_item(it, papers) for it in page], "total": len(items)}
         papers = resolve(self.api, cit, {cit.work(nd) for nd in page})
-        return {"items": [papers[cit.work(nd)] for nd in page], "total": len(items)}
+        eds = raw.get("editions") or {}
+        return {"items": [dict(papers[cit.work(nd)], editions=eds[str(nd)]) if str(nd) in eds else papers[cit.work(nd)]
+                          for nd in page], "total": len(items)}
+
+    def namesakes(self, row: int, k: int = 50) -> dict:
+        """Other author records with exactly the same name (folded): one person is often split across several
+        (historical figures most of all: reprints, letters, collected works). Not merged: listed, with what tells
+        them apart, for the reader to choose which to see together."""
+        if self.names is None:
+            from fastapi import HTTPException
+            raise HTTPException(503, "the names index is not built")
+        au = self.au
+        key = lambda r: " ".join(WORD.findall(fold(au.name(r))))   # noqa: E731
+        me = key(row)
+        rows, _ = self.names.search(au.name(row), 200)
+        same = sorted({r for r in rows if r != row and key(r) == me}, key=lambda r: -int(au.cites[r]))[:k]
+        from srl_search.topic_service import resolve
+        tops = {}
+        for r in same:
+            nodes, _ = au.papers(r)
+            nodes = nodes[self._publications(nodes)]
+            if len(nodes):
+                tops[r] = self.cit.work(int(nodes[np.argmax(np.asarray(self.cit.cites[nodes]))]))
+        papers = resolve(self.api, self.cit, set(tops.values()))
+        out = []
+        for r in same:
+            y0, y1 = int(au.year0[r]), int(au.year1[r])
+            d = {"id": au.openalex_id(r), "name": au.name(r), "works": int(au.works[r]), "citations": int(au.cites[r]),
+                 "h": int(au.h[r]), "years": [y0, y1] if y0 else None, "topic": self._topic(int(au.topic[r]))}
+            if r in tops:
+                d["top"] = papers[tops[r]]
+            if self.inst is not None:
+                where = self.inst.of_author(r)[:1]
+                if where:
+                    d["institution"] = self.inst.describe(where[0][0])
+            out.append(d)
+        return {"id": au.openalex_id(row), "name": au.name(row), "results": out}
 
     # ------------------------------------------------------------------ search
     def search(self, q: str, k: int) -> dict:
@@ -511,9 +644,13 @@ class People:
             from fastapi import HTTPException
             raise HTTPException(503, "the names index is not built")
         t0 = time.perf_counter()
-        hits, how = self.names.search(q, k)
-        out = []
+        hits, how = self.names.search(q, max(k, min(200, 4 * k)))
         qtok = set(WORD.findall(fold(q)))
+        # the best known first (citations), and for a one-word name, people with it as their surname first
+        surname = list(qtok)[0] if len(qtok) == 1 else None
+        last = lambda r: (WORD.findall(fold(self.au.name(r))) or [""])[-1]   # noqa: E731
+        hits = sorted(hits, key=lambda r: (surname is not None and last(r) != surname, -int(self.au.cites[r])))[:k]
+        out = []
         for row in hits:
             name = self.au.name(row)
             ntok = set(WORD.findall(fold(name)))
@@ -588,7 +725,7 @@ def _unit_text(u: dict, base: str, ref: str, at: str, head: int) -> list[str]:
                          else _paper_line(it))
         if total.get(k, 0) > len(items):
             q = urllib.parse.urlencode({"read": at, "list": k, "offset": len(items), "limit": 25})
-            lines.append(f"  … the next 25: {base}/{ref}?{q}")
+            lines.append(f"  … the next 25: {base}/{ref}{'&' if '?' in ref else '?'}{q}")
         lines.append("")
     return lines
 
@@ -596,11 +733,18 @@ def _unit_text(u: dict, base: str, ref: str, at: str, head: int) -> list[str]:
 def profile_text(d: dict, base: str) -> str:
     """A profile as Markdown for a model: the figures, the fields at a glance, then every field's lists."""
     p, kind = d["person"], d["kind"]
-    ref = f"{'authors' if kind == 'author' else 'institutions'}/{p['id']}"
+    ids = p["id"].split(",")
+    ref = f"{'authors' if kind == 'author' else 'institutions'}/{ids[0]}" + (f"?with={','.join(ids[1:])}" if len(ids) > 1 else "")
     yrs = f"{p['years'][0]}–{p['years'][1]}" if p.get("years") else ""
     facts = [_n(p['works'], "publication"), _n(p['authors'], "author") if p.get("authors") else "",
              f"cited {p['citations']:,} times", f"h-index {p['h']}", yrs]
     lines = [f"# {p['name']} ({p['id']})", " · ".join(f for f in facts if f)]
+    if p.get("records"):
+        lines.append(f"{len(p['records'])} OpenAlex records seen together as one person (chosen, not verified): " +
+                     "; ".join(f"{r['id']} ({_n(r['works'])})" for r in p["records"]))
+    if p.get("cited_years") and p.get("years") and p["cited_years"] != p["years"]:
+        lines.append(f"Most of the citations go to work from {p['cited_years'][0]}–{p['cited_years'][1]}"
+                     " (later years: often reprints and collected editions).")
     if kind == "author":
         if p.get("topic"):
             lines.append(f"Commonest topic: {p['topic']['name']} ({p['topic']['subfield']}, {p['topic']['field']})")
@@ -612,7 +756,8 @@ def profile_text(d: dict, base: str) -> str:
         lines.append(f"Position on papers: first author on {pos.get('first', 0)}, second on {pos.get('second', 0)}, other on {pos.get('other', 0)}.")
     else:
         lines.append(" · ".join(x for x in (p.get("kind"), p.get("country"), p.get("ror")) if x))
-    lines += [f"On ScienceMadeReadable: https://sciencemadereadable.com/?{'author' if kind == 'author' else 'institution'}={p['id']} · "
+    site = f"author={ids[0]}" + (f"&with={','.join(ids[1:])}" if len(ids) > 1 else "") if kind == "author" else f"institution={p['id']}"
+    lines += [f"On ScienceMadeReadable: https://sciencemadereadable.com/?{site} · "
               f"OpenAlex: https://openalex.org/{p['id']}", "",
               f"Caveat: this is one OpenAlex {'author' if kind == 'author' else 'institution'} record. "
               + ("A person can be split across several records, and about a quarter of author names on recent papers are "
@@ -667,7 +812,7 @@ def more_text(d: dict, name: str, base: str, ref: str, at: str, offset: int) -> 
         lines.append(_person_line(it, base, name) if isinstance(it, dict) and ("author" in it or "institution" in it) else _paper_line(it))
     if offset + len(d["items"]) < d["total"]:
         q = urllib.parse.urlencode({"read": at, "list": name, "offset": offset + len(d["items"]), "limit": 25})
-        lines += ["", f"Next: {base}/{ref}?{q}"]
+        lines += ["", f"Next: {base}/{ref}{'&' if '?' in ref else '?'}{q}"]
     return "\n".join(lines)
 
 
@@ -745,6 +890,7 @@ class NameIndex:
         self.index = tantivy.Index.open(str(root / "index"))
         self.index.register_tokenizer("names", analyzer(tantivy))
         self.schema = self.index.schema
+        self.order = self.meta.get("order", "works")       # author names since 2026-10-17: by citations
 
     def search(self, q: str, k: int) -> tuple[list[int], str]:
         Q, O = self.tv.Query, self.tv.Occur
@@ -753,7 +899,7 @@ class NameIndex:
             return [], "empty"
         def run(clauses):
             s = self.index.searcher()
-            r = s.search(Q.boolean_query(clauses), k, count=False, order_by_field="works")
+            r = s.search(Q.boolean_query(clauses), k, count=False, order_by_field=self.order)
             return [int(s.doc(a).to_dict()["row"][0]) for _, a in r.hits]
         exact = [(O.Must, Q.regex_query(self.schema, "name", f"{re.escape(t)}.*") if len(t) == 1
                   else Q.term_query(self.schema, "name", t)) for t in toks]
@@ -777,6 +923,7 @@ def schema(tantivy):
     sb = tantivy.SchemaBuilder()
     sb.add_text_field("name", stored=False, tokenizer_name="names", index_option="basic")
     sb.add_integer_field("works", stored=False, indexed=True, fast=True)
+    sb.add_integer_field("cites", stored=False, indexed=True, fast=True)
     sb.add_integer_field("row", stored=True, fast=True)
     return sb.build()
 
