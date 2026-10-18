@@ -2,7 +2,7 @@
 
 Checks reduce risk of consuming extra usage; they cannot guarantee zero spend if a
 provider reports usage late or other processes consume the shared allowance. Disable
-subscription extra-usage billing in the account settings for a hard billing limit.
+extra-usage billing in the account settings for a hard billing limit.
 """
 from __future__ import annotations
 import json

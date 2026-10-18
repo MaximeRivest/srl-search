@@ -11,7 +11,7 @@ staged jobs are stopped; the accelerated labelers did NOT stop at
 - Code: `experiments/fieldjudge/v2/`
 - Data/progress: `/mnt/fast/scholarsreadinglist/fieldjudge/v2/`
 - Search/corpus scripts: `search-dev/.venv/bin/python`
-- Subscription/FunctAI scripts: `sciencemadereadable/.venv/bin/python`
+- FunctAI scripts: `sciencemadereadable/.venv/bin/python`
 - Teacher models, clients and usage endpoints: private settings read by `../teachers.py`
   (template `../teachers.example.py`); choose models whose terms allow training on
   their outputs. `teachers.ROLES` names the two roles on disk (answer folders, keys).
@@ -98,7 +98,7 @@ order-check and first-cohort gates are **not** the active accelerated workflow.
 
 ## Scope and accounting
 
-The user requested two teacher models (private settings) through existing subscriptions,
+The user requested two teacher models (private settings) through existing accounts,
 25 papers per request, for approximately 100,000 topic–paper pairs. A paper can
 appear under different topics: learning the topic boundary is the point. This is
 not necessarily 100,000 unique papers.

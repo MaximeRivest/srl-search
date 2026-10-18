@@ -144,20 +144,20 @@ real run today (two extra vLLM passes: the teacher's 400 and ~19k checked papers
 
 Same question for all (the pipeline's instruction, one label). 300 papers per held-out topic drawn in proportion from
 the stratified population samples (weights kept) + the 44 landmarks. Judges 1-6 are six more models, three through
-each of two subscriptions (judges 1-3, 4-6); which models, and their settings, are in the private settings
-(`teachers.py`, `JUDGES`). 3,870 subscription answers, ~40 min; the subscriptions' usage windows went 8% -> 13% and
+each of two accounts (judges 1-3, 4-6); which models, and their settings, are in the private settings
+(`teachers.py`, `JUDGES`). 3,870 answers, ~40 min; the accounts' usage windows went 8% -> 13% and
 1% -> 2%. No judge is the truth: each is scored against the majority of the other seven, weighted to the population.
 
 | Judge | Fragmentation agree / P / R / F1 | LLM post-training agree / P / R / F1 | Landmarks | s/answer | Cost |
 |---|---:|---:|---:|---:|---|
 | reference model | 98.2% / 0.81 / 0.98 / 0.89 | 99.0% / 0.93 / 0.88 / 0.91 | 100% | 1-4 | ~$1.20 / 1,000 |
 | Jev | 97.8% / 0.88 / 0.82 / 0.85 | 98.5% / 0.93 / 0.76 / 0.84 | 95% | <0.1 | ~$0.03 / 1,000 |
-| judge 1 | 94.6% / 0.57 / 0.95 / 0.71 | 97.9% / 0.76 / 0.89 / 0.82 | 98% | 1.7 | subscription |
-| judge 2 | 98.4% / 0.99 / 0.80 / 0.88 | 98.0% / 0.97 / 0.64 / 0.77 | 98% | 1.3 | subscription |
-| judge 3 | 97.1% / 0.80 / 0.79 / 0.80 | 95.8% / 0.50 / 0.73 / 0.59 | 98% | 1.1 | subscription |
-| judge 4 | 98.7% / 0.86 / 0.97 / 0.91 | 92.8% / 0.41 / 1.00 / 0.58 | 98% | 2.1 | subscription |
-| judge 5 | 98.7% / 0.85 / 0.97 / 0.91 | 92.7% / 0.40 / 1.00 / 0.58 | 95% | 2.4 | subscription |
-| judge 6 | 97.3% / 0.94 / 0.69 / 0.79 | 97.3% / 0.74 / 0.75 / 0.75 | 93% | 1.5 | subscription |
+| judge 1 | 94.6% / 0.57 / 0.95 / 0.71 | 97.9% / 0.76 / 0.89 / 0.82 | 98% | 1.7 | plan |
+| judge 2 | 98.4% / 0.99 / 0.80 / 0.88 | 98.0% / 0.97 / 0.64 / 0.77 | 98% | 1.3 | plan |
+| judge 3 | 97.1% / 0.80 / 0.79 / 0.80 | 95.8% / 0.50 / 0.73 / 0.59 | 98% | 1.1 | plan |
+| judge 4 | 98.7% / 0.86 / 0.97 / 0.91 | 92.8% / 0.41 / 1.00 / 0.58 | 98% | 2.1 | plan |
+| judge 5 | 98.7% / 0.85 / 0.97 / 0.91 | 92.7% / 0.40 / 1.00 / 0.58 | 95% | 2.4 | plan |
+| judge 6 | 97.3% / 0.94 / 0.69 / 0.79 | 97.3% / 0.74 / 0.75 / 0.75 | 93% | 1.5 | plan |
 
 The reference model is the most consistent with the others on both topics. Judge 2 is strict and nearly a copy of
 Jev (98.1% agreement). Judge 1 is lenient on fragmentation (island invasions, sea-cucumber fishing counted as

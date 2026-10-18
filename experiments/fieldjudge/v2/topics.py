@@ -1,4 +1,4 @@
-"""Create and screen topic families through subscription connections only.
+"""Create and screen topic families through the teacher connections only.
 
 Generation is separate from labeling. Both teachers independently flag overlap
 with reserved evaluation topics. Rejected families and every raw generation are
