@@ -3,7 +3,7 @@ groups with reading lists (srl_search.field.build_maps, main map only), against 
   - what readers see first: the top 10 of each paper list (start_here, core, distinctive, rising, bridges, newest)
     of every group, and the group names
   - overlap between arms (the same papers?)
-  - Kimi K3 judges every distinct reading-list paper once, for its topic: the share on topic, per arm and per list
+  - the reference model judges every distinct reading-list paper once, for its topic: the share on topic, per arm and per list
     ~$3
 
     ../../.venv/bin/python readinglists.py      (SRL_RELEASE=<the runs' release>; keys in the environment)
@@ -73,7 +73,7 @@ for (t, arm), m in maps.items():
                 s.add((name, p["id"]))
     seen[(t, arm)] = s
 
-# Kimi on every distinct reading-list paper, once per topic (answers from an earlier run kept)
+# the reference model on every distinct reading-list paper, once per topic (answers from an earlier run kept)
 prev = {}
 for _f in sorted(Path(__file__).parent.glob("readinglists*.json")):
     for _t, _d in json.loads(_f.read_text()).get("labels", {}).items():

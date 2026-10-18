@@ -1,7 +1,7 @@
-# Round 2: Sol + Opus data for a general field judge
+# Round 2: data from two teacher models for a general field judge
 
 **Current status: accelerated streaming run.** The user explicitly prioritized
-labels over order checks and heavyweight preparation. Sol and Opus label in
+labels over order checks and heavyweight preparation. Teachers A and B label in
 25-paper requests with short ID + label outputs. The remaining work is now split
 between them, not double-judged (see below). Labeling is now finished; experimental
 0.8B training is running, with 2B queued afterward. Nothing is deployed. The old
@@ -12,6 +12,9 @@ staged jobs are stopped; the accelerated labelers did NOT stop at
 - Data/progress: `/mnt/fast/scholarsreadinglist/fieldjudge/v2/`
 - Search/corpus scripts: `search-dev/.venv/bin/python`
 - Subscription/FunctAI scripts: `sciencemadereadable/.venv/bin/python`
+- Teacher models, clients and usage endpoints: private settings read by `../teachers.py`
+  (template `../teachers.example.py`); choose models whose terms allow training on
+  their outputs. `teachers.ROLES` names the two roles on disk (answer folders, keys).
 
 ## Training and live dashboard (2026-10-15 evening)
 
@@ -42,7 +45,7 @@ staged jobs are stopped; the accelerated labelers did NOT stop at
 At the user's request, both workers were stopped before freezing `fast/assignment.json`.
 34,319 pairs already had an answer from at least one teacher (including uncertainty).
 They are not requested again. The remaining 65,681 pairs were split disjointly:
-32,840 to Sol and 32,841 to Opus. Whole batches are used where possible, with family
+32,840 to teacher A and 32,841 to teacher B. Whole batches are used where possible, with family
 and overall balancing; prior refusals go to the other teacher, never retried with
 the same one. If both refused, the pair stays for review. Assignment is immutable
 across restarts. `partition.py` verifies source checksums and locks both worker files
@@ -51,7 +54,7 @@ while creating the plan; tests prove no overlap and exact remaining coverage.
 Earlier double judgments are retained, including disagreements. `export_fast.py`
 now distinguishes `provisional_single_teacher` from `provisional_agreement`; a
 missing second opinion is expected for assigned work, not a pending task. It still
-flags uncertainty, refusals, Kimi conflicts where old labels exist, and leakage.
+flags uncertainty, refusals, conflicts with old reference-model labels, and leakage.
 This saves about half the remaining labeling work but removes the second-opinion
 check for these pairs. No automatic training or deployment.
 
@@ -61,8 +64,8 @@ check for these pairs. No automatic training or deployment.
 ./launch_fast.sh                     # independent processes; resumes checkpoints
 python fast.py status               # actual queue and per-teacher counts
 python export_fast.py --partial     # joined provisional labels + disagreements
-journalctl --user -u fj-fast-sol -f
-journalctl --user -u fj-fast-opus -f
+journalctl --user -u fj-fast-a -f      # teacher A (before 2026-10-18 units were named after the roles)
+journalctl --user -u fj-fast-b -f
 journalctl --user -u fj-fast-collect -f
 ```
 
@@ -80,13 +83,14 @@ journalctl --user -u fj-fast-collect -f
 - Keep both teacher implementations (disjoint remaining assignments as above), exactly matched IDs (output ordering is irrelevant),
   uncertainty, refusals, disagreements, held-out paper protection, quota checks,
   cached replies, atomic checkpoints and five-minute retries on temporary failures.
-- Initial observed throughput: Sol ~300 pairs/min; Opus ~500 pairs/min. Refusals
+- Initial observed throughput: teacher A ~300 pairs/min; teacher B ~500 pairs/min. Refusals
   are counted separately, not disguised as successful labels. No completion-time
   guarantee: shared quotas and provider stalls can interrupt this rate.
-- Existing Kimi labels are available as free checks on legacy enrichment. They are
-  never shown to the teachers. New independent Kimi benchmark cost: $6.22.
+- Existing reference-model labels (round 1) are available as free checks on legacy
+  enrichment. They are never shown to the teachers. New independent reference-model
+  benchmark (`benchmark_reference.py`) cost: $6.22.
 - `export_fast.py` removes cross-split work/title overlaps and flags disagreement
-  with old Kimi labels. Outputs remain provisional: whole-family overlap and
+  with old reference-model labels. Outputs remain provisional: whole-family overlap and
   disputed cases still need auditing BEFORE training, not before producing labels.
 
 The sections below preserve the original recipe and pilot findings; their
@@ -94,7 +98,7 @@ order-check and first-cohort gates are **not** the active accelerated workflow.
 
 ## Scope and accounting
 
-The user requested Sol 6.1 and Opus 5.5 through their existing subscriptions,
+The user requested two teacher models (private settings) through existing subscriptions,
 25 papers per request, for approximately 100,000 topic–paper pairs. A paper can
 appear under different topics: learning the topic boundary is the point. This is
 not necessarily 100,000 unique papers.
@@ -128,17 +132,17 @@ Generated families are rejected if either teacher flags substantial overlap.
 For each new topic, 500 rank-stratified papers from the eligible nearest-300k
 retrieval pool plus up to 100 cited title-only papers are frozen **before** any
 training collection. Sampling denominators and weights are retained. The two
-populations must be reported separately; neither is all of science. Kimi labels
-these as an independent silver reference, with a $20 run budget. No model's
+populations must be reported separately; neither is all of science. The reference
+model labels these as an independent silver reference, with a $20 run budget. No model's
 answer is human-reviewed ground truth. Human/expert review of disagreements and
 shared mistakes is still needed before claiming accuracy or publishing weights.
 
 ## Batch pilot: findings, not assumptions
 
 The initial mixed, often undefined-topic pilot failed the operational 95/100
-consistency gate. Sol matched single-paper calls on 94/100 and reordered batches
+consistency gate. Teacher A matched single-paper calls on 94/100 and reordered batches
 on 91/100; even repeated single-paper calls matched only 95/100. Five-paper
-batches did not cure this (95/100 and 90/100). Opus sometimes paraphrased evidence,
+batches did not cure this (95/100 and 90/100). Teacher B sometimes paraphrased evidence,
 reordered outputs, and once omitted one of 25 papers. These failures are retained
 under `pilot/`, not silently erased.
 
@@ -147,8 +151,8 @@ with 20% title-only cases and short request-local IDs. Results (`pilot-defined/`
 
 | Teacher | Same as singleton (n=100) | Same after reordering (n=100) |
 |---|---:|---:|
-| Sol | 95 | 94 |
-| Opus | 94 | 98 |
+| A | 95 | 94 |
+| B | 94 | 98 |
 
 Neither teacher individually passed both 95/100 gates. A stricter protocol was
 then preregistered in `acceptance.py`: both teachers must agree, retain that label
@@ -174,8 +178,8 @@ it contains precisely the boundaries we want the students to learn.
   changes, not rewritten words). No invented quotations in accepted supervision.
 - Two in-flight calls per provider; fail closed if usage cannot be read. Usage
   observations shared for at most 60 seconds because the usage endpoint is itself
-  rate limited. Pause at 85% of any reported window. Persist the starting Codex
-  credit balance; stop if it drops. No billed-API fallback.
+  rate limited. Pause at 85% of any reported window. Persist the starting
+  credit balance, where an account reports one; stop if it drops. No billed-API fallback.
 - These checks cannot guarantee zero extra-usage spend if reporting is delayed or
   another process spends the shared allowance. Disable account extra-usage billing
   for a hard limit. Refused requests are retained, not repeatedly retried.
@@ -187,8 +191,9 @@ it contains precisely the boundaries we want the students to learn.
 ## Commands and checkpoints
 
 ```sh
-# From this folder; use the interpreters described above.
-python pilot.py sol                  # then opus; saved replies resume
+# From this folder; use the interpreters described above. A, B: the two teacher roles
+# (python -c 'import sys; sys.path.insert(0, ".."); import teachers; print(*teachers.ROLES)')
+python pilot.py A                    # then B; saved replies resume
 python acceptance.py                # refuses incomplete pilot data
 python topics.py                     # generation + dual-teacher overlap screening
 python collect.py benchmark
@@ -196,8 +201,8 @@ python collect.py benchmark-titles
 python group_split.py
 python collect.py families           # validation ownership first
 python mine.py                       # GPU; writes exactly 100k pairs or refuses
-python label.py sol train --limit-pairs 2000
-python label.py opus train --limit-pairs 2000
+python label.py A train --limit-pairs 2000
+python label.py B train --limit-pairs 2000
 # Audit first cohort, then explicitly run remaining train + validation labeling.
 python export.py                     # provisional labels + unresolved review files
 python -m unittest test_contract -v
@@ -217,7 +222,7 @@ The labelers wait through preparation's auto-restart intervals. Completed servic
 remain `active/exited`, distinguishable from `active/running`.
 
 `prepare.sh` pins the corpus release. It explicitly allows deferred topic sections:
-Opus refused all four immunology screening proposals, so those 19 families are
+Teacher B refused all four immunology screening proposals, so those 19 families are
 recorded as missing, not retried or counted as covered. Other subjects proceed.
 `topics.json` records `deferred` and `complete`; `dataset-status.json` records the
 actual pair count against the 100,000 target and `training_approved: false`. No

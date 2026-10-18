@@ -11,7 +11,7 @@ import argparse
 import fcntl
 import json
 from pathlib import Path
-from common import ROOT, PROMPT_VERSION, Case, classify, settings, validate_response, presented, make_cases, digest, write_json
+from common import ROOT, PROMPT_VERSION, Case, classify, settings, teachers, validate_response, presented, make_cases, digest, write_json
 from allowance import check
 from control import provider_failure
 
@@ -87,7 +87,7 @@ def run(model, split, batch_size, limit_pairs=None):
 
 if __name__ == "__main__":
     ap=argparse.ArgumentParser()
-    ap.add_argument("model",choices=["sol","opus"])
+    ap.add_argument("model",choices=teachers.ROLES)
     ap.add_argument("split",choices=["train","validation"])
     ap.add_argument("--batch-size",type=int,choices=[5,10,25],default=25)
     ap.add_argument('--limit-pairs',type=int,default=None)

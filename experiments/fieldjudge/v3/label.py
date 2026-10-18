@@ -2,7 +2,7 @@
 Fail-closed allowance checks before each wave (round 2's allowance.py). Invalid replies are saved as errors and
 retried once, never guessed.
 
-    ~/Projects/scholarsreadinglist/sciencemadereadable/.venv/bin/python label.py sol|opus
+    ~/Projects/scholarsreadinglist/sciencemadereadable/.venv/bin/python label.py ROLE        (ROLE: one of teachers.ROLES, the private settings)
 """
 import json, sys, time
 import teacher as T

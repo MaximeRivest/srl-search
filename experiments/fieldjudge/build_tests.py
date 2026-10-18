@@ -1,9 +1,9 @@
-"""The test sets, in one file: papers of the two held-out topics with Kimi K3's answers (the yardstick), their
+"""The test sets, in one file: papers of the two held-out topics with the reference model's answers (the yardstick), their
 sampling weights (stratified samples of each topic's whole-field candidates: weights give population precision and
 recall), Jev's answers (the checker to beat), the meta-analyses' on-topic references (habitat fragmentation) and the
 44 landmark papers (LLM post-training).
 
-    ../../.venv/bin/python build_tests.py        (Kimi/Jev keys in the environment; writes tests.jsonl; ~$0.10 of Jev)
+    ../../.venv/bin/python build_tests.py        (reference-model/Jev keys in the environment; writes tests.jsonl; ~$0.10 of Jev)
 """
 import json, sys
 from pathlib import Path
@@ -42,7 +42,7 @@ def add(test, topic, s, ids, ys, strata=None, N=None, n=None, jev=None):
         jev = J.Jev(1.0).label(ps, *topic)
     for k, (w, (t, a)) in enumerate(zip(ids, ps)):
         r = {"test": test, "set": s, "topic": topic[0], "definition": topic[1], "id": int(w), "text": J.paper_text(t, a),
-             "kimi": ys[k], "jev": None if jev[k] is None or jev[k] != jev[k] else float(jev[k]), "title_only": not a}
+             "reference": ys[k], "jev": None if jev[k] is None or jev[k] != jev[k] else float(jev[k]), "title_only": not a}
         if strata:
             r.update({"stratum": strata[k], "weight": N[strata[k]] / n[strata[k]]})
         rows.append(r)

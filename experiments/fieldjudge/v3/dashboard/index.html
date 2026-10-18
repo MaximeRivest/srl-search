@@ -22,7 +22,7 @@ svg text{fill:var(--mut);font-size:11px}.legend span{display:inline-flex;align-i
  <section class="card"><h2>Now</h2><div id="now"></div></section>
 </div>
 <section class="card"><h2>Is it learning?</h2>
- <p class="mut">Held-back questions, checked every 400 steps. "Pick" = it chooses the same option as the teacher (Sol and Opus agree with each other about 90% of the time, so that is the ceiling). "Yes/no" = round 2's skill, which must not get worse.</p>
+ <p class="mut">Held-back questions, checked every 400 steps. "Pick" = it chooses the same option as the teacher (the two teachers agree with each other about 90% of the time, so that is the ceiling). "Yes/no" = round 2's skill, which must not get worse.</p>
  <div class="legend" id="legend"></div><div id="chart"></div></section>
 <section class="card" style="margin-top:18px"><h2>Test results</h2>
  <p class="mut">Filled in when each model finishes. The expert test: 200 articles sorted by 5–6 experts into 176 subfields of a classification the model never trained on. Higher is better except where noted.</p>
@@ -50,16 +50,16 @@ function chart(models){
 function results(E){
   const cols=[['round2-0.8B','Before (round-2 0.8B)'],['v3-0.8B','New 0.8B'],['v3-2B','New 2B']];
   const rows=[
-   ['Expert test, specialist journals (one question, 176 options)',e=>e.expert_flat?.disciplinary?.[0]/100,'Jev 64–68% · Qwen 27B 57–64% · one human expert 63% · Sol 66%'],
-   ['Expert test, general journals',e=>e.expert_flat?.multidisciplinary?.[0]/100,'Jev 61–67% · Qwen 27B 62–67% · human 57% · Sol 69%'],
+   ['Expert test, specialist journals (one question, 176 options)',e=>e.expert_flat?.disciplinary?.[0]/100,'Jev 64–68% · Qwen 27B 57–64% · one human expert 63% · teacher A 66%'],
+   ['Expert test, general journals',e=>e.expert_flat?.multidisciplinary?.[0]/100,'Jev 61–67% · Qwen 27B 62–67% · human 57% · teacher A 69%'],
    ['Expert test, the 22 broad fields',e=>e.expert_field?.field_agreement?.[0]/100,'Jev 78–86% · Qwen 27B 78–84%'],
    ['Expert test, level by level (field, then subfield), specialist',e=>e.expert_tree?.disciplinary?.[0]/100,''],
    ['Same pick when the options are shuffled',e=>e.expert_shuffled?.same_pick_as_unshuffled/100,'goal ≥ 90%'],
    ['Honest probabilities: calibration error (lower is better)',e=>e.expert_flat?.ece_vs_experts,'goal ≤ 0.05',1],
    ['Yes/no on 8 held-out topics (average precision)',e=>e.yesno_heldout_topics?.macro_average_precision,'round 2: 0.68 (0.8B) · 0.75 (2B)',1],
-   ['Unseen classification: economics JEL codes, agrees with Sol',e=>e.unseen_jel?.sol?.agree_top/100,'Sol vs Opus 92%'],
-   ['Unseen invented classifications, agrees with Sol',e=>e.unseen_invented?.sol?.agree_top/100,'Sol vs Opus 90%'],
-   ['Unseen papers on known classifications, agrees with Sol',e=>e.unseen_papers?.sol?.agree_top/100,'Sol vs Opus 92%'],
+   ['Unseen classification: economics JEL codes, agrees with teacher A',e=>e.unseen_jel?.teacher_a?.agree_top/100,'teacher A vs B 92%'],
+   ['Unseen invented classifications, agrees with teacher A',e=>e.unseen_invented?.teacher_a?.agree_top/100,'teacher A vs B 90%'],
+   ['Unseen papers on known classifications, agrees with teacher A',e=>e.unseen_papers?.teacher_a?.agree_top/100,'teacher A vs B 92%'],
    ['Speed: questions per second (shared card)',e=>e.speed?(e.speed.questions/e.speed.seconds.at(-1)):null,'',2]];
   let h='<table><tr><th>Test</th>'+cols.map(c=>`<th>${c[1]}</th>`).join('')+'<th>For comparison</th></tr>';
   for(const [name,f,ref,kind] of rows){ h+=`<tr><td>${name}</td>`;
@@ -75,7 +75,7 @@ async function tick(){
   const prog=m=>m.total?m.step/m.total:0;
   $('steps').innerHTML=
     st(true,false,'Classifications collected',`${d.schemes} schemes: 8 from the web, our 28 maps, invented ones (some held out)`)+
-    st(true,false,'Teachers labelled',`Sol ${d.teachers.sol.units} requests, Opus ${d.teachers.opus.units} · ${(mf.pick_train||0).toLocaleString()} questions + ${(mf.yesno_train||0).toLocaleString()} yes/no`)+
+    st(true,false,'Teachers labelled',`teacher A ${d.teachers.teacher_a.units} requests, teacher B ${d.teachers.teacher_b.units} · ${(mf.pick_train||0).toLocaleString()} questions + ${(mf.yesno_train||0).toLocaleString()} yes/no`)+
     st(m08.state==='done',m08.state!=='done','Train the 0.8B',m08.state==='done'?'finished':`step ${m08.step} of ${m08.total||'?'} · ${m08.state}`,m08.state==='done'?null:prog(m08))+
     st(!!E['v3-0.8B'],m08.state==='done'&&!E['v3-0.8B'],'Test the 0.8B','expert test, yes/no, unseen classifications, speed')+
     st(m2.state==='done',m2.state!=='done'&&m2.state!=='not started','Train the 2B',m2.state==='done'?'finished':m2.state==='not started'?'starts after the 0.8B test (needs 8.5 GB free on the card)':`step ${m2.step} of ${m2.total||'?'} · ${m2.state}`,m2.state==='training'?prog(m2):null)+
@@ -88,7 +88,7 @@ async function tick(){
     (cur.validation.length?`<p>Latest check (step ${cur.validation.at(-1)[0]}): picks like the teacher <b>${pct(cur.validation.at(-1)[1])}</b>, yes/no <b>${pct(cur.validation.at(-1)[2])}</b> (started at ${pct(cur.validation[0][1])} / ${pct(cur.validation[0][2])})</p>`:'');
   chart(d.models); results(E);
   $('sub').textContent=`Updated ${clock(d.now)} · refreshes every 30 s · nothing is deployed`;
-  $('foot').textContent='Teachers: Sol 6.1 and Opus 5.5 (subscriptions). Reference labels are AI labels except the expert test. Data: /mnt/fast/scholarsreadinglist/fieldjudge/v3.';
+  $('foot').textContent='Teachers: two models, set in the private settings (teachers.py). Reference labels are AI labels except the expert test. Data: /mnt/fast/scholarsreadinglist/fieldjudge/v3.';
 }
 tick(); setInterval(tick,30000);
 </script></body></html>

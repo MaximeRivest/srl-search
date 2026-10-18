@@ -1,9 +1,9 @@
 """Step 1: research topics across all of science, as researchers would type them, for training a general field
-judge (README.md). Kimi K3 proposes 18 per OpenAlex field; half get a one-sentence definition, a few are
+judge (README.md). The reference model proposes 18 per OpenAlex field; half get a one-sentence definition, a few are
 deliberately ambiguous words (with the definition that settles them). Near-duplicates and topics close to
 the test topics are taken out in sample.py, by meaning.
 
-    ../../.venv/bin/python topics.py            (Kimi keys in the environment; writes topics_raw.json, ~$0.30)
+    ../../.venv/bin/python topics.py            (reference-model keys in the environment; writes topics_raw.json, ~$0.30)
 """
 import json, os, re, sys, urllib.request
 from concurrent.futures import ThreadPoolExecutor
@@ -30,8 +30,14 @@ degree, or "transformers" in electrical engineering vs machine learning), with t
 Answer with JSON only: [{{"topic": "...", "definition": "..." or null}}, ...]"""
 
 
-def kimi(prompt: str) -> str:
-    for name, url, model, extra, price, key in [(n, *v) for n, v in J.KIMI.items() if os.environ.get(v[4])]:
+def reference_providers() -> list[tuple]:
+    """The reference model's providers that have a key in the environment, in order: the production teacher's own
+    table (srl_search.judges.Teacher), not a copy. Raises if there is none."""
+    return J.Teacher(budget_usd=float("inf")).providers
+
+
+def ask_reference(prompt: str) -> str:
+    for name, url, model, extra, price, key in reference_providers():
         try:
             body = json.dumps({"model": model, "temperature": 0.7, "max_tokens": 5000, **extra,
                                "messages": [{"role": "user", "content": prompt}]}).encode()
@@ -52,7 +58,7 @@ def parse(text: str) -> list[dict]:
 def one(f):
     for attempt in range(4):
         try:
-            return f, parse(kimi(ASK.format(field=f)))
+            return f, parse(ask_reference(ASK.format(field=f)))
         except ValueError as e:
             print(f, "unreadable answer, again:", e, file=sys.stderr)
     return f, []

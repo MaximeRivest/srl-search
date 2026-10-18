@@ -1,14 +1,17 @@
-"""Round-two data contract and subscription-only connections. No deployment changes."""
+"""Round-two data contract and teacher connections (private settings, ../teachers.py). No deployment changes."""
 from __future__ import annotations
 import hashlib
 import json
 import os
+import sys
 import unicodedata
 from pathlib import Path
 from typing import Literal
-import lm15
 from functai import ai, _ai
 from pydantic import BaseModel, Field
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # the fieldjudge folder: teachers.py
+import teachers  # noqa: E402
 
 ROOT = Path(os.environ.get("FIELDJUDGE_V2", "/mnt/fast/scholarsreadinglist/fieldjudge/v2"))
 ROOT.mkdir(parents=True, exist_ok=True)
@@ -59,17 +62,11 @@ def write_json(path: Path, obj):
     tmp.write_text(json.dumps(obj, indent=2, ensure_ascii=False, allow_nan=False) + "\n")
     os.replace(tmp, path)
 
-def settings(model: str):
+def settings(model: str, **extra):
+    """FunctAI settings of one teacher role (teachers.ROLES; models in the private settings) with round 2's cache."""
     common = dict(cache_replies=str(ROOT / "replies.sqlite"), api_retries=0, retries=0,
                   log_calls=str(ROOT / "calls"), log_content=True)
-    if model == "opus":
-        return dict(common, lm="claude:claude-opus-5-5",
-                    client=lm15.ClaudeCodeLM(claude_code_version="2.1.284"),
-                    reasoning=lm15.Reasoning(effort="off"), max_tokens=8192)
-    if model == "sol":
-        return dict(common, lm="openai-codex:gpt-6.1-sol", client=lm15.OpenAICodexLM(),
-                    reasoning=lm15.Reasoning(effort="low"))
-    raise ValueError(model)
+    return teachers.settings(model, **{**common, **extra})
 
 def validate(cases: list[dict], values, strict_evidence=True) -> list[dict]:
     """Invalid IDs fail the batch. Non-verbatim evidence is rejected or explicitly quarantined."""

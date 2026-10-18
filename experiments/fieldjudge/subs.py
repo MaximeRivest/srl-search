@@ -1,16 +1,21 @@
-"""Subscription judges (Claude login, ChatGPT/Codex login) asked exactly what Kimi K3 is asked (srl_search/judges.py)."""
+"""Extra judges, asked exactly what the reference model is asked (srl_search/judges.py). Which models, through which
+accounts, with which reasoning effort and output cap: the private settings (teachers.py, JUDGES)."""
 import sys, time
+from pathlib import Path
 import lm15
 sys.path.insert(0, "/home/maxime/Projects/scholarsreadinglist/search-dev")
+sys.path.insert(0, str(Path(__file__).resolve().parent))  # teachers.py
 from srl_search import judges as J
+import teachers
 
-CLAUDE = lm15.ClaudeCodeLM(claude_code_version="2.1.284")
-CODEX = lm15.OpenAICodexLM()
-MODELS = {  # name: (client, model id, reasoning)
-    "opus-5.5": (CLAUDE, "claude-opus-5-5", "off"), "sonnet-5.5": (CLAUDE, "claude-sonnet-5-5", "off"),
-    "haiku-5.5": (CLAUDE, "claude-haiku-5-5", "off"),
-    "sol-6.1": (CODEX, "gpt-6.1-sol", "low"), "astra-6": (CODEX, "gpt-6-astra", "low"), "luna-6": (CODEX, "gpt-6-luna", "low"),
-}
+MODELS = teachers.judges()  # public name: {"account", "model", "effort", "max_tokens", ...}
+_CLIENTS = {}               # one client per account, shared by its judges
+
+
+def client(account):
+    if account not in _CLIENTS:
+        _CLIENTS[account] = teachers.client(account)
+    return _CLIENTS[account]
 
 
 def system(topic, definition):
@@ -20,11 +25,11 @@ def system(topic, definition):
 
 def ask(name, topic, definition, text):
     """1.0 on topic, 0.0 not, None unreadable. Raises lm15.RateLimitError."""
-    client, model, eff = MODELS[name]
-    req = lm15.Request(model=model, messages=(lm15.Message.user(text),), system=system(topic, definition),
-                       config=lm15.Config(max_tokens=None if client is CODEX else 400,      # Codex refuses a cap
-                                          reasoning=lm15.Reasoning(effort=eff)))
-    ans = (client.complete(req).text or "").strip().lower().strip(".\"'*` -")
+    j = MODELS[name]
+    req = lm15.Request(model=j["model"], messages=(lm15.Message.user(text),), system=system(topic, definition),
+                       config=lm15.Config(max_tokens=j.get("max_tokens"),      # None: some backends refuse a cap
+                                          reasoning=lm15.Reasoning(effort=j["effort"])))
+    ans = (client(j["account"]).complete(req).text or "").strip().lower().strip(".\"'*` -")
     return 0.0 if ans.startswith("not on topic") else 1.0 if ans.startswith("on topic") else None
 
 

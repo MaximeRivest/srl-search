@@ -6,7 +6,7 @@ out, as there.
 
 Leakage guards: near-duplicate topics (cosine > 0.9) are dropped; topics close to the two test topics (cosine > 0.55
 to "habitat fragmentation" or to "LLM post-training: <definition>", listed in the output) are dropped; papers of the
-test sets (Kimi yardsticks, meta-analyses' references, landmarks) are never sampled.
+test sets (reference-model yardsticks, meta-analyses' references, landmarks) are never sampled.
 
     ../../.venv/bin/python sample.py        (~30 min; writes samples.jsonl, resumable; topics.json)
 """

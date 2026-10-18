@@ -1,4 +1,4 @@
-"""Offline checks: IDs, evidence, and fail-closed subscription accounting."""
+"""Offline checks: IDs, evidence, and fail-closed allowance accounting (no private settings needed)."""
 import json
 import tempfile
 import unittest
@@ -6,6 +6,9 @@ from pathlib import Path
 from unittest.mock import patch
 from common import validate, validate_response, presented
 import allowance
+
+A = allowance.teachers.ROLES[0]
+as_reported = lambda model, usage: usage   # the private settings normalise real reports; here they are normal already
 
 class ContractTests(unittest.TestCase):
     def setUp(self):
@@ -36,27 +39,28 @@ class ContractTests(unittest.TestCase):
         with self.assertRaises(ValueError): validate_response(self.cases,v)
     def test_provider_failure_stops(self):
         with patch.object(allowance,'get_usage',side_effect=TimeoutError):
-            with self.assertRaises(allowance.Pause): allowance.check('sol',force=True)
+            with self.assertRaises(allowance.Pause): allowance.check(A,force=True)
     def test_usage_rate_limit_waits_without_allowing_calls(self):
         import urllib.error
         error = urllib.error.HTTPError('usage',429,'limited',{},None)
-        status={'rate_limit':{'limit_reached':False,'primary_window':{'used_percent':4}},'credits':{'balance':0}}
+        status={'windows':[{'window':'w1','used':4,'resets':None}],'credits':0,'blocked':False}
         with tempfile.TemporaryDirectory() as d, patch.object(allowance,'ROOT',Path(d)), \
-             patch.object(allowance,'get_usage',side_effect=[error,status]) as get, patch.object(allowance.time,'sleep') as sleep:
-            allowance.check('sol',force=True)
+             patch.object(allowance,'get_usage',side_effect=[error,status]) as get, patch.object(allowance.time,'sleep') as sleep, \
+             patch.object(allowance,'normalise',as_reported):
+            allowance.check(A,force=True)
             sleep.assert_called_once_with(300.0)
             self.assertEqual(get.call_count,2)
     def test_checks_all_windows_and_persists_credit_floor(self):
         with tempfile.TemporaryDirectory() as d, patch.object(allowance,'ROOT',Path(d)):
-            status={'rate_limit':{'limit_reached':False,'primary_window':{'used_percent':4},'secondary_window':{'used_percent':12}},
-                    'credits':{'balance':10}}
-            with patch.object(allowance,'get_usage',return_value=status):
-                allowance.check('sol',force=True)
-                status['rate_limit']['secondary_window']['used_percent']=86
-                with self.assertRaises(allowance.Pause): allowance.check('sol',force=True)
-                status['rate_limit']['secondary_window']['used_percent']=12
-                status['credits']['balance']=9
-                with self.assertRaises(allowance.Pause): allowance.check('sol',force=True)
-                self.assertEqual(json.loads((Path(d)/'credits-start-sol.json').read_text())['credits'],10)
+            status={'windows':[{'window':'w1','used':4,'resets':None},{'window':'w2','used':12,'resets':None}],
+                    'credits':10,'blocked':False}
+            with patch.object(allowance,'get_usage',return_value=status), patch.object(allowance,'normalise',as_reported):
+                allowance.check(A,force=True)
+                status['windows'][1]['used']=86
+                with self.assertRaises(allowance.Pause): allowance.check(A,force=True)
+                status['windows'][1]['used']=12
+                status['credits']=9
+                with self.assertRaises(allowance.Pause): allowance.check(A,force=True)
+                self.assertEqual(json.loads((Path(d)/f'credits-start-{A}.json').read_text())['credits'],10)
 
 if __name__=='__main__': unittest.main()

@@ -1,4 +1,4 @@
-"""Step 6: the general judge's yes/no line, per topic, from the 400 Kimi answers every whole-field run already has
+"""Step 6: the general judge's yes/no line, per topic, from the 400 reference-model answers every whole-field run already has
 (the real runs' teacher answers; disjoint from the test yardsticks). P(y | score) does not depend on how papers were
 sampled when the sampling depends only on the paper (distance buckets, citations), so a logistic fit on those 400
 (Platt) gives probabilities for the whole population; then (a) the line at 0.5, or (b) the line that maximises the
@@ -75,8 +75,8 @@ for t, (topic, defin, run) in RUNS.items():
     pt = score(J.instruction(topic, defin) + ANSWER, texts)
     platt = LogisticRegression(C=100).fit(lg(pt).reshape(-1, 1), ys)
     cal = lambda p: platt.predict_proba(lg(p).reshape(-1, 1))[:, 1]
-    idx = [i for i, r in enumerate(tests) if r["test"] == t and r["set"] == "population" and r["kimi"] is not None]
-    y = np.array([tests[i]["kimi"] >= 0.5 for i in idx]); w = np.array([tests[i]["weight"] for i in idx])
+    idx = [i for i, r in enumerate(tests) if r["test"] == t and r["set"] == "population" and r["reference"] is not None]
+    y = np.array([tests[i]["reference"] >= 0.5 for i in idx]); w = np.array([tests[i]["weight"] for i in idx])
     raw, c = p_test[idx], cal(p_test[idx])
     o = np.argsort(-c); cw = np.cumsum((w * c)[o]); nw = np.cumsum(w[o])
     f1 = 2 * cw / (nw + (w * c).sum()); cut = float(c[o][int(np.argmax(f1))])
@@ -84,7 +84,7 @@ for t, (topic, defin, run) in RUNS.items():
         tp = (w * yes * y).sum(); P, R = tp / (w * yes).sum(), tp / (w * y).sum(); return round(P, 3), round(R, 3), round(2 * P * R / (P + R), 3)
     res[t] = {"raw@0.5": pr(raw >= .5), "calibrated@0.5": pr(c >= .5), f"calibrated@expected-F1 ({cut:.2f})": pr(c >= cut),
               "teacher_auc_of_raw": None, "expected_on_topic_share": round(float((w * c).sum() / w.sum()), 4),
-              "kimi_on_topic_share": round(float((w * y).sum() / w.sum()), 4)}
+              "reference_on_topic_share": round(float((w * y).sum() / w.sum()), 4)}
     for i_set in ("meta_refs", "landmarks", "cited50"):
         j = [i for i, r in enumerate(tests) if r["test"] == t and r["set"] == i_set]
         if j:

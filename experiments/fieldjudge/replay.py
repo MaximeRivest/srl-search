@@ -1,10 +1,10 @@
 """Step 7: the general judge inside the real pipeline. The two test topics' whole-field selections are replayed
-(srl_search.field.select_field, today's code) with the run's own cached Kimi answers; only the judge that labels
+(srl_search.field.select_field, today's code) with the run's own cached reference-model answers; only the judge that labels
 10,000 papers for the students changes:
   A per-topic  the run's own decider (its cached scores: the v5 runs)
   B general-2B / C general-0.8B  the general judge, the topic's question in each prompt, no per-topic training
 Students, citation combiner, cut-off and Jev's check run for real in every arm (Jev ~$0.5 per fragmentation arm).
-Measured against Kimi: tests.jsonl (population sample, papers cited 50+, meta-analyses' studies, landmarks).
+Measured against the reference model: tests.jsonl (population sample, papers cited 50+, meta-analyses' studies, landmarks).
 
     ../../.venv/bin/python replay.py        (GPU 1; keys in the environment; writes replay.json)
 """
@@ -23,11 +23,11 @@ RUNS = {"frag": ("habitat fragmentation", None, "fields-test5/a699318c9a209d289e
                 "tuning, reinforcement learning from human or AI feedback, preference optimization such as DPO, reinforcement "
                 "learning for reasoning, and alignment training", "fields-test6/1a0c3446c53e7f1da081def4")}
 ARMS = {"per-topic": None, "general-2B": D / "m2b" / "merged", "general-0.8B": D / "m08" / "merged",
-        "ensemble": "ensemble",      # Kimi and Jev as now; the 10k labels: mean logit of the per-topic decider and the 2B
-        "2B-only": "2B-only",        # no Kimi, no Jev: the 2B is the teacher, the 10k labeller and the final checker
-        "new08-only": "new08-only",  # the same, with the round-2 0.8B (Sol + Opus labels)
+        "ensemble": "ensemble",      # the reference model and Jev as now; the 10k labels: mean logit of the per-topic decider and the 2B
+        "2B-only": "2B-only",        # no reference model, no Jev: the 2B is the teacher, the 10k labeller and the final checker
+        "new08-only": "new08-only",  # the same, with the round-2 0.8B (the two teachers' labels)
         "new2B-only": "new2B-only",  # the same, with the round-2 2B (skipped until it exists)
-        "old08-only": "old08-only"}  # the same, with the round-1 0.8B (Kimi labels): the matched baseline
+        "old08-only": "old08-only"}  # the same, with the round-1 0.8B (reference labels): the matched baseline
 M2B = D / "m2b" / "merged"
 ONLY = {"2B-only": M2B, "new08-only": D / "v2" / "models" / "0.8B" / "merged",
         "new2B-only": D / "v2" / "models" / "2B" / "merged", "old08-only": D / "m08" / "merged"}
@@ -65,9 +65,9 @@ def text_of(ws):
 def measure(t, chosen):
     m = {"papers": len(chosen)}
     for s in ("population", "cited50"):
-        rs = [r for r in tests if r["test"] == t and r["set"] == s and r["kimi"] is not None]
+        rs = [r for r in tests if r["test"] == t and r["set"] == s and r["reference"] is not None]
         if rs:
-            y = np.array([r["kimi"] >= .5 for r in rs]); w = np.array([r["weight"] for r in rs])
+            y = np.array([r["reference"] >= .5 for r in rs]); w = np.array([r["weight"] for r in rs])
             yes = np.array([r["id"] in chosen for r in rs])
             tp = (w * yes * y).sum(); P, R = tp / (w * yes).sum(), tp / (w * y).sum()
             m[s] = {"precision": round(P, 3), "recall": round(R, 3), "f1": round(2 * P * R / (P + R), 3)}
@@ -135,7 +135,7 @@ for t, (q, defin, run) in RUNS.items():
 
         work = OUT / f"{t}-{arm}" / "work"
 
-        class Teacher2B:                                # the 2B in Kimi's place
+        class Teacher2B:                                # the 2B in the reference model's place
             def __init__(self, b): self.usd, self.failed, self.slowest = 0.0, 0, {}
             def label(self, texts, q_, d_): return score_2b(texts, question, work / "teacher2b", ONLY[model])
 

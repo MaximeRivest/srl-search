@@ -6,9 +6,13 @@
 # not a reboot. After reboot, run this script again.
 set -euo pipefail
 cd "$(dirname "$0")"
-units=(fj-v2-prepare fj-v2-first-sol fj-v2-first-opus)
+SUB=/home/maxime/Projects/scholarsreadinglist/sciencemadereadable/.venv/bin/python
+# Teacher roles A and B (names used on disk) come from the private settings (../teachers.py).
+read -r A B < <("$SUB" -c 'import sys; sys.path.insert(0, ".."); import teachers; print(*teachers.ROLES)')
+[[ -n ${B:-} ]] || { echo 'teacher roles unreadable (../teachers.py)'; exit 78; }
+units=(fj-v2-prepare fj-v2-first-a fj-v2-first-b)
 if [[ ${1:-} == --restart ]]; then
-  systemctl --user stop "${units[@]}" 2>/dev/null || true
+  systemctl --user stop "${units[@]}" "fj-v2-first-$A" "fj-v2-first-$B" 2>/dev/null || true  # also older role-named units
 fi
 start_job() {
   local unit=$1 script=$2
@@ -28,6 +32,6 @@ start_job() {
     -E PYTHONUNBUFFERED=1 /bin/bash "$script" "$@"
 }
 start_job fj-v2-prepare prepare.sh
-start_job fj-v2-first-sol first_cohort.sh sol
-start_job fj-v2-first-opus first_cohort.sh opus
+start_job fj-v2-first-a first_cohort.sh "$A"
+start_job fj-v2-first-b first_cohort.sh "$B"
 printf '\nProgress: journalctl --user -u fj-v2-prepare -f\n'

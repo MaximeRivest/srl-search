@@ -4,7 +4,7 @@ Benchmark: ~/Projects/jevarticle (Rivest et al. 2021, PLOS ONE 0251493, Benchmar
 experts each into the 176 Science-Metrix subfields. Score = agreement with the experts' modal first choice (a tie: any
 tied subfield counts), disciplinary and multidisciplinary halves separately, as in jevarticle/scripts/score.py.
 
-Models: the base Qwen3.5-0.8B and 2B (what we fine-tuned), round 1 (Kimi labels) and round 2 (Sol + Opus labels, live).
+Models: the base Qwen3.5-0.8B and 2B (what we fine-tuned), round 1 (reference labels) and round 2 (the two teachers' labels, live).
 Two ways to ask (vllm_pick.py):
   pick    the jevarticle prompt, same wording as its Jev and Qwen 27B runs (title, journal, year, abstract; all 176 names
           listed), every name scored as a full answer: a distribution over the 176

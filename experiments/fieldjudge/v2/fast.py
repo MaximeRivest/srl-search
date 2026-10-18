@@ -1,4 +1,4 @@
-"""Streaming, single-pass Sol/Opus labels: short answers, no order/evidence passes.
+"""Streaming, single-pass labels from the two teachers: short answers, no order/evidence passes.
 
 Queue files are atomic, immutable inputs; one teacher worker each uses FunctAI's
 reply cache and saves every batch before proceeding. Classification errors are
@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Literal
 from functai import ai, _ai
 from pydantic import BaseModel, Field
-from common import ROOT, OLD, digest, settings, write_json
+from common import ROOT, OLD, digest, settings, teachers, write_json
 from allowance import check
 from control import provider_failure, NeedsAttention
 from stream_queue import enqueue
@@ -68,7 +68,7 @@ def request(batch):
     return {'topic':topic,'definition':definition,'papers':[Paper(id=f'p{i+1:02d}',text=r['text']) for i,r in enumerate(rows)]}
 
 def seed():
-    """Enrich existing training candidates now; retain their old Kimi labels elsewhere, hidden from both teachers."""
+    """Enrich existing training candidates now; retain their old reference labels elsewhere, hidden from both teachers."""
     manifest=FAST/'seed.json'
     if manifest.exists():
         print('Seed already queued:',json.loads(manifest.read_text())['pairs'],flush=True);return
@@ -107,13 +107,10 @@ def seed():
 def run(model):
     folder=FAST/'answers'/model;folder.mkdir(parents=True,exist_ok=True)
     lock=open(folder/'worker.lock','w');fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
-    import lm15
     from lm15.transports import StdlibTransport
-    config=settings(model)
+    config=settings(model,**teachers.overrides(model,'fast'))
     transport=StdlibTransport(read_timeout=90,write_timeout=90,pool_timeout=90,max_connections=4)
-    config['client']=(lm15.ClaudeCodeLM(claude_code_version='2.1.284',transport=transport) if model=='opus'
-                      else lm15.OpenAICodexLM(transport=transport))
-    if model=='opus':config['max_tokens']=2048
+    config['client']=teachers.client(model,transport=transport)
     fn=label_batch.using(**config)
     assignment_path=FAST/'assignment.json'
     assignment=json.loads(assignment_path.read_text()) if assignment_path.exists() else None
@@ -185,12 +182,12 @@ def status():
     for p in (FAST/'queue').glob('*.json'):
         rows=json.loads(p.read_text())['pairs'];n+=len(rows);ids.update(r['work_id'] for r in rows)
     print('QUEUED',n,'pairs;',len(ids),'distinct papers')
-    for m in ('sol','opus'):
+    for m in teachers.ROLES:
         p=FAST/'answers'/m/'status.json'
         if p.exists():print(m,json.loads(p.read_text()))
 
 if __name__=='__main__':
-    ap=argparse.ArgumentParser();ap.add_argument('command',choices=['seed','run','status']);ap.add_argument('--model',choices=['sol','opus'])
+    ap=argparse.ArgumentParser();ap.add_argument('command',choices=['seed','run','status']);ap.add_argument('--model',choices=teachers.ROLES)
     a=ap.parse_args()
     if a.command=='seed':seed()
     elif a.command=='status':status()

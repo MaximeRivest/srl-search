@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Free (no Kimi, no Jev) replay of the round-2 judges on GPU 0, then the reading-list check.
+# Free (no reference model, no Jev) replay of the round-2 judges on GPU 0, then the reading-list check.
 # Pauses the public 9B rewriter only while it runs; always restores it on exit (success, failure or stop).
-# Does not start InkType. Kimi is used only afterwards, to SCORE reading lists (~$1), never inside the maps.
+# Does not start InkType. The reference model is used only afterwards, to SCORE reading lists (~$1), never inside the maps.
 set -euo pipefail
 cd "$(dirname "$0")"
 PY=/home/maxime/Projects/scholarsreadinglist/search-dev/.venv/bin/python

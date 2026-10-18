@@ -1,12 +1,12 @@
-"""Step 5: the judges on the two held-out topics (tests.jsonl, build_tests.py), Kimi K3 as the yardstick.
+"""Step 5: the judges on the two held-out topics (tests.jsonl, build_tests.py), the reference model as the yardstick.
 
 Judges: general models (train.py: the question in each prompt), the per-topic deciders of the real whole-field runs
-(each trained on 400 Kimi answers about its own topic: the baseline to beat), and Jev (its answers are in tests.jsonl).
+(each trained on 400 reference-model answers about its own topic: the baseline to beat), and Jev (its answers are in tests.jsonl).
 For each topic:
-  population  stratified sample of the whole-field candidates, weighted to the population: AUC; agreement with Kimi;
+  population  stratified sample of the whole-field candidates, weighted to the population: AUC; agreement with the reference model;
               precision and recall if the judge decided every candidate alone (at 0.5)
   cited50     papers cited 50+ times (what tops reading lists; habitat fragmentation): AUC, precision, recall
-  meta_refs   the studies 19 meta-analyses cite that Kimi calls on topic: share the judge says yes to (title only too)
+  meta_refs   the studies 19 meta-analyses cite that the reference model calls on topic: share the judge says yes to (title only too)
   landmarks   44 landmark papers of LLM post-training: share it says yes to
 
     ../../.venv/bin/python eval.py NAME=MODEL_DIR ...     (GPU 1; writes results.json, adds to it)
@@ -52,11 +52,11 @@ def metrics(rs: list[dict], p: np.ndarray) -> dict:
     for test in ("frag", "llm"):
         m = {}
         for s in ("population", "cited50"):
-            idx = [i for i, r in enumerate(rs) if r["test"] == test and r["set"] == s and r["kimi"] is not None
+            idx = [i for i, r in enumerate(rs) if r["test"] == test and r["set"] == s and r["reference"] is not None
                    and p[i] == p[i]]                    # a judge that did not answer a paper: left out
             if not idx:
                 continue
-            y = np.array([rs[i]["kimi"] >= 0.5 for i in idx])
+            y = np.array([rs[i]["reference"] >= 0.5 for i in idx])
             w = np.array([rs[i]["weight"] for i in idx])
             q = p[idx]
             yes = q >= 0.5

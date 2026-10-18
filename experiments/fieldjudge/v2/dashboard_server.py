@@ -3,13 +3,16 @@ import argparse
 import json
 import math
 import subprocess
+import sys
 import threading
 import time
 from http.server import BaseHTTPRequestHandler,ThreadingHTTPServer
 from pathlib import Path
 from stream_queue import ROOT,FAST
 HERE=Path(__file__).resolve().parent
-LOCK=threading.Lock(); ANSWERS={'sol':{},'opus':{}}; SEEN={'sol':set(),'opus':set()}
+sys.path.insert(0,str(HERE.parent))  # the fieldjudge folder: teachers.py
+import teachers  # noqa: E402
+LOCK=threading.Lock(); ANSWERS={m:{} for m in teachers.ROLES}; SEEN={m:set() for m in teachers.ROLES}
 
 def read(path,default=None):
     try:return json.loads(path.read_text())
@@ -37,7 +40,7 @@ def snapshot():
                 if value is None:continue
                 for r in value.get('answers',[]):ANSWERS[m][r['id']]=r.get('label')
                 SEEN[m].add(path.stem)
-        ids=set(ANSWERS['sol'])|set(ANSWERS['opus'])
+        ids=set().union(*ANSWERS.values())
         labeled=sum(any(ANSWERS[m].get(k) is not None for m in ANSWERS) for k in ids)
         binary=sum(any(ANSWERS[m].get(k) in ('on_topic','off_topic') for m in ANSWERS) for k in ids)
         initial=read(ROOT/'training/initial-manifest.json',{})

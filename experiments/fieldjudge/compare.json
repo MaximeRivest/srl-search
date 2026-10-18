@@ -1,6 +1,6 @@
 {
  "judges": {
-  "kimi-k3": {
+  "reference": {
    "seconds_median": null,
    "frag": {
     "agree_with_others": 0.982,
@@ -36,7 +36,7 @@
    },
    "landmarks": 0.955
   },
-  "opus-5.5": {
+  "judge-1": {
    "seconds_median": 1.7,
    "frag": {
     "agree_with_others": 0.946,
@@ -54,7 +54,7 @@
    },
    "landmarks": 0.977
   },
-  "sonnet-5.5": {
+  "judge-2": {
    "seconds_median": 1.26,
    "frag": {
     "agree_with_others": 0.984,
@@ -72,7 +72,7 @@
    },
    "landmarks": 0.977
   },
-  "haiku-5.5": {
+  "judge-3": {
    "seconds_median": 1.13,
    "frag": {
     "agree_with_others": 0.971,
@@ -90,7 +90,7 @@
    },
    "landmarks": 0.977
   },
-  "sol-6.1": {
+  "judge-4": {
    "seconds_median": 2.09,
    "frag": {
     "agree_with_others": 0.987,
@@ -108,7 +108,7 @@
    },
    "landmarks": 0.977
   },
-  "astra-6": {
+  "judge-5": {
    "seconds_median": 2.36,
    "frag": {
     "agree_with_others": 0.987,
@@ -126,7 +126,7 @@
    },
    "landmarks": 0.955
   },
-  "luna-6": {
+  "judge-6": {
    "seconds_median": 1.48,
    "frag": {
     "agree_with_others": 0.973,
@@ -146,33 +146,33 @@
   }
  },
  "pairs": {
-  "kimi-k3 ~ opus-5.5": 0.96,
-  "kimi-k3 ~ sonnet-5.5": 0.977,
-  "kimi-k3 ~ sol-6.1": 0.96,
-  "kimi-k3 ~ luna-6": 0.967,
-  "jev ~ kimi-k3": 0.978,
-  "jev ~ opus-5.5": 0.951,
-  "jev ~ sonnet-5.5": 0.981,
-  "jev ~ sol-6.1": 0.952,
-  "jev ~ luna-6": 0.969,
-  "opus-5.5 ~ sonnet-5.5": 0.953,
-  "opus-5.5 ~ sol-6.1": 0.939,
-  "haiku-5.5 ~ kimi-k3": 0.962,
-  "haiku-5.5 ~ jev": 0.962,
-  "haiku-5.5 ~ opus-5.5": 0.937,
-  "haiku-5.5 ~ sonnet-5.5": 0.968,
-  "haiku-5.5 ~ sol-6.1": 0.946,
-  "haiku-5.5 ~ luna-6": 0.961,
-  "sol-6.1 ~ sonnet-5.5": 0.956,
-  "astra-6 ~ kimi-k3": 0.959,
-  "astra-6 ~ jev": 0.952,
-  "astra-6 ~ opus-5.5": 0.939,
-  "astra-6 ~ sonnet-5.5": 0.956,
-  "astra-6 ~ haiku-5.5": 0.945,
-  "astra-6 ~ sol-6.1": 0.998,
-  "astra-6 ~ luna-6": 0.95,
-  "luna-6 ~ opus-5.5": 0.939,
-  "luna-6 ~ sonnet-5.5": 0.971,
-  "luna-6 ~ sol-6.1": 0.951
+  "jev ~ reference": 0.978,
+  "jev ~ judge-1": 0.951,
+  "jev ~ judge-2": 0.981,
+  "jev ~ judge-3": 0.962,
+  "jev ~ judge-4": 0.952,
+  "jev ~ judge-5": 0.952,
+  "jev ~ judge-6": 0.969,
+  "judge-1 ~ reference": 0.96,
+  "judge-1 ~ judge-2": 0.953,
+  "judge-1 ~ judge-3": 0.937,
+  "judge-1 ~ judge-4": 0.939,
+  "judge-1 ~ judge-5": 0.939,
+  "judge-1 ~ judge-6": 0.939,
+  "judge-2 ~ reference": 0.977,
+  "judge-2 ~ judge-3": 0.968,
+  "judge-2 ~ judge-4": 0.956,
+  "judge-2 ~ judge-5": 0.956,
+  "judge-2 ~ judge-6": 0.971,
+  "judge-3 ~ reference": 0.962,
+  "judge-3 ~ judge-4": 0.946,
+  "judge-3 ~ judge-5": 0.945,
+  "judge-3 ~ judge-6": 0.961,
+  "judge-4 ~ reference": 0.96,
+  "judge-4 ~ judge-5": 0.998,
+  "judge-4 ~ judge-6": 0.951,
+  "judge-5 ~ reference": 0.959,
+  "judge-5 ~ judge-6": 0.95,
+  "judge-6 ~ reference": 0.967
  }
 }

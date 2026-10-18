@@ -7,7 +7,7 @@ Every rejected case remains in the review pool. The held-out benchmark must not
 be filtered to agreement cases when assessing model quality.
 """
 import json
-from common import ROOT, write_json, validate_response
+from common import ROOT, teachers, write_json, validate_response
 from pilot import select, PILOT
 
 def phase(model, name):
@@ -22,7 +22,7 @@ def phase(model, name):
 
 def run():
     cases=select()[:100]
-    judgments={m:{s:phase(m,s) for s in ('batch25','single','reorder25')} for m in ('sol','opus')}
+    judgments={m:{s:phase(m,s) for s in ('batch25','single','reorder25')} for m in teachers.ROLES}
     if any(c['id'] not in judgments[m][s] for c in cases for m in judgments for s in judgments[m]):
         raise ValueError('incomplete paired pilot')
     accepted,consistent,review=[],[],[]

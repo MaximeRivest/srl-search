@@ -11,12 +11,17 @@ import argparse
 import fcntl
 import json
 import random
+import sys
 import time
 from collections import Counter, defaultdict
 from contextlib import ExitStack
+from pathlib import Path
 from stream_queue import FAST, digest, write_json
+sys.path.insert(0,str(Path(__file__).resolve().parents[1]))  # the fieldjudge folder: teachers.py
+import teachers  # noqa: E402
 
-MODELS=('sol','opus')
+MODELS=teachers.ROLES
+A,B=MODELS
 VALID={'on_topic','off_topic','uncertain'}
 
 def make_plan(batches, answers):
@@ -43,8 +48,8 @@ def make_plan(batches, answers):
         elif len(eligible)==1:assign(k,eligible[0])
         else:flexible[batch_id].append(k)
     total=len(rows)-len(covered)-len(review)
-    sol_target=max(counts['sol'],min(total//2,total-counts['opus']))
-    targets={'sol':sol_target,'opus':total-sol_target}
+    a_target=max(counts[A],min(total//2,total-counts[B]))
+    targets={A:a_target,B:total-a_target}
     order=sorted(flexible)
     random.Random(15726).shuffle(order)
     for batch_id in order:
@@ -58,8 +63,8 @@ def make_plan(batches, answers):
             for k in remaining[:n]:assign(k,model)
             remaining=remaining[n:]
     sets={m:{k for ks in allocations[m].values() for k in ks} for m in MODELS}
-    if sets['sol']&sets['opus'] or (sets['sol']|sets['opus'])&covered:raise ValueError('overlap in partition')
-    if sets['sol']|sets['opus']|covered|set(review)!=set(rows):raise ValueError('incomplete partition')
+    if sets[A]&sets[B] or (sets[A]|sets[B])&covered:raise ValueError('overlap in partition')
+    if sets[A]|sets[B]|covered|set(review)!=set(rows):raise ValueError('incomplete partition')
     return {'version':1,'mode':'single-teacher-remainder','created':time.time(),
             'queue_pairs':len(rows),'already_answered_pairs':len(covered),'review_only_ids':sorted(review),
             'remaining_pairs':total,'assigned_pairs':{m:counts[m] for m in MODELS},'targets':targets,

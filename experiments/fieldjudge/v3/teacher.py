@@ -1,4 +1,5 @@
-"""Round 3 teachers: Sol 6.1 and Opus 5.5 (subscriptions, as round 2) classify papers into a GIVEN option list.
+"""Round 3 teachers: teachers A and B (the private settings, ../teachers.py; as round 2) classify papers into a GIVEN
+option list.
 
 One request = one option list (a classification scheme at one level, possibly a subset) + up to 20 papers.
 Each paper gets up to 3 options with probabilities: the share of a panel of experts in that scheme who would pick
@@ -15,10 +16,11 @@ from pydantic import BaseModel, Field
 
 V2 = Path(__file__).resolve().parents[1] / "v2"
 sys.path.insert(0, str(V2))
-from common import settings as v2_settings          # noqa: E402  (same subscription connections as round 2)
+from common import settings as v2_settings, teachers  # noqa: E402  (same teacher connections as round 2)
 
 ROOT = Path("/mnt/fast/scholarsreadinglist/fieldjudge/v3")
 ROOT.mkdir(parents=True, exist_ok=True)
+ROLES = teachers.ROLES                              # teacher A, teacher B (models: the private settings)
 
 
 class Option(BaseModel):

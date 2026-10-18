@@ -12,11 +12,17 @@ from collections import Counter
 from pathlib import Path
 from pydantic import BaseModel, Field
 from functai import ai, _ai
-from common import ROOT, OLD, settings, write_json, digest
+from common import ROOT, OLD, settings, teachers, write_json, digest
 from allowance import check
 from control import provider_failure
 
 RECIPE = json.loads(Path(__file__).with_name("recipe.json").read_text())
+
+
+def recipe_sha256():
+    """The recipe's digest, without its record of earlier digests (recipe.json: earlier_sha256: same recipe before a
+    rewording; data frozen under those stays valid)."""
+    return digest({k: v for k, v in RECIPE.items() if not k.startswith("earlier_sha256")})
 
 class Scope(BaseModel):
     role: str = Field(description="anchor, sibling, broader, narrower, or alternative; one of each per family")
@@ -67,7 +73,7 @@ def generate(defer_blocked_fields=False, available_only=False):
     target = ROOT / ('topics-available.json' if available_only else 'topics.json')
     if target.exists():
         saved = json.loads(target.read_text())
-        if saved["recipe_sha256"] != digest(RECIPE):
+        if saved["recipe_sha256"] not in (recipe_sha256(), *RECIPE.get("earlier_sha256", [])):
             raise ValueError("recipe changed under frozen topics")
         if saved.get('deferred') and not defer_blocked_fields:
             raise RuntimeError('frozen manifest has deferred subjects; explicit --defer-blocked-fields required')
@@ -92,8 +98,8 @@ def generate(defer_blocked_fields=False, available_only=False):
             else:
                 if available_only:
                     break  # export completed screening only; do not wait or make any model calls
-                check("sol")
-                result = propose.using(**settings("sol")).map([args], threads=1).to_dicts()[0]
+                check(teachers.ROLES[0])
+                result = propose.using(**settings(teachers.ROLES[0])).map([args], threads=1).to_dicts()[0]
                 if result.get("error"):
                     write_json(path.with_suffix(".failure.json"), result)
                     provider_failure(result["error"], "topic generation")
@@ -123,7 +129,7 @@ def generate(defer_blocked_fields=False, available_only=False):
             if not candidates:
                 continue
             flagged = set()
-            for model in ("sol", "opus"):
+            for model in teachers.ROLES:
                 screen_path = ROOT / 'topic-generation' / f'{key}-{model}-screen.json'
                 if screen_path.exists():
                     verdicts = json.loads(screen_path.read_text())
@@ -175,7 +181,7 @@ def generate(defer_blocked_fields=False, available_only=False):
     random.Random(3026).shuffle(accepted)
     for i, family in enumerate(accepted):
         family["split"] = "validation" if i < 50 else "train"
-    write_json(target, {"recipe_sha256": digest(RECIPE), "families": accepted, "rejected": rejects,
+    write_json(target, {"recipe_sha256": recipe_sha256(), "families": accepted, "rejected": rejects,
                         'deferred': deferred, 'target_families': 500, 'complete': not deferred, 'available_only': available_only})
     print("FROZEN", len(accepted), "families", flush=True)
 

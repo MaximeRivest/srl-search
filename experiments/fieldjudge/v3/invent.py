@@ -1,4 +1,4 @@
-"""Invented classification schemes: the made-up ones the student must also follow. Sol and Opus each invent half.
+"""Invented classification schemes: the made-up ones the student must also follow. Teachers A and B each invent half.
 Each request: an area of research (sampled across OpenAlex's subfields and topics, plus broad ones), a way of dividing
 it (by subject, method, organism, ...) and target sizes. Output: schemes/inv-<n>.json in build_schemes.py's format.
 A small share are held out (split "heldout") to test schemes the student never saw.
@@ -12,6 +12,7 @@ from functai import ai, _ai
 from pydantic import BaseModel, Field
 import teacher as T
 
+A, B = T.ROLES
 SCHEMES = T.ROOT / "schemes"
 STYLES = [
     "by subject matter (what is studied)", "by research method or technique", "by organism, material or system studied",
@@ -69,7 +70,7 @@ def main(N):
         two = rng.random() < 0.75
         jobs.append({"i": i, "area": area, "style": rng.choice(STYLES), "top_options": rng.choice([3, 4, 5, 6, 8, 10, 12, 15, 20, 25]),
                      "children_each": rng.choice(["2-4", "3-6", "4-8", "5-12"]) if two else "0",
-                     "descriptions": rng.random() < 0.5, "teacher": "sol" if i % 2 else "opus",
+                     "descriptions": rng.random() < 0.5, "teacher": A if i % 2 else B,
                      "split": "heldout" if i % 15 == 7 else "train"})
 
     def run(model):
@@ -102,7 +103,7 @@ def main(N):
         print(model, "schemes written:", ok, "of", len(mine), flush=True)
 
     with ThreadPoolExecutor(2) as ex:
-        list(ex.map(run, ("sol", "opus")))
+        list(ex.map(run, T.ROLES))
 
 
 if __name__ == "__main__":

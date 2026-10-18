@@ -17,7 +17,7 @@ class FastTests(unittest.TestCase):
         for v in ([{'id':'p01','label':'on_topic'}], [{'id':'p01','label':'on_topic'}]*2):
             with self.assertRaises(ValueError):short_labels(self.rows(),v)
     def test_no_model_scores_or_known_labels_in_request(self):
-        rows=[{**r,'kimi':1,'mining_scores':{'m2b':.9}} for r in self.rows()]
+        rows=[{**r,'reference':1,'mining_scores':{'m2b':.9}} for r in self.rows()]
         req=request({'pairs':rows})
         self.assertEqual(set(req),{'topic','definition','papers'})
         self.assertEqual(set(req['papers'][0].model_dump()),{'id','text'})

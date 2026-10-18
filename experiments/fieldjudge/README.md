@@ -1,19 +1,25 @@
 # A general field judge: one small model for "is this paper about topic X?", any topic
 
-Why: whole-field maps (srl_search/field.py) teach a 0.8B "decider" per topic from 400 Kimi K3 answers (~95 s of GPU
+Why: whole-field maps (srl_search/field.py) teach a 0.8B "decider" per topic from 400 answers of a reference model (~95 s of GPU
 and $0.48 per map), and it is still clearly behind Jev, which only checks (its terms forbid training on its answers).
 A model trained once on many topics should know the judgment itself ("studies the topic" vs "a neighbouring subject")
 and need no per-topic training. Rerankers are made this way (small models trained on large models' judgments across
 many queries: InPars, doi:10.1145/3477495.3531863).
 
+Teacher models: rounds 2 and 3 (`v2/`, `v3/`) learn from two teacher models, teacher A and teacher B, and `compare.py`
+asks a few more judges. Which models, and how to reach them, are set in private settings outside this repository
+(`teachers.py` reads them; `teachers.example.py` is the template). Choose models whose terms allow training on their
+outputs. Round 1 and the evaluations use the production teacher (`srl_search.judges.Teacher`), called the reference
+model here.
+
 ## Data (2026-10-15)
 
-- `topics.py`: Kimi K3 proposed 18 topics per OpenAlex field (26 fields): 436 topics, 203 with a definition, a few
+- `topics.py`: the reference model proposed 18 topics per OpenAlex field (26 fields): 436 topics, 203 with a definition, a few
   deliberately ambiguous ("transformers" the electrical device vs the network). `topics.json`.
 - `sample.py`: for each topic, 90 papers chosen as the pipeline chooses its teacher's: 60 spread over 16 buckets from
   nearest to farthest of the 300,000 closest in meaning, 30 works the 5,000 nearest cite (20 title only). Junk and
   non-publications out. 39,113 papers, 0.5 s per topic.
-- `label.py`: Kimi K3 answers with the pipeline's own question: $46.98, 0 failures, 47% on topic (10th-90th
+- `label.py`: the reference model answers with the pipeline's own question: $46.98, 0 failures, 47% on topic (10th-90th
   percentile of topics: 18-76%; cited works with a vector 26%).
 - Held out: the two test topics (habitat fragmentation, LLM post-training) and every paper of their test sets (4,706
   papers never sampled); 3 topics overlapping LLM post-training dropped by hand (RLHF, "LLM", reinforcement learning;
@@ -24,20 +30,20 @@ many queries: InPars, doi:10.1145/3477495.3531863).
 LoRA r=32 on all linear layers + a yes/no head (the decider's recipe), the topic's question in every prompt, 2 passes
 over 35,269 papers (2,204 steps of 32), lr 1e-4 cosine. It steps aside when a whole-field map needs GPU 1.
 
-| Model | Time | Validation AUC (40 unseen topics) | Agreement with Kimi |
+| Model | Time | Validation AUC (40 unseen topics) | Agreement with the reference model |
 |---|---:|---:|---:|
 | Qwen3.5-0.8B, no training (zero-shot, habitat fragmentation only) | - | 0.69 | - |
 | Qwen3.5-0.8B general | 1 h 40 (14 papers/s) | 0.966 | 90.3% |
 | Qwen3.5-2B general | 3 h 20 (7-9 papers/s) | 0.976 | 91.5% |
 
-## Test: the two held-out topics, Kimi as the yardstick (`build_tests.py`, `eval.py`, `results.json`)
+## Test: the two held-out topics, the reference model as the yardstick (`build_tests.py`, `eval.py`, `results.json`)
 
 Population = stratified samples of each topic's whole-field candidates (1,585 and 970 papers), weighted: precision and
 recall if the judge decided every candidate alone, at 0.5.
 
 | Judge | Topic | AUC | Agreement | P | R | F1 | Cited 50+ P/R | Meta-analyses' studies (title only) / landmarks |
 |---|---|---:|---:|---:|---:|---:|---:|---:|
-| per-topic decider (400 Kimi answers on the topic) | fragmentation | 0.980 | 96.5% | 0.79 | 0.73 | 0.76 | 0.75/0.80 | 0.78 (0.76) |
+| per-topic decider (400 reference-model answers on the topic) | fragmentation | 0.980 | 96.5% | 0.79 | 0.73 | 0.76 | 0.75/0.80 | 0.78 (0.76) |
 | general 0.8B (never saw the topic) | fragmentation | 0.980 | 95.6% | 0.67 | 0.83 | 0.74 | 0.58/0.90 | 0.88 (0.90) |
 | Jev | fragmentation | 0.990 | 97.7% | 0.89 | 0.80 | 0.84 | 0.84/0.84 | 0.89 (0.89) |
 | per-topic decider | LLM post-training | 0.985 | 96.4% | 0.58 | 0.82 | 0.68 | - | 42 of 44 → 0.89 |
@@ -54,20 +60,20 @@ run already has. Jev is still ahead (AUC 0.990/0.995).
 The 2B is close to Jev on habitat fragmentation (AUC 0.987 vs 0.990, F1 0.82 vs 0.84; better on papers cited 50+
 times and on title-only classics), but no better than the 0.8B on LLM post-training. Its mistakes there: any
 fine-tuning of a language model counted as LLM post-training (intermediate-task training, adapters, BERT-era
-tuning; Kimi and Jev say no to 93 of its 126 wrong yeses), and still "LLM" the law degree once (0.94 for a civil
+tuning; the reference model and Jev say no to 93 of its 126 wrong yeses), and still "LLM" the law degree once (0.94 for a civil
 procedure paper, despite the definition); it misses reward-model landmarks (Christiano 2017, overoptimization). The
 LLM precision estimate is noisy: 4 papers of the sample stand for ~1,100 candidates each.
 
-Setting the line per topic from the run's 400 Kimi answers (`calibrate.py`, `calibration_*.json`): F1 +0.01 to +0.03
+Setting the line per topic from the run's 400 reference-model answers (`calibrate.py`, `calibration_*.json`): F1 +0.01 to +0.03
 (0.8B LLM 0.67 -> 0.70; 2B LLM 0.65 -> 0.68; 2B fragmentation already right at 0.5). It does make the expected number
-of on-topic papers right (8.6% vs Kimi's 7.6%; 5.5% vs 4.7%), which counts need. The ranking is the limit, not the line.
+of on-topic papers right (8.6% vs the reference model's 7.6%; 5.5% vs 4.7%), which counts need. The ranking is the limit, not the line.
 
-Cost: Kimi $46.98 for the training answers; GPU 1 for ~5 hours (shared, stepping aside for maps).
+Cost: $46.98 of reference-model answers for training; GPU 1 for ~5 hours (shared, stepping aside for maps).
 
 ## Inside the real pipeline (`replay.py`, `replay.json`, 2026-10-15)
 
 Both test maps replayed with today's code against the release they were made from (20261014T073821Z: last night's
-release changed the pool, so the teacher's sample would not have matched), the runs' own cached Kimi answers, and only
+release changed the pool, so the teacher's sample would not have matched), the runs' own cached reference-model answers, and only
 the judge that labels 10,000 papers for the students changed. Students, citation combiner, cut-off and Jev's check
 ran for real. The per-topic arm reproduces the real run (38,557 papers vs 38,655; same P/R).
 
@@ -91,7 +97,7 @@ from the students, the combiner and Jev; the general judge's leniency moves the 
 ## The reading lists (`readinglists.py`, `readinglists.json`)
 
 Each replay arm's selection mapped into groups (main map), the top 10 of every paper list of every group (what readers
-see first), every distinct one judged by Kimi for its topic ($2.16 for 1,595 papers). "Core" lists are the works a
+see first), every distinct one judged by the reference model for its topic ($2.16 for 1,595 papers). "Core" lists are the works a
 group cites most (foundations, often methods), so they are partly off topic by design in every arm.
 
 | Topic | Judge | Groups | Reading-list papers on topic | "Start here" on topic | Same papers as per-topic |
@@ -111,9 +117,9 @@ speech recognition: their lists 10-38% on topic); the general models' maps have 
 from 46% to 67-76% on topic. So where readers look, the general judges help on the topic the per-topic decider gets
 wrong, and the 2B costs nothing on the other. One run per arm, two topics.
 
-## Ensemble, and the 2B alone (no Kimi, no Jev)
+## Ensemble, and the 2B alone (no reference model, no Jev)
 
-Two more replay arms: "ensemble" (Kimi and Jev as now; the 10k labels are the mean logit of the per-topic decider
+Two more replay arms: "ensemble" (the reference model and Jev as now; the 10k labels are the mean logit of the per-topic decider
 and the 2B) and "2B-only" (the 2B is the teacher of the 400 papers, labels the 10k, and does Jev's final check: no
 paid AI at all). Reading lists judged as above (+$0.42 for the new papers).
 
@@ -137,29 +143,30 @@ real run today (two extra vLLM passes: the teacher's 400 and ~19k checked papers
 ## Eight judges compared (`subs.py`, `compare.py`, `compare.json`, 2026-10-15)
 
 Same question for all (the pipeline's instruction, one label). 300 papers per held-out topic drawn in proportion from
-the stratified population samples (weights kept) + the 44 landmarks. Claude Opus/Sonnet/Haiku 5.5 through the Claude
-Code login (reasoning off), GPT-6.1 Sol / GPT-6 Astra / Luna through the ChatGPT/Codex login (reasoning low; that
-backend refuses an output cap). 3,870 subscription answers, ~40 min; Claude 5-hour window 8% -> 13%, ChatGPT 1% -> 2%.
-No judge is the truth: each is scored against the majority of the other seven, weighted to the population.
+the stratified population samples (weights kept) + the 44 landmarks. Judges 1-6 are six more models, three through
+each of two subscriptions (judges 1-3, 4-6); which models, and their settings, are in the private settings
+(`teachers.py`, `JUDGES`). 3,870 subscription answers, ~40 min; the subscriptions' usage windows went 8% -> 13% and
+1% -> 2%. No judge is the truth: each is scored against the majority of the other seven, weighted to the population.
 
 | Judge | Fragmentation agree / P / R / F1 | LLM post-training agree / P / R / F1 | Landmarks | s/answer | Cost |
 |---|---:|---:|---:|---:|---|
-| Kimi K3 | 98.2% / 0.81 / 0.98 / 0.89 | 99.0% / 0.93 / 0.88 / 0.91 | 100% | 1-4 | ~$1.20 / 1,000 |
+| reference model | 98.2% / 0.81 / 0.98 / 0.89 | 99.0% / 0.93 / 0.88 / 0.91 | 100% | 1-4 | ~$1.20 / 1,000 |
 | Jev | 97.8% / 0.88 / 0.82 / 0.85 | 98.5% / 0.93 / 0.76 / 0.84 | 95% | <0.1 | ~$0.03 / 1,000 |
-| Opus 5.5 | 94.6% / 0.57 / 0.95 / 0.71 | 97.9% / 0.76 / 0.89 / 0.82 | 98% | 1.7 | subscription |
-| Sonnet 5.5 | 98.4% / 0.99 / 0.80 / 0.88 | 98.0% / 0.97 / 0.64 / 0.77 | 98% | 1.3 | subscription |
-| Haiku 5.5 | 97.1% / 0.80 / 0.79 / 0.80 | 95.8% / 0.50 / 0.73 / 0.59 | 98% | 1.1 | subscription |
-| GPT-6.1 Sol | 98.7% / 0.86 / 0.97 / 0.91 | 92.8% / 0.41 / 1.00 / 0.58 | 98% | 2.1 | subscription |
-| GPT-6 Astra | 98.7% / 0.85 / 0.97 / 0.91 | 92.7% / 0.40 / 1.00 / 0.58 | 95% | 2.4 | subscription |
-| GPT-6 Luna | 97.3% / 0.94 / 0.69 / 0.79 | 97.3% / 0.74 / 0.75 / 0.75 | 93% | 1.5 | subscription |
+| judge 1 | 94.6% / 0.57 / 0.95 / 0.71 | 97.9% / 0.76 / 0.89 / 0.82 | 98% | 1.7 | subscription |
+| judge 2 | 98.4% / 0.99 / 0.80 / 0.88 | 98.0% / 0.97 / 0.64 / 0.77 | 98% | 1.3 | subscription |
+| judge 3 | 97.1% / 0.80 / 0.79 / 0.80 | 95.8% / 0.50 / 0.73 / 0.59 | 98% | 1.1 | subscription |
+| judge 4 | 98.7% / 0.86 / 0.97 / 0.91 | 92.8% / 0.41 / 1.00 / 0.58 | 98% | 2.1 | subscription |
+| judge 5 | 98.7% / 0.85 / 0.97 / 0.91 | 92.7% / 0.40 / 1.00 / 0.58 | 95% | 2.4 | subscription |
+| judge 6 | 97.3% / 0.94 / 0.69 / 0.79 | 97.3% / 0.74 / 0.75 / 0.75 | 93% | 1.5 | subscription |
 
-Kimi is the most consistent with the others on both topics. Sonnet is strict and nearly a copy of Jev (98.1%
-agreement). Opus is lenient on fragmentation (island invasions, sea-cucumber fishing counted as fragmentation); Sol
-and Astra (99.8% the same answers as each other) on LLM post-training (an LLM-based malware detector counted as
-post-training). Unreadable answers (not one of the labels): Haiku 20, Sonnet 12, Opus 4, others 0. Caveats: two topics;
-the majority favours whoever thinks like most judges (Sol and Astra vote alike, as two votes).
+The reference model is the most consistent with the others on both topics. Judge 2 is strict and nearly a copy of
+Jev (98.1% agreement). Judge 1 is lenient on fragmentation (island invasions, sea-cucumber fishing counted as
+fragmentation); judges 4 and 5 (99.8% the same answers as each other) on LLM post-training (an LLM-based malware
+detector counted as post-training). Unreadable answers (not one of the labels): judge 3 20, judge 2 12, judge 1 4,
+others 0. Caveats: two topics; the majority favours whoever thinks like most judges (judges 4 and 5 vote alike, as two
+votes).
 
 Our models on the same papers, scored against the majority of all eight (they do not vote): per-topic decider
 F1 0.83 (fragmentation) / 0.63 (LLM post-training), landmarks 89%; general 0.8B 0.71 / 0.67, 82%; general 2B
-0.86 / 0.68, 91%. The 2B sits mid-pack: about Jev's level on fragmentation, above Haiku, Sol and Astra on LLM
-post-training, below Kimi, Jev, Opus, Sonnet and Luna there.
+0.86 / 0.68, 91%. The 2B sits mid-pack: about Jev's level on fragmentation, above judges 3, 4 and 5 on LLM
+post-training, below the reference model, Jev and judges 1, 2 and 6 there.

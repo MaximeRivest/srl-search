@@ -13,11 +13,12 @@ with two options.
 
 ## Data
 - Schemes (build_schemes.py, invent.py): OpenAlex (4 levels), arXiv, ACM CCS, MSC 2020, MeSH, ANZSRC FoR, OECD FORD,
-  28 of our whole-field maps (AI group names and descriptions), 284 invented by Sol/Opus (16 ways of dividing).
+  28 of our whole-field maps (AI group names and descriptions), 284 invented by the two teachers (16 ways of dividing).
   Held out: Science-Metrix (expert benchmark), JEL, 18 invented schemes, and 2,496 papers.
-- Teachers (teacher.py, label.py): Sol 6.1 and Opus 5.5 on subscriptions, 20 papers per request, 1-3 options with
-  the share of experts who would pick each. Pilot on the expert benchmark: Sol 66/69%, Opus 65/69% (Jev 64-68/61-67,
-  one human expert 63/57). Sol and Opus see different schemes and different papers; eval units get both
+- Teachers (teacher.py, label.py): teachers A and B, as round 2 (models: the private settings, `../teachers.py`;
+  choose models whose terms allow training on their outputs), 20 papers per request, 1-3 options with the share of
+  experts who would pick each. Pilot on the expert benchmark: teacher A 66/69%, teacher B 65/69% (Jev 64-68/61-67,
+  one human expert 63/57). The two teachers see different schemes and different papers; eval units get both
   (they agree 90-92%).
 - Training rows (make_data.py): 46,179 pick questions + 40,000 round-2 yes/no examples (replay).
 

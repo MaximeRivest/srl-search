@@ -52,49 +52,49 @@
   "topics": 8
  },
  "unseen_invented": {
-  "sol": {
+  "teacher_a": {
    "agree_top": 30.0,
    "log_loss": 2.207,
    "ece": 0.0352,
    "n": 800
   },
-  "opus": {
+  "teacher_b": {
    "agree_top": 31.6,
    "log_loss": 2.096,
    "ece": 0.039,
    "n": 760
   },
-  "sol_vs_opus_agree_top": 89.9
+  "teachers_agree_top": 89.9
  },
  "unseen_jel": {
-  "sol": {
+  "teacher_a": {
    "agree_top": 25.7,
    "log_loss": 2.702,
    "ece": 0.0605,
    "n": 600
   },
-  "opus": {
+  "teacher_b": {
    "agree_top": 26.0,
    "log_loss": 2.715,
    "ece": 0.0638,
    "n": 600
   },
-  "sol_vs_opus_agree_top": 91.8
+  "teachers_agree_top": 91.8
  },
  "unseen_papers": {
-  "sol": {
+  "teacher_a": {
    "agree_top": 25.2,
    "log_loss": 2.516,
    "ece": 0.0281,
    "n": 1200
   },
-  "opus": {
+  "teacher_b": {
    "agree_top": 26.6,
    "log_loss": 2.522,
    "ece": 0.038,
    "n": 1180
   },
-  "sol_vs_opus_agree_top": 91.5
+  "teachers_agree_top": 91.5
  },
  "speed": {
   "questions": 7800,

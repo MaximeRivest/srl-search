@@ -12,7 +12,7 @@ import json
 import random
 from collections import Counter
 from pathlib import Path
-from common import ROOT, OLD, Case, classify, settings, validate_response, presented, write_json, digest
+from common import ROOT, OLD, Case, classify, settings, teachers, validate_response, presented, write_json, digest
 from allowance import check
 
 PILOT = ROOT / "pilot-defined"
@@ -129,7 +129,7 @@ def run(model, smoke=False, batch_size=25, repeat=False):
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
-    ap.add_argument("model", choices=["sol", "opus"])
+    ap.add_argument("model", choices=teachers.ROLES)
     ap.add_argument("--smoke", action="store_true")
     ap.add_argument("--batch-size", type=int, choices=[5, 10, 25], default=25)
     ap.add_argument("--repeat-single", action="store_true")

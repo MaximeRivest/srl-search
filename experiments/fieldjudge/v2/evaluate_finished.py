@@ -1,5 +1,5 @@
 """Wait for both models, then score the frozen eight-topic benchmark on GPU 1.
-No provider calls. Kimi is an independent silver reference, not human truth.
+No provider calls. The reference model is an independent silver reference, not human truth.
 """
 import json
 import os
@@ -19,7 +19,7 @@ def run():
     while not all((ROOT/'models'/m/'DONE.json').exists() for m in ('0.8B','2B')):
         time.sleep(60)
     labels={}
-    for f in (ROOT/'benchmark-kimi').glob('wave-*.json'):
+    for f in (ROOT/'benchmark-reference').glob('wave-*.json'):
         for r in json.loads(f.read_text())['answers']:
             if r['y'] is not None:labels.setdefault(r['id'],set()).add(r['y'])
     rows=[]
@@ -50,7 +50,7 @@ def run():
             out[f'{topic} / {kind}']={'n':len(ix),'precision':pp,'recall':rr,'f1':2*pp*rr/max(1e-9,pp+rr),
                  'auc':float(roc_auc_score(y,p[ix],sample_weight=w)) if len(set(y))==2 else None}
         results[size]=out
-        write_json(ROOT/'evaluation/results.json',{'reference':'Kimi silver labels; retrieval and title-only populations reported separately','models':results})
+        write_json(ROOT/'evaluation/results.json',{'reference':'reference-model silver labels; retrieval and title-only populations reported separately','models':results})
         print('EVALUATED',size,flush=True)
 
 if __name__=='__main__':run()

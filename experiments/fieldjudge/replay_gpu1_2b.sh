@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Free (no Kimi, no Jev inside the maps) replay of the round-2 2B on GPU 1, then the reading-list check.
+# Free (no reference model, no Jev inside the maps) replay of the round-2 2B on GPU 1, then the reading-list check.
 # Same topics, same data release and same output folder as the round-2 0.8B run (fields-r4), so the two are matched.
 # GPU 1 instead of GPU 0: the public rewriter keeps running; GPU 1 is the card production maps use anyway.
-# Kimi is used only afterwards, to SCORE reading lists, never inside the maps.
+# The reference model is used only afterwards, to SCORE reading lists, never inside the maps.
 set -euo pipefail
 cd "$(dirname "$0")"
 PY=/home/maxime/Projects/scholarsreadinglist/search-dev/.venv/bin/python

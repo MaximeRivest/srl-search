@@ -1,4 +1,4 @@
-"""Join streaming labels; reuse old Kimi answers as free checks where available.
+"""Join streaming labels; reuse old reference-model answers (round 1) as free checks where available.
 
 This exports PROVISIONAL supervision, not training approval. Missing answers,
 refusals, uncertainty, disagreements, and cross-split duplicates remain explicit.
@@ -7,8 +7,12 @@ Whole-topic-family overlap still needs auditing before a training release.
 import argparse
 import json
 import re
+import sys
 from collections import Counter
+from pathlib import Path
 from stream_queue import ROOT,FAST,digest,write_json
+sys.path.insert(0,str(Path(__file__).resolve().parents[1]))  # the fieldjudge folder: teachers.py
+import teachers  # noqa: E402
 
 def resolve(answers, old=None, overlap=False, single_mode=False, assigned_pending=False):
     """Single-teacher labels are usable provisionally but never reported as consensus."""
@@ -19,7 +23,7 @@ def resolve(answers, old=None, overlap=False, single_mode=False, assigned_pendin
             ('unanswered' if any(a is not None for a in answers.values()) else 'pending') if not labels else
             'uncertain' if 'uncertain' in labels else
             'disagreement' if len(set(labels))!=1 else
-            'kimi_disagrees' if old is not None and (old>=.5)!=(labels[0]=='on_topic') else
+            'reference_disagrees' if old is not None and (old>=.5)!=(labels[0]=='on_topic') else
             'provisional_agreement' if len(available)>1 else 'provisional_single_teacher')
     y=int(labels[0]=='on_topic') if reason in ('provisional_agreement','provisional_single_teacher') else None
     return reason,y,list(available)
@@ -33,9 +37,9 @@ def run(partial=False):
             rows[r['id']]=r
     assignment_path=FAST/'assignment.json'
     assignment=json.loads(assignment_path.read_text()) if assignment_path.exists() else None
-    allocated={m:{k for ids in assignment['batches'][m].values() for k in ids} if assignment else set() for m in ('sol','opus')}
+    allocated={m:{k for ids in assignment['batches'][m].values() for k in ids} if assignment else set() for m in teachers.ROLES}
     votes={}
-    for model in ('sol','opus'):
+    for model in teachers.ROLES:
         by={}
         for path in (FAST/'answers'/model).glob('*.json'):
             if path.name=='status.json':continue
@@ -50,9 +54,9 @@ def run(partial=False):
                 if not allocated[model] <= set(by):raise ValueError(f'{model} assigned work incomplete')
             elif set(by)!=set(rows):raise ValueError(f'{model} incomplete')
         votes[model]=by
-    if not partial and set(votes['sol'])|set(votes['opus']) != set(rows):
+    if not partial and set().union(*votes.values()) != set(rows):
         raise ValueError('some pairs have no completed attempt')
-    kimi={(r['topic_id'],r['id']):r['y'] for r in map(json.loads,open(ROOT.parent/'labels.jsonl'))}
+    reference={(r['topic_id'],r['id']):r['y'] for r in map(json.loads,open(ROOT.parent/'labels.jsonl'))}
     val=[r for r in rows.values() if r['split']=='validation']
     vwork={r['work_id'] for r in val};vtext={r['text_group'] for r in val}
     norm=lambda s:' '.join(re.sub(r'[^\w\s]',' ',s.casefold()).split())
@@ -62,12 +66,12 @@ def run(partial=False):
         answers={m:v.get(k) for m,v in votes.items()}
         old=None
         if r['family_id'].startswith('legacy-'):
-            old=kimi.get((int(r['family_id'][7:]),r['work_id']))
+            old=reference.get((int(r['family_id'][7:]),r['work_id']))
         overlap=r['split']!='validation' and (r['work_id'] in vwork or r['text_group'] in vtext or norm(r['topic']) in vtopic)
         waiting=any(k in allocated[m] and k not in votes[m] for m in votes)
         reason,y,sources=resolve(answers,old,overlap,assignment is not None,waiting)
         counts[reason]+=1
-        row={**r,'answers':answers,'kimi_v1':old,'status':reason,'label_sources':sources,'training_approved':False}
+        row={**r,'answers':answers,'reference_v1':old,'status':reason,'label_sources':sources,'training_approved':False}
         if y is not None:row['y']=y
         output.append(row)
     dest=FAST/'exports';dest.mkdir(exist_ok=True)

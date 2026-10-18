@@ -93,11 +93,11 @@ def labels(batches,rows):
     votes=load_answers(batches)
     assignment=json.loads((FAST/'assignment.json').read_text())
     assigned={m:{k for ids in assignment['batches'][m].values() for k in ids} for m in votes}
-    kimi={(r['topic_id'],r['id']):r['y'] for r in map(json.loads,open(ROOT.parent/'labels.jsonl'))}
+    reference={(r['topic_id'],r['id']):r['y'] for r in map(json.loads,open(ROOT.parent/'labels.jsonl'))}
     result={};counts=Counter()
     for r in rows:
         k=r['id'];answers={m:({'label':a[k]} if k in a else None) for m,a in votes.items()}
-        old=kimi.get((int(r['family_id'][7:]),r['work_id'])) if r['family_id'].startswith('legacy-') else None
+        old=reference.get((int(r['family_id'][7:]),r['work_id'])) if r['family_id'].startswith('legacy-') else None
         pending=any(k in assigned[m] and k not in votes[m] for m in votes)
         reason,y,sources=resolve(answers,old=old,single_mode=True,assigned_pending=pending)
         counts[reason]+=1

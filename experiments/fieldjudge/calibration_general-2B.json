@@ -17,7 +17,7 @@
   ],
   "teacher_auc_of_raw": null,
   "expected_on_topic_share": 0.0858,
-  "kimi_on_topic_share": 0.0759,
+  "reference_on_topic_share": 0.0759,
   "meta_refs found (calibrated@0.5)": 0.847,
   "cited50 found (calibrated@0.5)": 0.41
  },
@@ -39,7 +39,7 @@
   ],
   "teacher_auc_of_raw": null,
   "expected_on_topic_share": 0.0552,
-  "kimi_on_topic_share": 0.0471,
+  "reference_on_topic_share": 0.0471,
   "landmarks found (calibrated@0.5)": 0.886
  }
 }

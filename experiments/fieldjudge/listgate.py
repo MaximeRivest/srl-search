@@ -14,11 +14,11 @@ every candidate is judged by both round-2 judges, and each list keeps the first 
                 which starves the lists counted from the group's references; other groups and lists as in_map_both.
                 All lists then judged as in_map_both
 
-Measured: Kimi K3 on every paper any rule shows (silver reference, cached; ~$0.0015 a paper), per list; how many of the
+Measured: the reference model on every paper any rule shows (silver reference, cached; ~$0.0015 a paper), per list; how many of the
 classics (frag: studies 19 meta-analyses used; LLM: 44 landmarks) appear anywhere in the lists; how cited the core
 lists stay (median "cited by N papers of the group"); lists left short of 8 (the pool ran out).
 
-    SRL_RELEASE=<the runs' release> SRL_FIELDS_GPU=1 ../../.venv/bin/python listgate.py   (Kimi key in the environment)
+    SRL_RELEASE=<the runs' release> SRL_FIELDS_GPU=1 ../../.venv/bin/python listgate.py   (reference-model key in the environment)
 """
 import inspect, json, os, re, sys
 from pathlib import Path
@@ -214,9 +214,9 @@ for (t, a), m in maps.items():
                 rows += [(g["id"], n, p) for p in pick]
         shown[(t, a, rule)] = rows
 
-# Kimi on every paper any rule shows (answers from earlier runs kept)
+# the reference model on every paper any rule shows (answers from earlier runs kept)
 prev = {}
-for f in [*Path(__file__).parent.glob("readinglists*.json"), WORK / "kimi.json"]:
+for f in [*Path(__file__).parent.glob("readinglists*.json"), WORK / "reference.json"]:
     if f.exists():
         for t, d in json.loads(f.read_text()).get("labels", json.loads(f.read_text())).items():
             prev.setdefault(t, {}).update({int(k): v for k, v in d.items()})
@@ -227,8 +227,8 @@ for t, (q, defin) in TOPICS.items():
     ws = sorted({int(p["id"][1:]) for (tt, a, r), rows in shown.items() if tt == t for _, _, p in rows} - set(old))
     y = J.Teacher(8.0).label(text_of(ws), q, defin) if ws else np.zeros(0)
     labels[t] = {**old, **dict(zip(ws, y.tolist()))}
-    print(t, len(ws), "new papers judged by Kimi", flush=True)
-(WORK / "kimi.json").write_text(json.dumps({t: {str(k): v for k, v in d.items()} for t, d in labels.items()}))
+    print(t, len(ws), "new papers judged by the reference model", flush=True)
+(WORK / "reference.json").write_text(json.dumps({t: {str(k): v for k, v in d.items()} for t, d in labels.items()}))
 
 classics = {}
 for r in map(json.loads, open(D / "tests.jsonl")):

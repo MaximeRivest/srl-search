@@ -2,7 +2,7 @@
  "frag": {
   "on_topic": 0.931,
   "shown": 480,
-  "new_kimi": 13,
+  "new_reference": 13,
   "by_list": {
    "start_here": 0.95,
    "core": 0.925,
@@ -17,7 +17,7 @@
  "llm": {
   "on_topic": 0.809,
   "shown": 256,
-  "new_kimi": 5,
+  "new_reference": 5,
   "by_list": {
    "start_here": 0.792,
    "core": 0.792,

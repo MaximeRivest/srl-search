@@ -1,6 +1,6 @@
 {
-  "sol": {
-    "model": "sol",
+  "teacher_a": {
+    "model": "teacher A",
     "batch_size": 25,
     "paired_n": 100,
     "same_batch_single": 95,
@@ -14,8 +14,8 @@
     "passed": false,
     "note": "95/100 is an operational pilot gate, not a population accuracy estimate."
   },
-  "opus": {
-    "model": "opus",
+  "teacher_b": {
+    "model": "teacher B",
     "batch_size": 25,
     "paired_n": 100,
     "same_batch_single": 94,

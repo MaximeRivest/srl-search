@@ -1,6 +1,6 @@
 """Matched old/new 0.8B evaluation on eight reserved topics plus old diagnostics.
 Exclude papers/titles seen in v1 training from the new-topic comparison for BOTH
-models. Kimi labels are a silver reference; no threshold is tuned on these tests.
+models. Reference-model labels are a silver reference; no threshold is tuned on these tests.
 """
 from __future__ import annotations
 import hashlib
@@ -29,7 +29,7 @@ def data():
     train_ids={w for t,w in keys}
     train_titles={title_key(r['text']) for r in map(json.loads,open(old/'samples.jsonl')) if (r['topic_id'],r['id']) in keys}
     ref=defaultdict(set)
-    for f in (ROOT/'benchmark-kimi').glob('wave-*.json'):
+    for f in (ROOT/'benchmark-reference').glob('wave-*.json'):
         for r in json.loads(f.read_text())['answers']:
             if r['y'] is not None:ref[r['id']].add(r['y'])
     rows=[];removed=defaultdict(int)
@@ -42,9 +42,9 @@ def data():
                     removed['no_unique_reference']+=1;continue
                 rows.append({**r,'kind':folder,'y':next(iter(ref[r['id']])),'suite':'new_topics'})
     for r in map(json.loads,open(old/'tests.jsonl')):
-        if r['kimi'] is None:continue
+        if r['reference'] is None:continue
         rows.append({'id':r['id'],'topic':r['topic'],'definition':r['definition'],'text':r['text'],'kind':r['set'],
-                     'suite':'development','y':r['kimi'],'weight':r.get('weight',1.),'stratum':r.get('stratum',r['set'])})
+                     'suite':'development','y':r['reference'],'weight':r.get('weight',1.),'stratum':r.get('stratum',r['set'])})
     return rows,dict(removed)
 
 def metrics(rows,p):
@@ -93,7 +93,7 @@ def run():
         for (topic,s),idx in strata.items():by[topic].extend(rng.choice(idx,len(idx),replace=True).tolist())
         vals={name:np.mean([metrics([rows[i] for i in idx],scores[name][idx])['f1'] for idx in by.values()]) for name in models}
         deltas.append(vals['v2']-vals['v1'])
-    report={'reference':'Kimi silver labels, not human gold. Fixed 0.5 threshold.', 'excluded':removed,'macro':macro,
+    report={'reference':'reference-model silver labels, not human gold. Fixed 0.5 threshold.', 'excluded':removed,'macro':macro,
             'paired_macro_f1_difference':macro['v2']['f1']-macro['v1']['f1'],
             'paired_f1_ci95':np.percentile(deltas,[2.5,97.5]).tolist(), 'per_topic':results,
             'caveats':['Single training seed each; intervals are conditional on these topics.',

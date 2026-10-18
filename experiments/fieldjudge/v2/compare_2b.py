@@ -1,5 +1,5 @@
 """The round-2 2B on the same matched cases as compare_08.py (old 0.8B = v1, round-2 0.8B = v2).
-Reuses v1/v2 scores; scores only the 2B. Kimi labels are a silver reference; fixed 0.5 threshold, nothing tuned here.
+Reuses v1/v2 scores; scores only the 2B. Reference-model labels are a silver reference; fixed 0.5 threshold, nothing tuned here.
 Writes evaluation-08/comparison-2b.json.
 """
 import json
@@ -44,7 +44,7 @@ for _ in range(400):
     for m in deltas:
         v = {n: np.mean([metrics([rows[i] for i in idx], scores[n][idx])[m] for idx in by.values()]) for n in ('v2', 'v2-2B')}
         deltas[m].append(v['v2-2B'] - v['v2'])
-report = {'reference': 'Kimi silver labels, not human gold. Fixed 0.5 threshold.', 'excluded': removed, 'macro': macro,
+report = {'reference': 'reference-model silver labels, not human gold. Fixed 0.5 threshold.', 'excluded': removed, 'macro': macro,
           '2B_minus_08_ci95': {m: np.percentile(d, [2.5, 97.5]).tolist() for m, d in deltas.items()},
           'per_topic': results}
 write_json(OUT / 'comparison-2b.json', report)

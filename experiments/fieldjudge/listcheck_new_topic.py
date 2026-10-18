@@ -1,5 +1,5 @@
 """Step 9c: a topic the list rules were not developed on (microplastics in freshwater ecosystems, the dev store's
-whole-field map): its lists before (previous map code) and after (lens_min_score etc.), Kimi on every list paper."""
+whole-field map): its lists before (previous map code) and after (lens_min_score etc.), the reference model on every list paper."""
 import json, sys
 from pathlib import Path
 import numpy as np

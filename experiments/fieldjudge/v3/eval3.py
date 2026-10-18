@@ -5,9 +5,10 @@
            shuffled the same with 2 random option orders                       -> does the pick depend on order?
            field    one question, the 22 fields                                -> field-level agreement
            tree     P(subfield) = P(field) x P(subfield | field): 1 + 22 questions per paper (prefix-cached)
-  yesno    the 8 held-out topics of round 2 (4,800 pairs, Kimi reference): macro average precision and AUC
+  yesno    the 8 held-out topics of round 2 (4,800 pairs, reference-model labels): macro average precision and AUC
   unseen   eval units (JEL, held-out invented schemes, held-out papers on training schemes), against the teachers:
-           agreement with each teacher's top pick, soft log loss, calibration (ECE); teacher-vs-teacher as ceiling
+           agreement with each teacher's top pick, soft log loss, calibration (ECE); teacher-vs-teacher as ceiling.
+           Written as teacher_a, teacher_b and teachers_agree_top (teachers.ROLES order; models: private settings)
 
     ../../../.venv/bin/python eval3.py NAME MODEL_DIR [legacy]     (SRL_FIELDS_GPU; legacy = round-2 yes/no prompt)
 """
@@ -17,14 +18,17 @@ import numpy as np
 from sklearn.metrics import average_precision_score, roc_auc_score
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parents[2]))
+sys.path.insert(0, str(HERE.parent))  # the fieldjudge folder: teachers.py
 from srl_search import judges as J
 import fmt
+import teachers
 
 V3 = Path("/mnt/fast/scholarsreadinglist/fieldjudge/v3")
 V2 = V3.parent / "v2"
 JA = Path.home() / "Projects/jevarticle"
 VPY = os.environ.get("SRL_VLLM_PYTHON", "/nix/store/skvyvs8jj0k7q4vw2137blrnfp3y5cb2-vllm-runtime-0.29.0/bin/python")
 OUT = V3 / "evaluation"; OUT.mkdir(exist_ok=True)
+TEACHER_KEYS = ("teacher_a", "teacher_b")          # result keys of teachers.ROLES[0], [1]
 ANSWER_V2 = ' Answer with one word: "yes" (on topic) or "no" (not on topic).'
 
 tax = list(csv.DictReader(open(JA / "data/taxonomy.csv")))
@@ -65,7 +69,7 @@ def build(legacy):
                                  "Which subfield best describes the research content of this paper?", [{"name": s} for s in ch]))
     # yes/no on the 8 held-out topics
     labels = {}
-    for f in (V2 / "benchmark-kimi").glob("wave-*.json"):
+    for f in (V2 / "benchmark-reference").glob("wave-*.json"):
         for r in json.loads(f.read_text())["answers"]:
             if r["y"] is not None:
                 labels.setdefault(r["id"], set()).add(r["y"])
@@ -82,7 +86,7 @@ def build(legacy):
     for f in sorted((V3 / "queue" / "eval").glob("*.json")):
         u = json.loads(f.read_text())
         ans = {}
-        for m in ("sol", "opus"):
+        for m in teachers.ROLES:
             a = V3 / "answers" / m / f.name
             if a.exists():
                 for x in json.loads(a.read_text())["answers"]:
@@ -171,7 +175,7 @@ def score(rows, P):
                                    "macro_auc": round(float(np.mean(aucs)), 4), "topics": len(aps)}
     for g, xs in sorted(unseen.items()):
         out = {}
-        for m in ("sol", "opus"):
+        for key, m in zip(TEACHER_KEYS, teachers.ROLES):
             hit, conf, ll = [], [], []
             for r, p in xs:
                 d = r["teachers"].get(m)
@@ -181,13 +185,14 @@ def score(rows, P):
                 hit.append(int(p.argmax() == t.argmax())); conf.append(float(p.max()))
                 ll.append(float(-(t * np.log(np.clip(p, 1e-6, 1))).sum()))
             if hit:
-                out[m] = {"agree_top": round(100 * float(np.mean(hit)), 1), "log_loss": round(float(np.mean(ll)), 3),
+                out[key] = {"agree_top": round(100 * float(np.mean(hit)), 1), "log_loss": round(float(np.mean(ll)), 3),
                           "ece": ece(conf, hit), "n": len(hit)}
         both = [(r, p) for r, p in xs if len(r["teachers"]) == 2]
         if both:
-            tt = [int(max(r["teachers"]["sol"], key=r["teachers"]["sol"].get) == max(r["teachers"]["opus"], key=r["teachers"]["opus"].get))
+            a, b = teachers.ROLES
+            tt = [int(max(r["teachers"][a], key=r["teachers"][a].get) == max(r["teachers"][b], key=r["teachers"][b].get))
                   for r, _ in both]
-            out["sol_vs_opus_agree_top"] = round(100 * float(np.mean(tt)), 1)
+            out["teachers_agree_top"] = round(100 * float(np.mean(tt)), 1)
         res[f"unseen_{g}"] = out
     return res
 

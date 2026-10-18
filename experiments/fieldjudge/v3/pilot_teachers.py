@@ -1,4 +1,4 @@
-"""Can the teachers do the task? Sol and Opus on the 200 expert-classified articles (jevarticle, Science-Metrix 176
+"""Can the teachers do the task? Teachers A and B on the 200 expert-classified articles (jevarticle, Science-Metrix 176
 subfields), 20 papers a request, the round-3 teacher prompt. Scored like jevarticle/scripts/score.py.
 The benchmark stays out of student training; this only validates the teachers and their shares (calibration).
 
@@ -67,7 +67,7 @@ def wilson(k, n, z=1.96):
 
 
 with ThreadPoolExecutor(2) as ex:
-    results = dict(zip(("sol", "opus"), ex.map(label, ("sol", "opus"))))
+    results = dict(zip(T.ROLES, ex.map(label, T.ROLES)))
 for model, r in results.items():
     A = r["answers"]
     by = collections.defaultdict(list); fhit = []; share_on_expert = []; conf_hit = []

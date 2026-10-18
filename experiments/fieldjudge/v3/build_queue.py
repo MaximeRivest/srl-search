@@ -6,7 +6,7 @@ Shapes:  level     every option of one level (<= MAX_OPTIONS)
 "None of these" is added to NONE_SHARE of units, which then also carry 3-5 papers from elsewhere in science.
 Papers: our search API (title, venue, year, abstract), never the record's own OpenAlex topic/field (that would leak one
 scheme's answers). 15% shown as title only. Excluded: every test paper (round-2 benchmarks, frag/LLM tests,
-jevarticle). A paper goes to one teacher only (Sol and Opus see different papers); used at most 3 times.
+jevarticle). A paper goes to one teacher only (teachers A and B see different papers); used at most 3 times.
 Split: train units, and eval units (held-out schemes, plus held-out papers on training schemes; both teachers label
 eval units, which also measures how far the two teachers agree).
 
@@ -17,6 +17,10 @@ from collections import Counter, defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # the fieldjudge folder: teachers.py
+import teachers  # noqa: E402
+A, B = teachers.ROLES                         # teacher roles (models: the private settings)
+
 ROOT = Path("/mnt/fast/scholarsreadinglist/fieldjudge/v3")
 SCHEMES = ROOT / "schemes"
 Q = ROOT / "queue"
@@ -26,8 +30,8 @@ NONE = "None of these (outside the options listed)"
 rng = random.Random(17)
 
 BUDGET = {"openalex": 350, "acm-ccs": 200, "mesh": 200, "oecd-ford": 100, "arxiv": 150, "msc2020": 150, "anzsrc-for": 200}
-TEACHER = {"openalex": "sol", "acm-ccs": "sol", "mesh": "sol", "oecd-ford": "sol", "arxiv": "opus", "msc2020": "opus",
-           "anzsrc-for": "opus"}
+TEACHER = {"openalex": 0, "acm-ccs": 0, "mesh": 0, "oecd-ford": 0, "arxiv": 1, "msc2020": 1,   # teacher A (0) or B (1)
+           "anzsrc-for": 1}
 MAPS_UNITS, INVENTED_UNITS = 300, 850
 EVAL = {"jel": 30, "heldout-invented": 40, "heldout-papers": 60}
 QUESTIONS = ["Which {level} best describes the research content of this paper?",
@@ -215,12 +219,12 @@ def main():
                 eval_papers.add(w)
     plan = []
     for sid, n in BUDGET.items():
-        plan += [(sid, TEACHER[sid], "train")] * n
+        plan += [(sid, teachers.ROLES[TEACHER[sid]], "train")] * n
     for i in range(MAPS_UNITS):
-        plan.append((maps[i % len(maps)], "sol" if (i // len(maps) + maps.index(maps[i % len(maps)])) % 2 else "opus", "train"))
+        plan.append((maps[i % len(maps)], A if (i // len(maps) + maps.index(maps[i % len(maps)])) % 2 else B, "train"))
     for i in range(INVENTED_UNITS):
         s = inv_train[i % len(inv_train)]
-        plan.append((s, "sol" if "sol" in load(s)["source"] else "opus", "train"))   # a scheme's inventor labels it
+        plan.append((s, A if load(s)["source"] == f"invented by {A}" else B, "train"))   # a scheme's inventor labels it (invent.py)
     # eval first, so its papers are reserved before training takes any
     ev = [("jel", "both", "eval")] * EVAL["jel"] + [(inv_held[i % len(inv_held)], "both", "eval") for i in range(EVAL["heldout-invented"])]
     real = list(BUDGET) + maps[:10]

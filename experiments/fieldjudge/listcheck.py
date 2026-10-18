@@ -1,5 +1,5 @@
 """Step 9b: the reading-list rules as shipped (topics.Options.lens_min_score, field.LENS_MIN_SCORE) on the round-2
-replay maps (fields-r4, 0.8B arm): Kimi on every list paper (cached labels from listgate/readinglists reused)."""
+replay maps (fields-r4, 0.8B arm): the reference model on every list paper (cached labels from listgate/readinglists reused)."""
 import json, sys
 from pathlib import Path
 import numpy as np
@@ -36,12 +36,12 @@ for t in L.TOPICS:
         lab.update(zip(new, y.tolist()))
     on = lambda n: [lab[int(p["id"][1:])] for nn, p in rows if nn == n and lab.get(int(p["id"][1:])) == lab.get(int(p["id"][1:]))]
     lists = [v for n in L.LISTS for v in on(n)]
-    out[t] = {"on_topic": round(float(np.mean(lists)), 3), "shown": len(lists), "new_kimi": len(new),
+    out[t] = {"on_topic": round(float(np.mean(lists)), 3), "shown": len(lists), "new_reference": len(new),
               "by_list": {n: round(float(np.mean(on(n))), 3) if on(n) else None for n in L.LISTS + ("foundations",)},
               "classics_in_lists": len({int(p["id"][1:]) for n, p in rows if n != "foundations"} & L.classics[t])}
     print(t, json.dumps(out[t]), flush=True)
     for g in m["groups"]:
         print("  ", g["name"][:40], "| core:", " / ".join(p["title"][:45] for p in g["lenses"]["core"][:3]),
               "| foundations:", " / ".join(p["title"][:40] for p in (g["lenses"].get("foundations") or [])[:3]), flush=True)
-L.WORK.joinpath("kimi.json").write_text(json.dumps({t: {str(k): v for k, v in d.items()} for t, d in L.labels.items()}))
+L.WORK.joinpath("reference.json").write_text(json.dumps({t: {str(k): v for k, v in d.items()} for t, d in L.labels.items()}))
 (Path(__file__).parent / "listcheck.json").write_text(json.dumps(out, indent=1))

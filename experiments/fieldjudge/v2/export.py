@@ -7,7 +7,7 @@ probability 0.5 passed off as calibrated uncertainty.
 """
 import json
 from collections import Counter
-from common import ROOT, write_json
+from common import ROOT, teachers, write_json
 
 def run():
     summary={}
@@ -17,7 +17,7 @@ def run():
         rows=[json.loads(l) for l in open(ROOT/f"pairs-{split}.jsonl")]
         expected={r['id'] for r in rows}
         judgments={}
-        for model in ("sol","opus"):
+        for model in teachers.ROLES:
             folder=ROOT/"judgments"/split/model
             if not (folder/"DONE.json").exists():
                 raise ValueError(f"{split}/{model} incomplete")
@@ -42,7 +42,7 @@ def run():
             counts[reason]+=1
             if reason=="agreement":
                 record['y']=int(next(iter(labels))=="on_topic")
-                record['label_source']='sol_opus_agreement_unreviewed'
+                record['label_source']='_'.join(teachers.ROLES)+'_agreement_unreviewed'
                 records.append(record)
             else:
                 review.append(record)

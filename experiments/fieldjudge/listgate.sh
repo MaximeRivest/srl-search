@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Step 9 on GPU 1 (the rewriter on GPU 0 keeps running). Kimi only scores the results.
+# Step 9 on GPU 1 (the rewriter on GPU 0 keeps running). The reference model only scores the results.
 set -euo pipefail
 cd "$(dirname "$0")"
 export SRL_FIELDS_GPU=1 CUDA_DEVICE_ORDER=PCI_BUS_ID PYTHONPATH=/home/maxime/Projects/scholarsreadinglist/search-dev \

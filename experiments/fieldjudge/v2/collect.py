@@ -33,6 +33,18 @@ def digest(value):
     return hashlib.sha256(json.dumps(value, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
 
 
+def recipe_sha256():
+    """The recipe's digest, without its record of earlier digests (recipe.json: earlier_sha256)."""
+    return digest({k: v for k, v in RECIPE.items() if not k.startswith("earlier_sha256")})
+
+
+def same_recipe(saved):
+    """`saved` with an earlier digest of the same recipe (before a rewording) read as the current one."""
+    if saved.get("recipe_sha256") in RECIPE.get("earlier_sha256", []):
+        return {**saved, "recipe_sha256": recipe_sha256()}
+    return saved
+
+
 def write(path, obj):
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(".tmp")
@@ -54,8 +66,8 @@ class Collector:
         self.owners = {}
         self.wowners = {}
         manifest = ROOT / "corpus-manifest.json"
-        current = {"release": self.ctx.release, "recipe_sha256": digest(RECIPE)}
-        if manifest.exists() and json.loads(manifest.read_text()) != current:
+        current = {"release": self.ctx.release, "recipe_sha256": recipe_sha256()}
+        if manifest.exists() and same_recipe(json.loads(manifest.read_text())) != current:
             raise ValueError("release/recipe changed; do not mix data snapshots")
         if not manifest.exists():
             write(manifest, current)

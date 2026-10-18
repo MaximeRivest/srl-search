@@ -186,7 +186,7 @@ any training data). One question per article, with title, venue, year and abstra
 | Qwen3.8-27B (direct) | 57% | 64% | $0.022 |
 | Jev (TypeSafe), flat | 64% | 61% | $0.19 |
 | Jev (TypeSafe), field then subfield | 68% | 65% | $0.21 |
-| GPT-6.1 Sol, 20 papers a request | 66% | 69% | $1.40 |
+| a frontier API model | 66% | 69% | $1.40 |
 | one human expert vs the others | 63% | 57% | ~$550 (reading the abstract at $50/h) |
 
 ![Best-value chart](benchmark.png)
@@ -197,10 +197,10 @@ Costs of local models: one RTX 3090 at $0.25 an hour (Vast.ai and RunPod, 2026-1
 
 ### Classifications it never saw, against the teachers
 
-Held-out schemes and papers, labelled by GPT-6.1 Sol (the two teachers agree with each other 90-92% of the time,
+Held-out schemes and papers, labelled by teacher A (the two teachers agree with each other 90-92% of the time,
 the practical ceiling):
 
-| | same top pick as Sol |
+| | same top pick as teacher A |
 |---|---:|
 | JEL economics codes (held-out scheme) | {jel} |
 | 18 invented classifications (held out) | {inv} |
@@ -208,20 +208,20 @@ the practical ceiling):
 
 ### Topic yes / no
 
-8 topics held out of all training (4,800 papers, a Kimi K3 reference): macro average precision {ap} (the round-2
+8 topics held out of all training (4,800 papers, labels of a reference model): macro average precision {ap} (the round-2
 judge it started from: {ap_before}). Training on lists improved the yes/no skill rather than eroding it.
 
 ## How it was trained
 
 1. **Round 2 (start):** Qwen3.5-{size} fine-tuned (LoRA) as a yes/no judge of "is this topic a central subject of
-   this paper", on about 85,000 topic-paper pairs labelled by GPT-6.1 Sol and Claude Opus 5.5.
+   this paper", on about 85,000 topic-paper pairs labelled by two teacher models.
 2. **Round 3 (this model):** from the round-2 judge, a new LoRA (rank 32, all linear layers, merged) and the output
    rows of the answer tokens, {steps} steps of 32, on
    - 46,179 classification questions: 2,500 lists of options from 321 schemes (OpenAlex at four levels, arXiv, ACM
      CCS, MSC 2020, MeSH, ANZSRC FoR, OECD FORD, 28 maps of research fields with named groups, and 284 schemes invented
      for the purpose: by method, organism, application, study design, ...), as whole levels, subsets or the children
      of one parent, some with a "none of these" option, 20 papers each. Labels: the share of experts who would pick
-     each option (up to 3), from GPT-6.1 Sol and Claude Opus 5.5, each on different schemes and papers.
+     each option (up to 3), from the two teacher models, each on different schemes and papers.
    - 40,000 yes/no examples replayed from round 2.
    Loss: cross-entropy between the teacher's shares and the softmax over the offered codes. Every time a question was
    shown, its options were shuffled (80%), given a random set of codes (50%) and stripped of descriptions (30%).

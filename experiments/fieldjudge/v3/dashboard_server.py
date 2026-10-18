@@ -2,11 +2,15 @@
 
     python3 dashboard_server.py --port 8944      (tailnet: https://lambda.tail69222b.ts.net:18944)
 """
-import argparse, json, subprocess, time
+import argparse, json, subprocess, sys, time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE.parent))  # the fieldjudge folder: teachers.py
+import teachers  # noqa: E402
+
+KEYS = ("teacher_a", "teacher_b")      # what the page reads, for teachers.ROLES[0] and [1]
 V3 = Path("/mnt/fast/scholarsreadinglist/fieldjudge/v3")
 BATCH = 32
 
@@ -67,14 +71,29 @@ def model(size):
             "updated": ev[-1]["time"] if ev else None}
 
 
+def neutral(ev):
+    """Evaluation files written before eval3.py used teacher_a / teacher_b keys carry the role names: renamed."""
+    if not ev:
+        return ev
+    a, b = teachers.ROLES
+    for g, out in ev.items():
+        if g.startswith("unseen_") and isinstance(out, dict):
+            for key, m in zip(KEYS, teachers.ROLES):
+                if m in out:
+                    out.setdefault(key, out.pop(m))
+            if f"{a}_vs_{b}_agree_top" in out:
+                out.setdefault("teachers_agree_top", out.pop(f"{a}_vs_{b}_agree_top"))
+    return ev
+
+
 def snapshot():
-    teachers = {}
-    for m in ("sol", "opus"):
+    labelled = {}
+    for key, m in zip(KEYS, teachers.ROLES):
         f = list((V3 / "answers" / m).glob("*.json"))
-        teachers[m] = {"units": len(f), "errors": len(list((V3 / "answers" / m / "errors").glob("*.json")))}
-    evals = {n: read(V3 / "evaluation" / f"{n}.json") for n in ("round2-0.8B", "round2-2B", "v3-0.8B", "v3-2B")}
+        labelled[key] = {"units": len(f), "errors": len(list((V3 / "answers" / m / "errors").glob("*.json")))}
+    evals = {n: neutral(read(V3 / "evaluation" / f"{n}.json")) for n in ("round2-0.8B", "round2-2B", "v3-0.8B", "v3-2B")}
     return {"now": time.time(), "manifest": read(V3 / "training" / "manifest.json", {}),
-            "teachers": teachers, "queue": {s: len(list((V3 / "queue" / s).glob("*.json"))) for s in ("train", "eval")},
+            "teachers": labelled, "queue": {s: len(list((V3 / "queue" / s).glob("*.json"))) for s in ("train", "eval")},
             "schemes": len(list((V3 / "schemes").glob("*.json"))),
             "models": [model("0.8B"), model("2B")],
             "services": {u: active(u) for u in ("fj3-train", "fj3-2b-gpu0")},

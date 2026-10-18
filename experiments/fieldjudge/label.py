@@ -1,7 +1,7 @@
-"""Step 3: Kimi K3 judges every sampled paper for its topic, with the whole-field pipeline's own question
+"""Step 3: the reference model judges every sampled paper for its topic, with the whole-field pipeline's own question
 (srl_search/judges.py: instruction, labels, provider rotation). Resumable: labels.jsonl gets one line per answer.
 
-    ../../.venv/bin/python label.py [BUDGET_USD]      (Kimi keys in the environment; ~$45 for ~39k papers)
+    ../../.venv/bin/python label.py [BUDGET_USD]      (reference-model keys in the environment; ~$45 for ~39k papers)
 """
 import json, sys, threading, time
 from concurrent.futures import ThreadPoolExecutor

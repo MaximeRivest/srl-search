@@ -3,7 +3,7 @@
 Budget: $20 for this benchmark run, checkpointed between chunks. Reserve an
 intentionally conservative UTF-8 byte token bound for each wave before sending;
 if the remaining budget is insufficient, stop instead of guessing labels.
-Kimi labels are a diagnostic reference, not reviewed ground truth.
+Labels of the reference model (srl_search.judges.Teacher): a diagnostic reference, not reviewed ground truth.
 """
 import json
 import os
@@ -21,7 +21,7 @@ def write(path,obj):
     tmp=path.with_suffix('.tmp');tmp.write_text(json.dumps(obj,allow_nan=False));tmp.replace(path)
 
 def run():
-    outdir=ROOT/'benchmark-kimi';outdir.mkdir(exist_ok=True)
+    outdir=ROOT/'benchmark-reference';outdir.mkdir(exist_ok=True)
     spent=sum(json.loads(p.read_text())['usd'] for p in outdir.glob('wave-*.json'))
     for path in sorted((ROOT/'benchmark').glob('*.json'))+sorted((ROOT/'benchmark-titles').glob('*.json')):
         data=json.loads(path.read_text());scope=data['scope'];pairs=data['pairs']
@@ -40,8 +40,8 @@ def run():
             spent+=teacher.usd
             write(dest,{'usd':teacher.usd,'source_sha256':__import__('hashlib').sha256(path.read_bytes()).hexdigest(),
                         'answers':[{'id':r['id'],'y':None if v!=v else float(v)} for r,v in zip(chunk,y)],
-                        'reference':'Kimi silver labels, not human-reviewed'})
-            print('BENCHMARK KIMI',key,'total $',round(spent,3),flush=True)
-    print('BENCHMARK KIMI DONE $',round(spent,3),flush=True)
+                        'reference':'reference-model silver labels, not human-reviewed'})
+            print('BENCHMARK REFERENCE',key,'total $',round(spent,3),flush=True)
+    print('BENCHMARK REFERENCE DONE $',round(spent,3),flush=True)
 
 if __name__=='__main__':run()

@@ -1,4 +1,4 @@
-"""Step 4: one judge for every topic. Qwen3.5 (0.8B or 2B) learns Kimi K3's answers on ~430 topics: LoRA on all
+"""Step 4: one judge for every topic. Qwen3.5 (0.8B or 2B) learns the reference model's answers on ~430 topics: LoRA on all
 linear layers plus a yes/no head started from the model's own "yes"/"no" rows (the per-topic decider's recipe,
 srl_search/judges.py, with the topic's question in each prompt instead of one fixed question). Saved merged, with the
 head in an untied output layer, so srl_search/vllm_decider.py scores with it (a row's own "system").
