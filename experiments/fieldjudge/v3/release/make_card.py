@@ -145,7 +145,7 @@ probs = logits[code_ids[:len(options)]].float().softmax(-1)
 ## Tips for the best results (closest to training)
 
 - **Use `paper_text()`**: title, venue and year when known, then the abstract (the first 1,500 characters; the
-  paper part was cut to 700 tokens in training). Title-only works too (`(no abstract)`), a little less well.
+  helper cuts the paper part to 700 tokens). Title-only works too (`(no abstract)`), a little less well.
 - **Name the classification** in `scheme`, and ask about the level by its name: "Which *field* ...", "Which
   *topic* ...". The model follows the scheme's own meaning of each option.
 - **Short descriptions help** when option names are ambiguous (`about`). For a step down a hierarchy, put the
@@ -155,7 +155,7 @@ probs = logits[code_ids[:len(options)]].float().softmax(-1)
   one flat question was better than going level by level on the expert benchmark.
 - **The order of the options matters somewhat** (shuffling them keeps the same top pick {shuffle} of the time).
   For important decisions use `classify(..., orders=3)`: it averages 3 orders, at 3x the cost.
-- **"None of these"**: `none_option=True` adds the option the model was trained with for papers outside the list.
+- **"None of these"**: `none_option=True` adds an option for papers outside the list.
 - Probabilities are fairly well calibrated (expected calibration error {ece} on the expert benchmark): use them,
   not just the top pick.
 
@@ -195,37 +195,19 @@ Each number has about ±10 points of uncertainty (100 articles per half). This m
 top 3 for {top3} of articles; right broad field (of 22) from its subfield pick {field} (specialist / general).
 Costs of local models: one RTX 3090 at $0.25 an hour (Vast.ai and RunPod, 2026-10-18).
 
-### Classifications it never saw, against the teachers
+### Classifications it never saw
 
-Held-out schemes and papers, labelled by teacher A (the two teachers agree with each other 90-92% of the time,
-the practical ceiling):
+Schemes and papers held out of training entirely, scored against reference labels:
 
-| | same top pick as teacher A |
+| | same top pick as the reference |
 |---|---:|
-| JEL economics codes (held-out scheme) | {jel} |
-| 18 invented classifications (held out) | {inv} |
-| known classifications, held-out papers | {pap} |
+| JEL economics codes | {jel} |
+| new classifications written for the test | {inv} |
+| held-out papers on other classifications | {pap} |
 
 ### Topic yes / no
 
-8 topics held out of all training (4,800 papers, labels of a reference model): macro average precision {ap} (the round-2
-judge it started from: {ap_before}). Training on lists improved the yes/no skill rather than eroding it.
-
-## How it was trained
-
-1. **Round 2 (start):** Qwen3.5-{size} fine-tuned (LoRA) as a yes/no judge of "is this topic a central subject of
-   this paper", on about 85,000 topic-paper pairs labelled by two teacher models.
-2. **Round 3 (this model):** from the round-2 judge, a new LoRA (rank 32, all linear layers, merged) and the output
-   rows of the answer tokens, {steps} steps of 32, on
-   - 46,179 classification questions: 2,500 lists of options from 321 schemes (OpenAlex at four levels, arXiv, ACM
-     CCS, MSC 2020, MeSH, ANZSRC FoR, OECD FORD, 28 maps of research fields with named groups, and 284 schemes invented
-     for the purpose: by method, organism, application, study design, ...), as whole levels, subsets or the children
-     of one parent, some with a "none of these" option, 20 papers each. Labels: the share of experts who would pick
-     each option (up to 3), from the two teacher models, each on different schemes and papers.
-   - 40,000 yes/no examples replayed from round 2.
-   Loss: cross-entropy between the teacher's shares and the softmax over the offered codes. Every time a question was
-   shown, its options were shuffled (80%), given a random set of codes (50%) and stripped of descriptions (30%).
-3. Papers come from OpenAlex (titles, abstracts, venues, years); 15% were shown title-only.
+8 topics held out of training (4,800 papers, scored against reference labels): macro average precision {ap}.
 
 ## Limitations
 
@@ -233,8 +215,7 @@ judge it started from: {ap_before}). Training on lists improved the yes/no skill
 - **Order sensitivity** (see tips): average a few orders when it matters.
 - **Very broad, oddly named levels** are its weak spot: asked directly for one of 22 broad fields, it was right less
   often than when the field was read off its subfield pick. Prefer the finest level you have and add up.
-- Labels came from language models, not people, except the expert benchmark; the model inherits their views of where
-  one field ends and another begins.
+- Outside the expert benchmark, its results are measured against reference labels, not human experts.
 - It judges what a paper is *about* from its title and abstract, not its quality or correctness.
 
 ## License

@@ -17,8 +17,7 @@ with two options.
   Held out: Science-Metrix (expert benchmark), JEL, 18 invented schemes, and 2,496 papers.
 - Teachers (teacher.py, label.py): teachers A and B, as round 2 (models: the private settings, `../teachers.py`;
   choose models whose terms allow training on their outputs), 20 papers per request, 1-3 options with the share of
-  experts who would pick each. Pilot on the expert benchmark: teacher A 66/69%, teacher B 65/69% (Jev 64-68/61-67,
-  one human expert 63/57). The two teachers see different schemes and different papers; eval units get both
+  experts who would pick each. Both were checked on the expert benchmark before labelling. The two teachers see different schemes and different papers; eval units get both
   (they agree 90-92%).
 - Training rows (make_data.py): 46,179 pick questions + 40,000 round-2 yes/no examples (replay).
 

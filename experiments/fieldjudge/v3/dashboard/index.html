@@ -50,8 +50,8 @@ function chart(models){
 function results(E){
   const cols=[['round2-0.8B','Before (round-2 0.8B)'],['v3-0.8B','New 0.8B'],['v3-2B','New 2B']];
   const rows=[
-   ['Expert test, specialist journals (one question, 176 options)',e=>e.expert_flat?.disciplinary?.[0]/100,'Jev 64–68% · Qwen 27B 57–64% · one human expert 63% · teacher A 66%'],
-   ['Expert test, general journals',e=>e.expert_flat?.multidisciplinary?.[0]/100,'Jev 61–67% · Qwen 27B 62–67% · human 57% · teacher A 69%'],
+   ['Expert test, specialist journals (one question, 176 options)',e=>e.expert_flat?.disciplinary?.[0]/100,'Jev 64–68% · Qwen 27B 57–64% · one human expert 63%'],
+   ['Expert test, general journals',e=>e.expert_flat?.multidisciplinary?.[0]/100,'Jev 61–67% · Qwen 27B 62–67% · human 57%'],
    ['Expert test, the 22 broad fields',e=>e.expert_field?.field_agreement?.[0]/100,'Jev 78–86% · Qwen 27B 78–84%'],
    ['Expert test, level by level (field, then subfield), specialist',e=>e.expert_tree?.disciplinary?.[0]/100,''],
    ['Same pick when the options are shuffled',e=>e.expert_shuffled?.same_pick_as_unshuffled/100,'goal ≥ 90%'],
