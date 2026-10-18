@@ -77,7 +77,7 @@ def snapshot():
             "teachers": teachers, "queue": {s: len(list((V3 / "queue" / s).glob("*.json"))) for s in ("train", "eval")},
             "schemes": len(list((V3 / "schemes").glob("*.json"))),
             "models": [model("0.8B"), model("2B")],
-            "services": {u: active(u) for u in ("fj3-train", "fj3-chain")},
+            "services": {u: active(u) for u in ("fj3-train", "fj3-2b-gpu0")},
             "gpu": gpu(), "evaluation": {k: v for k, v in evals.items() if v}}
 
 

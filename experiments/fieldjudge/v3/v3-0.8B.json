@@ -1,0 +1,107 @@
+{
+ "expert_flat": {
+  "disciplinary": [
+   64.0,
+   54.2,
+   72.7
+  ],
+  "multidisciplinary": [
+   53.0,
+   43.3,
+   62.5
+  ],
+  "top3": 87.0,
+  "ece_vs_experts": 0.0759,
+  "mean_confidence": 0.626
+ },
+ "expert_shuffled": {
+  "disciplinary": [
+   56.0,
+   46.2,
+   65.3
+  ],
+  "multidisciplinary": [
+   49.0,
+   39.4,
+   58.7
+  ],
+  "same_pick_as_unshuffled": 74.0
+ },
+ "expert_field": {
+  "field_agreement": [
+   41.0,
+   34.4,
+   47.9
+  ]
+ },
+ "expert_tree": {
+  "disciplinary": [
+   42.0,
+   32.8,
+   51.8
+  ],
+  "multidisciplinary": [
+   24.0,
+   16.7,
+   33.2
+  ]
+ },
+ "yesno_heldout_topics": {
+  "macro_average_precision": 0.7325,
+  "macro_auc": 0.9908,
+  "topics": 8
+ },
+ "unseen_invented": {
+  "sol": {
+   "agree_top": 78.4,
+   "log_loss": 0.698,
+   "ece": 0.0295,
+   "n": 800
+  },
+  "opus": {
+   "agree_top": 77.5,
+   "log_loss": 0.77,
+   "ece": 0.041,
+   "n": 760
+  },
+  "sol_vs_opus_agree_top": 89.9
+ },
+ "unseen_jel": {
+  "sol": {
+   "agree_top": 80.5,
+   "log_loss": 0.645,
+   "ece": 0.0396,
+   "n": 600
+  },
+  "opus": {
+   "agree_top": 81.3,
+   "log_loss": 0.848,
+   "ece": 0.0368,
+   "n": 600
+  },
+  "sol_vs_opus_agree_top": 91.8
+ },
+ "unseen_papers": {
+  "sol": {
+   "agree_top": 86.4,
+   "log_loss": 0.517,
+   "ece": 0.064,
+   "n": 1200
+  },
+  "opus": {
+   "agree_top": 86.7,
+   "log_loss": 0.633,
+   "ece": 0.0674,
+   "n": 1180
+  },
+  "sol_vs_opus_agree_top": 91.5
+ },
+ "speed": {
+  "questions": 11800,
+  "requests": 12540,
+  "prompt_tokens": 9724783,
+  "seconds": [
+   313.6231515407562
+  ]
+ }
+}

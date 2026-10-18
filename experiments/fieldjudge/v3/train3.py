@@ -22,7 +22,8 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parents[2])); sys.path.insert(0, str(HERE.parent / "v2"))
 import fmt                                                  # noqa: E402
-from train_incremental import wanted                        # noqa: E402  (live maps first)
+from train_incremental import wanted as _wanted             # noqa: E402  (live maps first)
+wanted = (lambda: False) if os.environ.get("FJ3_GPU") == "0" else _wanted   # live maps use GPU 1 only
 
 DATA = Path(os.environ.get("FJ3_DATA", "/mnt/fast/scholarsreadinglist/fieldjudge/v3/training"))
 MAXLEN, BATCH, LR, RANK = 3584, 32, 1e-4, 32
@@ -74,7 +75,7 @@ def run(a):
         opt.load_state_dict(saved["optimizer"]); torch.set_rng_state(saved["torch_rng"])
         del saved
     free = torch.cuda.mem_get_info()[0] / 2 ** 30
-    budget = int((9000 if "0.8B" in a.base else 5000) * max(0.5, min(1.5, (free - 2) / 8)))   # tokens per micro-batch
+    budget = int((9000 if "0.8B" in a.base else 5000) * max(0.5, min(float(os.environ.get("FJ3_SCALE_MAX", "1.5")), (free - 2) / 8)))   # tokens per micro-batch
 
     def checkpoint():
         tmp = cp.with_suffix(".tmp")
