@@ -1444,7 +1444,19 @@ def worker(store: Path = ROOT) -> None:
         return
     fs = FieldStore(store)
     ctx = None
+    from srl_search import judges as J
+    held = J.paused_by_map()                           # a worker that died holding GPU 0: give it back first
+    if held and not os.path.exists(f"/proc/{held.get('pid')}"):
+        J.give_back_rewriter(print)
+    import atexit
+    atexit.register(J.give_back_rewriter, print)       # the worker leaves: GPU 0 back to the rewriter
     while True:
+        if J.paused_by_map():                          # between maps: keep GPU 0 only for a full map up next,
+            pl = fs.plan()                             # and never while rewrites wait
+            nxt = pl["waiting"][0] if pl["waiting"] else None
+            waiting_rewrites = (J.rewriter_status() or {}).get("queued", 0)
+            if waiting_rewrites or not (nxt and nxt["st"].get("kind") == "full" and nxt["start"] - pl["now"] < 120):
+                J.give_back_rewriter(print)
         for k in fs.queued():                          # a queue file whose job is no longer waiting: stale
             if (_read(store / k / "job.json") or {}).get("status") not in ("queued", "running"):
                 (store / "queue" / f"{k}.job").unlink(missing_ok=True)

@@ -40,6 +40,61 @@ CARDS = [c.strip() for c in os.environ.get("SRL_FIELDS_GPUS", GPU + (",0" if GPU
 OWNER = {"0": os.environ.get("SRL_GPU0_OWNER", "model-vllm-smr-9b")}
 BORROW_STOP = Path(f"/run/user/{os.getuid()}/srl-gpu0-returning")
 BORROWED_UTIL = "0.25"
+# When no card fits (GPU 1 full of household services, GPU 0 held by the rewriter), a map pauses the rewriter itself:
+# after PAUSE_AFTER_S of waiting and once no rewrite is running, it stops the 9B and records that (PAUSED_BY_MAP). It
+# gives GPU 0 back (give_back_rewriter) when no full map waits next or when rewrites wait; a rewriter paused by
+# anyone else (training, tests) is never restarted here. Decided 2026-10-18. SRL_MAPS_PAUSE_REWRITER=0 turns it off.
+PAUSE_REWRITER = os.environ.get("SRL_MAPS_PAUSE_REWRITER", "1") != "0"
+PAUSE_AFTER_S = int(os.environ.get("SRL_MAPS_PAUSE_AFTER_S", "60"))
+PAUSED_BY_MAP = Path(f"/run/user/{os.getuid()}/srl-rewriter-paused-by-map")
+REWRITER_STATUS = os.environ.get("SRL_REWRITER_STATUS", "http://127.0.0.1:8795/api/status")
+GIVE_BACK = Path(__file__).resolve().parents[1] / "scripts" / "give_back_gpu0.sh"
+
+
+def rewriter_status() -> dict | None:
+    import urllib.request
+    try:
+        with urllib.request.urlopen(REWRITER_STATUS, timeout=5) as r:
+            return json.load(r)
+    except Exception:                                   # noqa: BLE001
+        return None
+
+
+def _active(unit: str, user: bool = False) -> bool:
+    return subprocess.run(["systemctl", *(["--user"] if user else []), "is-active", "--quiet", unit]).returncode == 0
+
+
+def pause_rewriter(say=lambda s: None) -> bool:
+    """Stop the rewriter's 9B on GPU 0 for a map, once no rewrite is running (queued ones wait). True when paused."""
+    owner = OWNER.get("0")
+    if not (PAUSE_REWRITER and owner and _active(owner)) or BORROW_STOP.exists():
+        return False
+    st = rewriter_status()
+    if st is None or st.get("running"):
+        say("waiting for a rewrite to finish before pausing the rewriter")
+        return False
+    PAUSED_BY_MAP.write_text(json.dumps({"pid": os.getpid(), "at": time.time()}))
+    subprocess.run(["systemctl", "--user", "stop", "smr-worker-home"])
+    subprocess.run(["sudo", "-n", "systemctl", "stop", owner])
+    say("paused the rewriter: this map judges on GPU 0")
+    time.sleep(10)
+    return True
+
+
+def paused_by_map() -> dict | None:
+    try:
+        return json.loads(PAUSED_BY_MAP.read_text())
+    except (OSError, ValueError):
+        return None
+
+
+def give_back_rewriter(say=lambda s: None) -> None:
+    """Restart the rewriter if a map paused it (and nobody else has taken GPU 0 over since)."""
+    if paused_by_map() is None:
+        return
+    PAUSED_BY_MAP.unlink(missing_ok=True)
+    say("giving GPU 0 back to the rewriter")
+    subprocess.run(["bash", str(GIVE_BACK)])
 RESERVED = Path("/run/gpu1-reserved")
 DECIDER_BASE = "Qwen/Qwen3.5-0.8B"
 STUDENT_BASE = "jhu-clsp/ettin-encoder-17m"
@@ -265,6 +320,8 @@ def wait_for_gpu(need_mb: int, say=lambda s: None, timeout_s: int = 7200) -> str
     global GPU
     t0 = time.time()
     while True:
+        if PAUSE_REWRITER and "0" in CARDS[1:] and time.time() - t0 >= PAUSE_AFTER_S and not _usable(CARDS[0], need_mb):
+            pause_rewriter(say)
         for card in CARDS:
             if _usable(card, need_mb):
                 if card != GPU:
