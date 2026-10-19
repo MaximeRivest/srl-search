@@ -199,7 +199,7 @@ class Engine:
         """Details for scored ids, best first: filters applied, identical records once, k at most.
         Hits are (W-number, score) or (W-number, ranking score, similarity, P(junk) or None); "score" stays
         what it always was (similarity, or the keyword score), "junk" is added when known."""
-        results, seen, seen_groups = [], set(), set()
+        results, seen, seen_groups, seen_ids = [], set(), set(), set()
         V = getattr(self, "versions", None)
         step = 200 if filters else max(k, 20)
         for start in range(0, len(hits), step):
@@ -230,6 +230,9 @@ class Engine:
                     d["junk"] = round(h[3], 3)
                 d["openalex"] = f"https://openalex.org/W{w}"
                 d["id"] = f"W{w}"
+                if w in seen_ids:                       # one work in two corpora (a rescued copy, now in the updates)
+                    continue
+                seen_ids.add(w)
                 if vinfo:
                     d.update(vinfo)
                 src_of = getattr(self, "abstract_source", None)     # a rescued abstract says where it is from

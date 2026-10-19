@@ -92,6 +92,9 @@ if RESCUE is not None and (RESCUE.parent / "sources.parquet").exists():
     _t = _pq.read_table(RESCUE.parent / "sources.parquet", columns=["id", "abstract_source"])
     RESCUE_IDS = _t["id"].to_numpy().astype(np.uint64)
     RESCUE_SRC = np.array([1 if x.startswith("pubmed") else 2 for x in _t["abstract_source"].to_pylist()], np.uint8)
+    if UPDATES is not None and (UPDATES / "map-meta" / "id.npy").exists():   # OpenAlex has the abstract now: not rescued
+        _mine = ~np.isin(RESCUE_IDS, np.load(UPDATES / "map-meta" / "id.npy").astype(np.uint64))
+        RESCUE_IDS, RESCUE_SRC = RESCUE_IDS[_mine], RESCUE_SRC[_mine]
     del _t
 
 
