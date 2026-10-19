@@ -49,6 +49,7 @@ PAUSE_AFTER_S = int(os.environ.get("SRL_MAPS_PAUSE_AFTER_S", "60"))
 PAUSED_BY_MAP = Path(f"/run/user/{os.getuid()}/srl-rewriter-paused-by-map")
 REWRITER_STATUS = os.environ.get("SRL_REWRITER_STATUS", "http://127.0.0.1:8795/api/status")
 GIVE_BACK = Path(__file__).resolve().parents[1] / "scripts" / "give_back_gpu0.sh"
+SUDO = "/run/wrappers/bin/sudo" if os.path.exists("/run/wrappers/bin/sudo") else "sudo"   # NixOS: the setuid one
 
 
 def rewriter_status() -> dict | None:
@@ -75,7 +76,12 @@ def pause_rewriter(say=lambda s: None) -> bool:
         return False
     PAUSED_BY_MAP.write_text(json.dumps({"pid": os.getpid(), "at": time.time()}))
     subprocess.run(["systemctl", "--user", "stop", "smr-worker-home"])
-    subprocess.run(["sudo", "-n", "systemctl", "stop", owner])
+    r = subprocess.run([SUDO, "-n", "systemctl", "stop", owner], capture_output=True, text=True)
+    if r.returncode != 0:                       # could not stop it: restart the home worker, say why, keep waiting
+        PAUSED_BY_MAP.unlink(missing_ok=True)
+        subprocess.run(["systemctl", "--user", "start", "smr-worker-home"])
+        say(f"could not pause the rewriter ({(r.stderr or r.stdout).strip()[:120]})")
+        return False
     say("paused the rewriter: this map judges on GPU 0")
     time.sleep(10)
     return True
