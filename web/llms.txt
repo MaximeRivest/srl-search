@@ -80,8 +80,11 @@ The main entry. Returns `{"mode", "results": [...], "filters", "timing", ...}`.
 - `map=true` adds each result's position on the map of science (`x`, `y`, both 0–1) and where the
   question lands (`map`).
 
-Identical records appear once; a preprint and its published version are different records and can both
-appear (merge by `doi` or title if that matters). Left out unless you ask with `type=`: datasets, figures, covers and other non-publications. Always left out:
+Identical records appear once, and so do a paper's versions: a preprint and its journal article, a repository or
+mirror copy are one result, shown as the version you can read on ScienceMadeReadable if there is one, else the
+version of record, with `versions` (the other records: id, type, year, doi, venue, canonical) and `versions_count`.
+Versions are grouped by an exact folded title, years at most 2 apart and a shared author surname (read by hand: 144
+of 145 groups right). Left out unless you ask with `type=`: datasets, figures, covers and other non-publications. Always left out:
 retracted papers (OpenAlex flag, or titles starting "[RETRACTED]" / "Retraction Note:").
 
 ### GET /similar/{ref}
@@ -213,11 +216,18 @@ whole's, `read=3.2`: a subgroup's) list further. `format=text` on any of these g
 a model to read. Big universities' pages are computed once per snapshot and kept, so they open at once.
 One person is often split across several author records (historical figures most of all: reprints, letters,
 collected works): `/authors/{id}/namesakes` lists the other records with exactly the same name, each with its
-most cited paper, and `/authors/{id}?with=A2,A3` shows several as one page (your judgement: nothing is merged).
+most cited paper, and `/authors/{id}?with=A2,A3` shows several as one page (your judgement). Records that carry the
+same ORCID are already one page (`person.identity` lists them; `records=one` gives OpenAlex's single record), and
+papers whose publisher printed a person's ORCID are on that person's page even when OpenAlex filed them elsewhere or
+under no record: for people whose papers carry their ORCID, a page holds about 98 % of their papers instead of 83 %
+(measured on 1.06M held-out ORCIDs). People without ORCIDs are still OpenAlex's records. Organisations and
+placeholders filed as authors ("Anonymous", ":unav", universities) are left out of name search; their pages say
+`not_a_person`.
 Name search puts the best cited first, and for a one-word name, people with it as their surname. On author
 pages, editions of one work (the same title, reprints, chapters in collected works) are listed once. `/works/{ref}/authors` gives a paper's authors with their ids.
-Authors are OpenAlex's author records: one person can be split across several, and about a quarter of
-author names on recent papers are tied to no record (so missing from every profile). `/institutions?q=mcgill`
+Authors are OpenAlex's author records, corrected by ORCID as above: one person without an ORCID can still be split
+across several, and about a sixth of author names on papers are tied to no record (4 % of those are placed by
+their ORCID; the rest are missing from every profile). `/institutions?q=mcgill`
 and `/institutions/I5023651 are the same for organisations (universities, hospitals, companies, agencies: OpenAlex's
 I-records, matched from affiliation strings), with lists `cited`, `newest`, `people` (its authors on the most of
 those papers) and `partners` (the other organisations on its papers), and in `person`: works, authors, citations,
@@ -275,6 +285,8 @@ as a resource.
 | `id` | OpenAlex W-number, e.g. `W2782456798`; `openalex` is its URL. Use it to cite and to call /works, /similar, /walk |
 | `doi`, `pmcid` | identifiers when known (DOI without `https://doi.org/`) |
 | `title`, `abstract` | as OpenAlex has them; abstracts can contain HTML/JATS tags |
+| `abstract_source` | only when OpenAlex has no abstract and we found one: `pubmed` (PubMed's record of the paper, its title checked) or `version` (another version of the same paper) |
+| `versions`, `versions_count` | the paper's other records (preprint, journal article, copies), see above; /works also gives `version_of_record` |
 | `date`, `year` | publication date |
 | `type` | article, review, preprint, book-chapter, ... |
 | `authors`, `authors_count` | first 12 names joined with `" | "`, and the full count |
