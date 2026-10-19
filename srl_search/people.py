@@ -138,6 +138,7 @@ class People:
         self.names = NameIndex(names_index) if names_index and (names_index / "meta.json").exists() else None
         self.inst_names = NameIndex(inst_index) if inst_index and (inst_index / "meta.json").exists() else None
         self.recent: OrderedDict[tuple[str, int], dict] = OrderedDict()   # (kind, row) -> raw profile
+        self.identity = None      # srl_search/identity.py: ORCID-based corrections of author records (set by the app)
         self.lock = threading.Lock()
 
     # ------------------------------------------------------------------ lookup
@@ -166,6 +167,14 @@ class People:
         if nd < 0:
             return []
         rows, pos, n = self.au.of(nd)
+        if self.identity is not None:                       # moves on this paper: the ORCID's person at that position
+            fix = dict(self.identity.on_paper(nd))
+            if fix:
+                at = {int(p): int(r) for r, p in zip(rows.tolist(), pos.tolist())}
+                at.update(fix)
+                pos = np.array(sorted(at), np.int64)
+                rows = np.array([at[p] for p in pos.tolist()], np.int64)
+            rows = np.array([self.identity.person_row(int(r)) for r in rows.tolist()], np.int64)
         order = np.argsort(pos, kind="stable")
         out = []
         for r, p in zip(rows[order].tolist(), pos[order].tolist()):
@@ -252,7 +261,14 @@ class People:
         parts = [au.papers(r) for r in rows]
         nodes = np.concatenate([x[0] for x in parts]).astype(np.int64)
         pos = np.concatenate([x[1] for x in parts]).astype(np.int64)
-        if len(rows) > 1:                                   # records seen together: each paper once, oldest first
+        moved = None
+        if self.identity is not None:                       # authorships the ORCID evidence gives to someone else, or here
+            out_n = self.identity.moved_out(rows)
+            in_n, in_p = self.identity.moved_in(rows)
+            gone = np.isin(nodes, out_n) & ~np.isin(nodes, in_n)
+            moved = {"in": int(len(in_n)), "out": int(gone.sum())}
+            nodes, pos = np.concatenate([nodes[~gone], in_n]), np.concatenate([pos[~gone], in_p])
+        if len(rows) > 1 or (moved and moved["in"]):        # records seen together: each paper once, oldest first
             order = np.lexsort((pos, nodes))
             nodes, pos = nodes[order], pos[order]
             first = np.r_[True, nodes[1:] != nodes[:-1]] if len(nodes) else np.zeros(0, bool)
@@ -279,6 +295,16 @@ class People:
         if len(rows) > 1:
             person["records"] = [{"id": au.openalex_id(r), "name": au.name(r), "works": int(au.works[r]),
                                   "citations": int(au.cites[r])} for r in rows]
+        if self.identity is not None:
+            same = self.identity.records(main)
+            if len(same) > 1 or (moved and (moved["in"] or moved["out"])):
+                person["identity"] = {"orcid": self.identity.orcid(self.identity.person_row(main)),
+                                      "records_with_this_orcid": [au.openalex_id(r) for r in same] if len(same) > 1 else [],
+                                      "papers_added_by_orcid": moved["in"] if moved else 0,
+                                      "papers_removed_by_orcid": moved["out"] if moved else 0}
+            why = self.identity.not_person(main)
+            if why:
+                person["not_a_person"] = why
         if self.inst is not None:
             where: dict[int, list] = {}
             for r in rows:
@@ -857,6 +883,9 @@ class People:
         # the best known first (citations), and for a one-word name, people with it as their surname first
         surname = list(qtok)[0] if len(qtok) == 1 else None
         last = lambda r: (WORD.findall(fold(self.au.name(r))) or [""])[-1]   # noqa: E731
+        if self.identity is not None:                       # one line per person; organisations and placeholders out
+            idt = self.identity
+            hits = list(dict.fromkeys(idt.person_row(int(r)) for r in hits if not idt.not_person(int(r))))
         hits = sorted(hits, key=lambda r: (surname is not None and last(r) != surname, -int(self.au.cites[r])))[:k]
         out = []
         for row in hits:

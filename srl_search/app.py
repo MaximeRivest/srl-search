@@ -81,6 +81,28 @@ WORKS = CORPUS / "works.sqlite"
 UPDATES = P.get("updates")
 UPDATES = UPDATES if UPDATES and (UPDATES / "DONE.json").exists() else None
 UPDATES_INFO = json.loads((UPDATES / "manifest.json").read_text()) if UPDATES else None
+# Abstracts rescued from PubMed or from another version of the paper (data repository: pipeline/rescue): a third small
+# corpus, read like the updates one. RESCUE_SOURCE says where each rescued abstract came from.
+RESCUE = P.get("rescue") or (Path(os.environ["SRL_RESCUE"]) if os.environ.get("SRL_RESCUE") else None)
+RESCUE = RESCUE if RESCUE and (RESCUE / "DONE.json").exists() else None
+MORE = [c for c in (UPDATES, RESCUE) if c is not None]
+RESCUE_IDS = RESCUE_SRC = None
+if RESCUE is not None and (RESCUE.parent / "sources.parquet").exists():
+    import pyarrow.parquet as _pq
+    _t = _pq.read_table(RESCUE.parent / "sources.parquet", columns=["id", "abstract_source"])
+    RESCUE_IDS = _t["id"].to_numpy().astype(np.uint64)
+    RESCUE_SRC = np.array([1 if x.startswith("pubmed") else 2 for x in _t["abstract_source"].to_pylist()], np.uint8)
+    del _t
+
+
+def abstract_source(w: int) -> str | None:
+    """'pubmed' or 'version' for a rescued abstract (the paper had none in OpenAlex), else None."""
+    if RESCUE_IDS is None:
+        return None
+    i = int(np.searchsorted(RESCUE_IDS, np.uint64(w)))
+    return {1: "pubmed", 2: "version"}[int(RESCUE_SRC[i])] if i < len(RESCUE_IDS) and int(RESCUE_IDS[i]) == w else None
+
+
 META = WORKS if WORKS.exists() else Path(os.environ.get("SRL_META", ROOT / "meta-2024plus.sqlite"))
 NPROBE = int(os.environ.get("SRL_NPROBE", "128"))  # eval 2026-10-06: recall@10 0.89, ~37 ms search
 DEPTH = int(os.environ.get("SRL_DEPTH", "300"))
@@ -126,13 +148,20 @@ D_DEPTH = "Candidates re-scored exactly before filtering (search by meaning). Ra
 D_JUNK = ("Search by meaning ranks by similarity - junk_penalty x junk (how likely a record is spam or not "
           "scholarship). Default 0.3 for all, 0 for smr; 0 = pure similarity.")
 
-QUALITY = Quality(QUALITY_DIR, more=[UPDATES / "quality"] if UPDATES else []) \
+# Paper versions (data repository: pipeline/identity/build_versions.py): a paper's records listed once.
+VERSIONS_DIR = P.get("versions") or (Path(os.environ["SRL_VERSIONS"]) if os.environ.get("SRL_VERSIONS") else None)
+QUALITY = Quality(QUALITY_DIR, more=[c / "quality" for c in MORE]) \
     if (QUALITY_DIR / "model.npz").exists() else None
 # smr holds PMC research articles under CC BY only; on the 60 evaluation questions it had no junk in the top 10
 # and the penalty changed nothing measurable (useful nDCG -0.007, 95% interval -0.017 … +0.004), so it is off.
 DEFAULT_JUNK_PENALTY = {"all": JUNK_PENALTY, "smr": 0.0}
 engine = Engine(INDEX, META, threads=int(os.environ.get("SRL_THREADS", "4")), quality=QUALITY,
-                more_meta=[UPDATES / "works.sqlite"] if UPDATES else [])
+                more_meta=[c / "works.sqlite" for c in MORE])
+if RESCUE_IDS is not None:
+    engine.abstract_source = abstract_source
+if VERSIONS_DIR and (VERSIONS_DIR / "versions.sqlite").exists():
+    from srl_search.versions import Versions
+    engine.versions = Versions(VERSIONS_DIR)
 SEMANTIC = {"all": engine}
 SMR = str(P["smr"]) if "smr" in P else os.environ.get("SRL_SMR")
 if SMR:
@@ -140,7 +169,9 @@ if SMR:
     SEMANTIC["smr"] = ExactEngine(Path(SMR), threads=4, encoder=engine.encoder,
                                   nprobe=int(os.environ.get("SRL_SMR_NPROBE", "512")),
                                   meta_path=WORKS if WORKS.exists() else None, quality=QUALITY)
-KEYWORDS = KeywordIndex([CORPUS / "keywords"] + ([UPDATES / "keywords"] if UPDATES else [])) \
+    if getattr(engine, "versions", None) is not None:
+        SEMANTIC["smr"].versions = engine.versions
+KEYWORDS = KeywordIndex([CORPUS / "keywords"] + [c / "keywords" for c in MORE]) \
     if (CORPUS / "keywords" / "DONE.json").exists() else None
 KEYWORD_COLLECTIONS = {"all", "smr"}
 ATLAS_BUILD = P.get("atlas") or Path(os.environ.get("SRL_ATLAS", "/mnt/fast/science-atlas/build/20261008T131030-tsne"))
@@ -546,6 +577,15 @@ def work(ref: str):
         raise HTTPException(404, f"{ref} is not in the corpus")
     d["id"] = f"W{w}"
     d["openalex"] = f"https://openalex.org/W{w}"
+    src = abstract_source(int(w))
+    if src:
+        d["abstract_source"] = src
+    V = getattr(engine, "versions", None)
+    g = V.group(int(w)) if V is not None else None
+    if g is not None:     # the paper's other records (preprint, journal article, copies), version of record first
+        members = V.members(g)
+        d.update(V.listed(members, int(w)))
+        d["version_of_record"] = next((m["id"] for m in members if m["canonical"]), None)
     return d
 
 
@@ -820,6 +860,13 @@ PEOPLE = People(sys.modules[__name__], CITATIONS, NAMES_INDEX / CITATIONS.genera
     if CITATIONS is not None and CITATIONS.authors is not None and getattr(CITATIONS.authors, "by", False) else None
 
 
+# ORCID-based corrections of author records (data repository: pipeline/identity/authors.py)
+IDENTITY_DIR = P.get("identity") or (Path(os.environ["SRL_IDENTITY"]) if os.environ.get("SRL_IDENTITY") else None)
+if PEOPLE is not None and IDENTITY_DIR and (IDENTITY_DIR / "meta.json").exists():
+    from srl_search.identity import Identity
+    PEOPLE.identity = Identity(IDENTITY_DIR, CITATIONS)
+
+
 def author_ref(svc: People, row) -> str:
     """The address of an author page: one record, or several seen together (A1?with=A2,A3)."""
     first, _, rest = svc.ident("author", row).partition(",")
@@ -856,6 +903,9 @@ def author(ref: str,
                                     description="With read: which list."),
            offset: int = Query(8, ge=0, le=5000), limit: int = Query(25, ge=1, le=50),
            format: str = Query("json", pattern="^(json|text)$", description=D_FORMAT),
+           records: str = Query("person", pattern="^(person|one)$", description=(
+               "person (default): every OpenAlex record carrying this person's ORCID, as one page; one: this record "
+               "only, as OpenAlex has it.")),
            with_: str | None = Query(None, alias="with", max_length=400, description=(
                "Other records of the same person, seen together on one page (comma-separated A-numbers, up to 19): "
                "OpenAlex often splits one person, historical figures most of all; /authors/{id}/namesakes lists the "
@@ -878,6 +928,9 @@ def author(ref: str,
         row = tuple(dict.fromkeys([row, *others]))
         if len(row) == 1:
             row = row[0]
+    elif records == "person" and svc.identity is not None:      # the person's records by ORCID, theirs first
+        same = svc.identity.records(row)[:20]
+        row = same if len(same) > 1 else same[0]
     if lens is not None:
         out = svc.more("author", row, read or "", lens, offset, limit)
         return PlainTextResponse(more_text(out, lens, PUBLIC_BASE, author_ref(svc, row), read or "", offset)) \

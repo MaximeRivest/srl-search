@@ -199,16 +199,26 @@ class Engine:
         """Details for scored ids, best first: filters applied, identical records once, k at most.
         Hits are (W-number, score) or (W-number, ranking score, similarity, P(junk) or None); "score" stays
         what it always was (similarity, or the keyword score), "junk" is added when known."""
-        results, seen = [], set()
+        results, seen, seen_groups = [], set(), set()
+        V = getattr(self, "versions", None)
         step = 200 if filters else max(k, 20)
         for start in range(0, len(hits), step):
             page = hits[start:start + step]
             det = self.details([h[0] for h in page])
-            for h in page:
+            groups = V.groups([h[0] for h in page]) if V is not None else [None] * len(page)
+            for h, g in zip(page, groups):
                 w, s = h[0], (h[2] if len(h) > 2 else h[1])
                 d = det.get(w)
                 if d is None or not passes(d, filters):
                     continue
+                vinfo = None
+                if g is not None:                       # one of a paper's versions: list the paper once
+                    if g in seen_groups:
+                        continue
+                    seen_groups.add(g)
+                    members = V.members(g)
+                    w, d = self._best_version(members, w, d, filters)
+                    vinfo = V.listed(members, w)
                 key = ((d["title"] or "").strip().lower(), (d["abstract"] or "")[:300])
                 if key in seen:
                     continue
@@ -220,10 +230,27 @@ class Engine:
                     d["junk"] = round(h[3], 3)
                 d["openalex"] = f"https://openalex.org/W{w}"
                 d["id"] = f"W{w}"
+                if vinfo:
+                    d.update(vinfo)
+                src_of = getattr(self, "abstract_source", None)     # a rescued abstract says where it is from
+                if src_of is not None and (src := src_of(w)):
+                    d["abstract_source"] = src
                 results.append(d)
                 if len(results) == k:
                     return results
         return results
+
+    def _best_version(self, members: list[dict], w: int, d: dict, filters: dict) -> tuple[int, dict]:
+        """The version a result shows: readable on the site first, then the version of record (canonical, then the
+        group's order), among those this corpus holds and the filters allow; else the hit itself."""
+        ids = [int(m["id"][1:]) for m in members]
+        det = self.details([i for i in ids if i != w])
+        det[w] = d
+        held = [(i, det[i]) for i in ids if i in det and passes(det[i], filters)]
+        if not held:
+            return w, d
+        best = min(held, key=lambda x: (not x[1].get("smr"), ids.index(x[0])))
+        return best
 
     def _finish(self, q, k, nprobe, depth, filters, abstracts, timing, t0, exclude=None,
                 junk_penalty: float = JUNK_PENALTY) -> dict:
