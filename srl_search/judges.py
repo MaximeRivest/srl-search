@@ -32,6 +32,14 @@ from pathlib import Path
 import numpy as np
 
 GPU = os.environ.get("SRL_FIELDS_GPU", "1")
+# Cards a map may use, in order of preference. GPU 1 is the maps' card, but the household services there can grow
+# until a map's judge no longer fits (2026-10-18: 19 of 24 GB, a map waited with nothing left to free). Then a map
+# borrows another card, only while that card's owner is off (GPU 0: the rewriter's 9B, paused e.g. for training) and
+# not being given back (BORROW_STOP, set by whoever restarts the owner), and with a smaller vLLM share there.
+CARDS = [c.strip() for c in os.environ.get("SRL_FIELDS_GPUS", GPU + (",0" if GPU == "1" else "")).split(",") if c.strip()]
+OWNER = {"0": os.environ.get("SRL_GPU0_OWNER", "model-vllm-smr-9b")}
+BORROW_STOP = Path(f"/run/user/{os.getuid()}/srl-gpu0-returning")
+BORROWED_UTIL = "0.25"
 RESERVED = Path("/run/gpu1-reserved")
 DECIDER_BASE = "Qwen/Qwen3.5-0.8B"
 STUDENT_BASE = "jhu-clsp/ettin-encoder-17m"
@@ -228,35 +236,57 @@ class Jev:
 
 
 # ------------------------------------------------------------------------------------------------ the GPU
-def gpu_free_mb() -> int:
+def gpu_free_mb(card: str | None = None) -> int:
+    card = card or GPU
     q = subprocess.run(["nvidia-smi", "--query-gpu=index,memory.free", "--format=csv,noheader,nounits"],
                        capture_output=True, text=True, timeout=30).stdout
     for line in q.splitlines():
         i, free = [x.strip() for x in line.split(",")]
-        if i == GPU:
+        if i == card:
             return int(free)
     return 0
 
 
-def wait_for_gpu(need_mb: int, say=lambda s: None, timeout_s: int = 7200) -> None:
-    """Wait (saying why) until the card has `need_mb` free and is not reserved; never stops anything on it."""
+def _usable(card: str, need_mb: int) -> bool:
+    if card == "1" and RESERVED.exists():
+        return False
+    if card != CARDS[0]:                          # a borrowed card: its owner must be off and not coming back
+        if BORROW_STOP.exists():
+            return False
+        owner = OWNER.get(card)
+        if owner and subprocess.run(["systemctl", "is-active", "--quiet", owner]).returncode == 0:
+            return False
+    return gpu_free_mb(card) >= need_mb
+
+
+def wait_for_gpu(need_mb: int, say=lambda s: None, timeout_s: int = 7200) -> str:
+    """Wait (saying why) until a card of CARDS has `need_mb` free and may be used; never stops anything on it.
+    Sets GPU (used by gpu_env and the scoring scripts) to that card and returns it."""
+    global GPU
     t0 = time.time()
     while True:
-        reserved = RESERVED.exists() and GPU == "1"
-        free = gpu_free_mb()
-        if not reserved and free >= need_mb:
-            return
+        for card in CARDS:
+            if _usable(card, need_mb):
+                if card != GPU:
+                    say(f"using GPU {card}")
+                GPU = card
+                return card
         if time.time() - t0 > timeout_s:
-            raise RuntimeError(f"GPU {GPU} busy for {timeout_s // 60} min")
+            raise RuntimeError(f"GPU {CARDS[0]} busy for {timeout_s // 60} min")
+        reserved = RESERVED.exists() and CARDS[0] == "1"
+        free = gpu_free_mb(CARDS[0])
         say("waiting for the GPU (reserved for training)" if reserved else
             f"waiting for {need_mb // 1024} GB free on the GPU ({free // 1024} GB now)")
         time.sleep(30)
 
 
 def gpu_env() -> dict:
-    return {**os.environ, "CUDA_DEVICE_ORDER": "PCI_BUS_ID", "CUDA_VISIBLE_DEVICES": GPU,
-            "TOKENIZERS_PARALLELISM": "false", "PYTORCH_CUDA_ALLOC_CONF": "expandable_segments:True",
-            "TRITON_LIBCUDA_PATH": "/run/opengl-driver/lib"}
+    env = {**os.environ, "CUDA_DEVICE_ORDER": "PCI_BUS_ID", "CUDA_VISIBLE_DEVICES": GPU,
+           "TOKENIZERS_PARALLELISM": "false", "PYTORCH_CUDA_ALLOC_CONF": "expandable_segments:True",
+           "TRITON_LIBCUDA_PATH": "/run/opengl-driver/lib"}
+    if GPU != CARDS[0]:                            # borrowed: leave room for whatever else runs there
+        env.setdefault("SRL_VLLM_UTIL", BORROWED_UTIL)
+    return env
 
 
 def run(args: list[str], log: Path, env: dict | None = None) -> None:
@@ -280,16 +310,16 @@ def decider_scores(model_dir: Path, texts: list[str], say) -> np.ndarray:
     f = model_dir / "score.jsonl"
     f.write_text("".join(json.dumps({"text": t}) + "\n" for t in texts))
     vpy = os.environ.get("SRL_VLLM_PYTHON") or "python"
-    args = [vpy, str(Path(__file__).with_name("vllm_decider.py")), str(model_dir / "merged"), str(f),
-            str(model_dir / "scores.json"), GPU]
+    args = lambda: [vpy, str(Path(__file__).with_name("vllm_decider.py")), str(model_dir / "merged"), str(f),
+                    str(model_dir / "scores.json"), GPU]
     wait_for_gpu(10000, say)
     try:
-        run(args, model_dir / "log.txt")
+        run(args(), model_dir / "log.txt")
     except RuntimeError:                        # a household service grew under it: once more, smaller
         say("the GPU filled up; trying again with less memory")
         time.sleep(20)
         wait_for_gpu(8000, say)
-        run(args, model_dir / "log.txt", {"SRL_VLLM_UTIL": "0.3"})
+        run(args(), model_dir / "log.txt", {"SRL_VLLM_UTIL": "0.3"})
     return np.array(json.loads((model_dir / "scores.json").read_text()))
 
 
@@ -306,17 +336,17 @@ LOCAL = os.environ.get("SRL_FIELD_JUDGE", "local") != "paid" and (JUDGE_MODEL / 
 
 def _vllm(model: Path, rows_file: Path, out: Path, log: Path, say) -> np.ndarray:
     vpy = os.environ.get("SRL_VLLM_PYTHON") or "python"
-    args = [vpy, str(Path(__file__).with_name("vllm_decider.py")), str(model), str(rows_file), str(out), GPU]
+    args = lambda: [vpy, str(Path(__file__).with_name("vllm_decider.py")), str(model), str(rows_file), str(out), GPU]
     # 9 GB: the household services on GPU 1 hold ~14.4 of 24 GB since 2026-10-16, leaving 9.5-10.3; vLLM then takes
     # ~20% of the card (measured: 3,000 papers in 74 s with start-up). 10 GB made maps wait for hours
     wait_for_gpu(9000, say)
     try:
-        run(args, log)
+        run(args(), log)
     except RuntimeError:                        # a household service grew under it: once more, smaller
         say("the GPU filled up; trying again with less memory")
         time.sleep(20)
         wait_for_gpu(8000, say)
-        run(args, log, {"SRL_VLLM_UTIL": "0.3"})
+        run(args(), log, {"SRL_VLLM_UTIL": "0.3"})
     return np.array(json.loads(out.read_text()))
 
 
