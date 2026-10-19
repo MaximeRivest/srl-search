@@ -209,7 +209,11 @@ class People:
         # a source's page reads a sample of its abstracts and counts words in all of science: kept from 300 papers
         if root is None or self.size_of(kind, row) < (300 if kind == "source" else CACHE_FROM):
             return None
-        return root / kind / f"{self.ident(kind, row).replace(',', '+')}.json.gz"
+        name = self.ident(kind, row).replace(',', '+')
+        if len(name) > 120:          # a person of many records: the joined ids exceed a file name's 255 bytes
+            import hashlib
+            name = f"{name.split('+')[0]}+{len(name.split('+')) - 1}-{hashlib.sha1(name.encode()).hexdigest()[:16]}"
+        return root / kind / f"{name}.json.gz"
 
     @staticmethod
     def _read(path: Path | None) -> dict | None:

@@ -46,3 +46,12 @@ def test_canonical_not_held(tmp_path):
     e = fake_engine(make_versions(tmp_path), {11: 0, 12: 0})
     out = e.shape([(12, 0.9)], k=10, filters={}, abstracts=True)
     assert out[0]["id"] == "W11"
+
+
+def test_long_cache_names(tmp_path):
+    from srl_search.people import People
+    p = People.__new__(People)
+    p.size_of = lambda kind, row: 10 ** 6
+    p.ident = lambda kind, row: ",".join(f"A{5100000000 + i}" for i in range(20))
+    path = p._cached(tmp_path, "author", (1,))
+    assert len(path.name) < 100 and path.name.startswith("A5100000000+19-")
