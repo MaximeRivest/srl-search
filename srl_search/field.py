@@ -1429,6 +1429,34 @@ def run_job(ctx: Ctx, store: Path, key: str) -> None:
     _write(job.dir / "job.json", job.st)
 
 
+def recover_orphans(store: Path, fs: "FieldStore") -> list[str]:
+    """Jobs left "running" by a worker that died (a crash, a restart of the machine). Call it holding the worker
+    lock: then nobody runs them. Each goes back in line, as a map-only job when its field was already selected
+    (field.json), so the expensive part is not redone; a job orphaned a third time fails (it can be asked again)
+    rather than loop. Without this a dead worker's job stayed "running" forever, its queue file kept the path unit
+    starting a worker that found nothing to do, and systemd gave up (2026-10-21 → 11-01)."""
+    out = []
+    for k in fs.queued():
+        st = _read(store / k / "job.json") or {}
+        if st.get("status") != "running":
+            continue
+        n = int(st.get("orphaned", 0)) + 1
+        if n > 2:
+            st.update({"status": "failed", "final": False, "orphaned": n, "finished": _now(),
+                       "error": "the job stopped three times while running; it can be asked again"})
+            (store / "queue" / f"{k}.job").unlink(missing_ok=True)
+        else:
+            if (store / k / "field.json").exists():
+                st["kind"] = "map"
+            st.update({"status": "queued", "stage": None, "stage_index": 0, "orphaned": n,
+                       "eta_s": job_seconds(st.get("kind"), st.get("big")),
+                       "detail": "resumed: the machine stopped while this map was being made"})
+        _write(store / k / "job.json", st)
+        print(f"job {k}: left running by a worker that stopped; {st['status']} ({st.get('kind')})", flush=True)
+        out.append(k)
+    return out
+
+
 def worker(store: Path = ROOT) -> None:
     """Run waiting maps one at a time in the plan's order (FieldStore.plan: paid first, then the free line while
     today's free budget lasts) until none is waiting. When only free maps wait and today's budget is spent, it
@@ -1443,6 +1471,7 @@ def worker(store: Path = ROOT) -> None:
         print("another worker is running", flush=True)
         return
     fs = FieldStore(store)
+    recover_orphans(store, fs)
     ctx = None
     from srl_search import judges as J
     held = J.paused_by_map()                           # a worker that died holding GPU 0: give it back first
